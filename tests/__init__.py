@@ -58,3 +58,11 @@ def _install_guard():
 
 
 _install_guard()
+
+import sys as _sys
+_scripts_dir = str((_SYSTEM_DIR / "scripts").resolve())
+if _scripts_dir not in _sys.path:
+    _sys.path.insert(0, _scripts_dir)
+_tests_dir = str((_SYSTEM_DIR / "tests").resolve())
+if _tests_dir not in _sys.path:
+    _sys.path.insert(0, _tests_dir)
