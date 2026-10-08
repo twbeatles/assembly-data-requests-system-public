@@ -1,0 +1,4 @@
+{
+  "typeCheckingMode": "standard",
+  "extraPaths": ["scripts", "tests"]
+}

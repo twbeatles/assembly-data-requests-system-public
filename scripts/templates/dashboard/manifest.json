@@ -1,0 +1,23 @@
+{
+  "css": [
+    "styles.css"
+  ],
+  "js": [
+    "js/00_boot.js",
+    "js/01_search.js",
+    "js/02_state.js",
+    "js/03_ui.js",
+    "js/04_search_tokens.js",
+    "js/05_sanitize.js",
+    "js/06_ledger_due.js",
+    "js/07_excel_status.js",
+    "js/08_prefs.js",
+    "js/09_filter.js",
+    "js/10_ledger_crud.js",
+    "js/11_render.js",
+    "js/12_modal.js",
+    "js/13_events.js",
+    "js/14_quarantine.js",
+    "js/15_ux.js"
+  ]
+}
