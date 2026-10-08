@@ -453,7 +453,7 @@ class TestRemoteImageBlocked(unittest.TestCase):
             '<img src="http://evil.example/x.png">',
             '<img src="image_001.png" alt="image">',
             '<img src="data:image/png;base64,iVBORw0KGgo=" alt="inline">',
-            '<a href="https://www.kocsc.or.kr/">링크</a>',
+            '<a href="https://www.example.go.kr/">링크</a>',
         ])
         self.assertNotIn("https://evil.example", out['<img src="https://evil.example/x.png" alt="x">'])
         self.assertNotIn("http://evil.example", out['<img src="http://evil.example/x.png">'])
@@ -463,5 +463,5 @@ class TestRemoteImageBlocked(unittest.TestCase):
         self.assertEqual(out['<img src="image_001.png" alt="image">'],
                          '<img src="image_001.png" alt="image">')
         self.assertIn("data:image/png", out['<img src="data:image/png;base64,iVBORw0KGgo=" alt="inline">'])
-        self.assertIn('href="https://www.kocsc.or.kr/"',
-                      out['<a href="https://www.kocsc.or.kr/">링크</a>'])
+        self.assertIn('href="https://www.example.go.kr/"',
+                      out['<a href="https://www.example.go.kr/">링크</a>'])

@@ -195,7 +195,7 @@ function downloadBlob(blob, filename) {
 function mergeLocalLedger(list) {
   const merged = Array.isArray(list) ? list.slice() : [];
   try {
-    const localLedger = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+    const localLedger = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
     if (Array.isArray(localLedger) && localLedger.length) {
       const existingIds = new Set(merged.map(l => l && l.ledger_id));
       for (let i = localLedger.length - 1; i >= 0; i--) {
@@ -209,12 +209,12 @@ function mergeLocalLedger(list) {
 
 function removeLocalLedgerIds(ids) {
   try {
-    const current = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+    const current = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
     const next = (Array.isArray(current) ? current : []).filter(it => !(it && ids.has(it.ledger_id)));
     if (next.length) {
-      localStorage.setItem('kocsc_local_ledger', JSON.stringify(next));
+      localStorage.setItem('datareq_local_ledger', JSON.stringify(next));
     } else {
-      localStorage.removeItem('kocsc_local_ledger');
+      localStorage.removeItem('datareq_local_ledger');
     }
     return next;
   } catch (e) {

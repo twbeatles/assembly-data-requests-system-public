@@ -303,7 +303,7 @@ function toggleFavorite(id, event) {
   } else {
     favorites.push(id);
   }
-  localStorage.setItem('kocsc_db_favorites', JSON.stringify(favorites));
+  localStorage.setItem('datareq_favorites', JSON.stringify(favorites));
   updateFavCount();
   render();
 }

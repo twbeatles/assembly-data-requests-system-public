@@ -171,12 +171,12 @@ class TestAuditPhase2(unittest.TestCase):
 
     def test_8_pii_masking_in_request_ledger(self):
         """Verify mask_pii masks phone numbers and emails in ledger fields"""
-        test_text = "보좌관 연락처 010-9876-5432, 이메일 aide_kim@assembly.go.kr 문의 요망"
+        test_text = "보좌관 연락처 010-9876-5432, 이메일 aide_kim@sample.go.kr 문의 요망"
         masked = extract_and_build_db.mask_pii(test_text)
         self.assertNotIn("010-9876-5432", masked)
         self.assertIn("010-****-5432", masked)
-        self.assertNotIn("aide_kim@assembly.go.kr", masked)
-        self.assertIn("ai***@assembly.go.kr", masked)
+        self.assertNotIn("aide_kim@sample.go.kr", masked)
+        self.assertIn("ai***@sample.go.kr", masked)
 
     def test_9_recursive_drop_folder_scanning(self):
         """Verify that add_documents_smart recursively scans nested subfolders and identifies year from parent folder"""

@@ -73,16 +73,16 @@ console.log(JSON.stringify([
 
     def test_offline_sync_commits_per_item_without_clobbering_other_tabs(self):
         out = run_node(["removeLocalLedgerIds"], """
-const store = { kocsc_local_ledger: JSON.stringify([{ ledger_id: 'LOCAL-1' }, { ledger_id: 'LOCAL-2' }]) };
+const store = { datareq_local_ledger: JSON.stringify([{ ledger_id: 'LOCAL-1' }, { ledger_id: 'LOCAL-2' }]) };
 localStorage.getItem = k => (k in store ? store[k] : null);
 localStorage.setItem = (k, v) => { store[k] = v; };
 localStorage.removeItem = k => { delete store[k]; };
 const afterFirst = removeLocalLedgerIds(new Set(['LOCAL-1']));
 // 전송 도중 다른 탭이 새 임시 등록을 추가했다.
-store.kocsc_local_ledger = JSON.stringify(JSON.parse(store.kocsc_local_ledger).concat([{ ledger_id: 'LOCAL-3' }]));
+store.datareq_local_ledger = JSON.stringify(JSON.parse(store.datareq_local_ledger).concat([{ ledger_id: 'LOCAL-3' }]));
 const afterSecond = removeLocalLedgerIds(new Set(['LOCAL-1', 'LOCAL-2']));
 const afterAll = removeLocalLedgerIds(new Set(['LOCAL-3']));
-console.log(JSON.stringify({ afterFirst, afterSecond, afterAll, removed: !('kocsc_local_ledger' in store) }));
+console.log(JSON.stringify({ afterFirst, afterSecond, afterAll, removed: !('datareq_local_ledger' in store) }));
 """)
         self.assertEqual(out["afterFirst"], [{"ledger_id": "LOCAL-2"}])
         self.assertEqual(out["afterSecond"], [{"ledger_id": "LOCAL-3"}])

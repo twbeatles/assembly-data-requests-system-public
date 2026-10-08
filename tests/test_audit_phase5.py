@@ -50,11 +50,11 @@ class TestAuditPhase5(unittest.TestCase):
         content = tmpl_path.read_text(encoding="utf-8")
 
         # Must not unconditionally remove the entire storage
-        self.assertNotIn("localStorage.removeItem('kocsc_local_ledger');\n  const banner", content)
+        self.assertNotIn("localStorage.removeItem('datareq_local_ledger');\n  const banner", content)
         # Must track successfulIds and compute remaining
         self.assertIn("successfulIds", content)
         self.assertIn("remaining", content)
-        self.assertIn("localStorage.setItem('kocsc_local_ledger'", content)
+        self.assertIn("localStorage.setItem('datareq_local_ledger'", content)
 
     def test_ledger_service_connection_closed_on_error(self):
         """Verify that LedgerService queries safely close connections."""

@@ -252,9 +252,9 @@ async function submitNewLedgerItemNow() {
       updated_at: new Date().toISOString()
     };
     try {
-      const localLedger = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+      const localLedger = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
       localLedger.unshift(savedItem);
-      localStorage.setItem('kocsc_local_ledger', JSON.stringify(localLedger));
+      localStorage.setItem('datareq_local_ledger', JSON.stringify(localLedger));
     } catch (e) {}
   }
 
@@ -410,7 +410,7 @@ function checkAndNotifyOfflineSync() {
   // 그래서 오프라인 화면에서는 '내보내기', 서버 화면에서는 '가져오기/전송'을 안내한다.
   const isHttp = window.location.protocol.startsWith('http');
   try {
-    const localLedger = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+    const localLedger = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
     const banner = document.getElementById('offline-sync-banner');
     const textSpan = document.getElementById('offline-sync-text');
     const sendBtn = document.getElementById('offline-sync-send');
@@ -440,7 +440,7 @@ function syncOfflineLedgerToServer() {
 async function syncOfflineLedgerToServerNow() {
   let localLedger = [];
   try {
-    localLedger = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+    localLedger = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
   } catch (e) {
     return;
   }
@@ -500,7 +500,7 @@ async function syncOfflineLedgerToServerNow() {
 function exportLocalLedger() {
   let localLedger = [];
   try {
-    localLedger = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+    localLedger = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
   } catch (e) {}
   if (!localLedger.length) {
     notify('파일로 저장할 임시 등록이 없습니다.');
@@ -527,7 +527,7 @@ async function importLocalLedgerFile(input) {
     return;
   }
   try {
-    const current = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+    const current = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
     const seen = new Set(current.map(it => it && it.ledger_id));
     items.forEach(it => {
       if (it && it.ledger_id && !seen.has(it.ledger_id)) {
@@ -535,7 +535,7 @@ async function importLocalLedgerFile(input) {
         seen.add(it.ledger_id);
       }
     });
-    localStorage.setItem('kocsc_local_ledger', JSON.stringify(current));
+    localStorage.setItem('datareq_local_ledger', JSON.stringify(current));
   } catch (e) {
     notify('브라우저에 저장할 수 없습니다. 시크릿(사생활 보호) 창이면 일반 창에서 다시 해 주세요.');
     return;
@@ -786,11 +786,11 @@ async function submitEditLedgerItemNow() {
 
   // Also update in localStorage if present
   try {
-    const localLedger = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+    const localLedger = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
     const idx = localLedger.findIndex(l => l.ledger_id === ledger_id);
     if (idx !== -1) {
       Object.assign(localLedger[idx], applied, { updated_at: updatedAt });
-      localStorage.setItem('kocsc_local_ledger', JSON.stringify(localLedger));
+      localStorage.setItem('datareq_local_ledger', JSON.stringify(localLedger));
     }
   } catch (e) {}
 
@@ -860,11 +860,11 @@ async function markLedgerSubmittedNow() {
 
   Object.assign(it, applied, { updated_at: updatedAt });
   try {
-    const localLedger = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+    const localLedger = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
     const idx = localLedger.findIndex(l => l.ledger_id === it.ledger_id);
     if (idx !== -1) {
       Object.assign(localLedger[idx], applied, { updated_at: updatedAt });
-      localStorage.setItem('kocsc_local_ledger', JSON.stringify(localLedger));
+      localStorage.setItem('datareq_local_ledger', JSON.stringify(localLedger));
     }
   } catch (e) {}
 
@@ -921,9 +921,9 @@ async function deleteCurrentLedgerItemNow() {
 
   // Remove from localStorage if present
   try {
-    const localLedger = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]');
+    const localLedger = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]');
     const filteredLocal = localLedger.filter(l => l.ledger_id !== ledger_id);
-    localStorage.setItem('kocsc_local_ledger', JSON.stringify(filteredLocal));
+    localStorage.setItem('datareq_local_ledger', JSON.stringify(filteredLocal));
   } catch (e) {}
 
   closeLedgerModal();

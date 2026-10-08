@@ -274,8 +274,8 @@ class TestAuditPhase4(unittest.TestCase):
         self.assertEqual(res1["title"], "대외기관_불법촬영물_조치현황")
 
         # 2-digit 19 date prefix (2019)
-        res2 = extract_metadata(r"2019\190820_국회_디지털성범죄_현황.hwp")
-        self.assertEqual(res2["title"], "국회_디지털성범죄_현황")
+        res2 = extract_metadata(r"2019\190820_국회_정보통신망_현황.hwp")
+        self.assertEqual(res2["title"], "국회_정보통신망_현황")
 
         # 2026 date prefix
         res3 = extract_metadata(r"2026\260309_국회_질의서.hwpx")

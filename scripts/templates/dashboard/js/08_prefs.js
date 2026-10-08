@@ -1,6 +1,6 @@
 // 마지막으로 보던 탭·보기 방식·정렬을 기억한다. 검색어를 입력하면 자동으로 바뀌는
 // '정확도순'은 기억하지 않는다(검색어 없이 열면 의미가 없다).
-const VIEW_PREFS_KEY = 'kocsc_view_prefs';
+const VIEW_PREFS_KEY = 'datareq_view_prefs';
 const VIEW_MODES = ['docs', 'qa', 'tables', 'ledger'];
 const VIEW_SORTS = ['date-desc', 'date-asc', 'qa-count', 'table-first', 'deadline-asc'];
 
@@ -89,7 +89,7 @@ function showAppLoadingError(message) {
   txt.textContent = message;
 }
 
-const RECENT_SEARCH_KEY = 'kocsc_recent_searches';
+const RECENT_SEARCH_KEY = 'datareq_recent_searches';
 
 function safeStorageGet(key, fallback) {
   try {

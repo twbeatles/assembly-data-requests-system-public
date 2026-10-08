@@ -866,7 +866,7 @@ async function refreshConnStatus() {
   if (offline) {
     let n = 0;
     try {
-      n = JSON.parse(localStorage.getItem('kocsc_local_ledger') || '[]').length;
+      n = JSON.parse(localStorage.getItem('datareq_local_ledger') || '[]').length;
     } catch (e) {
       n = 0;
     }

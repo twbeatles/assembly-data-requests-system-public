@@ -2,7 +2,7 @@ let currentMode = 'docs'; // 'docs', 'qa', 'tables'
 let currentView = 'card';
 let currentRenderLimit = 40;
 let currentModalFontSize = 14;
-let favorites = JSON.parse(localStorage.getItem('kocsc_db_favorites') || '[]');
+let favorites = JSON.parse(localStorage.getItem('datareq_favorites') || '[]');
 let selectedDocIds = new Set();
 
 let activeFilters = {

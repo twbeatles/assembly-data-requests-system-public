@@ -852,7 +852,7 @@ console.log(JSON.stringify(texts.map(t => {
         """R4-06 / R4-15a."""
         prelude = """
 const window = { location: { protocol: 'file:' } };
-const store = { kocsc_local_ledger: JSON.stringify([{ ledger_id: 'LOCAL-2026-b' }, { ledger_id: 'LOCAL-2026-a' }, { ledger_id: 'REQ-2026-001' }]) };
+const store = { datareq_local_ledger: JSON.stringify([{ ledger_id: 'LOCAL-2026-b' }, { ledger_id: 'LOCAL-2026-a' }, { ledger_id: 'REQ-2026-001' }]) };
 const localStorage = { getItem: k => store[k] || null, setItem: (k, v) => { store[k] = v; } };
 """
         out = run_js(["isLocalOnlyLedgerId", "ledgerWriteBlockReason", "mergeLocalLedger"], """
