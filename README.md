@@ -243,6 +243,74 @@ flowchart TD
 
 ---
 
+## 📄 KorDoc을 활용한 공문서(HWP/HWPX/PDF) 파싱 및 시스템 연동 가이드
+
+본 시스템의 자동 문서 변환 엔진은 공공기관 표준 문서 포맷인 **HWP, HWPX, PDF(스캔본 OCR 포함), XLSX, DOCX**를 서식과 다중 병합 표까지 완벽하게 Markdown(`.md`)으로 초고속 변환해주는 **[KorDoc](https://github.com/chrisryugj/kordoc)**과 유기적으로 연동됩니다.
+
+### 1. KorDoc 소개 및 공식 다운로드
+
+* **공식 GitHub 저장소**: [https://github.com/chrisryugj/kordoc](https://github.com/chrisryugj/kordoc)
+* **공식 릴리스 및 다운로드**: [KorDoc Releases (GitHub)](https://github.com/chrisryugj/kordoc/releases)
+* **주요 특징**:
+  - HWP (한글 3.0/5.0), HWPX, PDF(한국어 OCR 지원), Office 문서를 깨짐 없이 고품질 마크다운으로 변환
+  - 한국 공공기관 특유의 복잡한 다중 병합 셀, 신구조문대비표, 글상자 구조 완벽 복원
+  - CLI 명령어 및 AI 에이전트 연동용 **MCP(Model Context Protocol)** 지원
+
+### 2. KorDoc 설치 방법 (Windows 기준)
+
+사용 환경에 따라 다음 두 가지 방식 중 하나로 간편하게 설치할 수 있습니다:
+
+#### [방법 A] Windows 전용 인스톨러 (MSI) 설치 (권장 ⭐)
+1. [KorDoc Releases](https://github.com/chrisryugj/kordoc/releases) 페이지에서 최신 **`KorDoc.AI_x64_ko-KR.msi`** 파일을 다운로드합니다.
+2. 다운로드한 `.msi` 파일을 실행하여 마법사 안내에 따라 설치를 완료합니다. (약 20초 소요)
+3. 설치가 완료되면 데스크톱 프로그램과 함께 명령 프롬프트(CMD) 및 PowerShell 환경변수(`PATH`)에 `kordoc` 명령어가 자동으로 등록됩니다.
+
+#### [방법 B] npm 패키지 매니저로 전역 설치
+Node.js(v18 이상)가 설치된 환경에서는 터미널에서 다음 명령어로 즉시 전역 설치할 수 있습니다:
+```bash
+npm install -g kordoc pdfjs-dist
+```
+
+> **설치 확인**: 터미널(CMD 또는 PowerShell)에서 `kordoc --version`을 입력하여 정상 출력되는지 확인합니다.
+
+### 3. 파싱 후 본 시스템 연동하기 (3가지 방식)
+
+#### 🚀 방식 1: 원클릭 자동 파싱 및 DB 연동 (가장 추천)
+KorDoc이 설치되어 있으면, 본 시스템이 `kordoc` CLI를 자동으로 감지하여 모든 과정을 원클릭으로 처리합니다:
+1. 부서의 HWP, HWPX, PDF 답변서 원본들을 **`새자료_투입폴더/`**에 넣습니다. (연도별 하위 폴더가 있어도 자동 인식)
+2. **`00_새자료_추가_및_DB동기화.bat`**를 더블클릭합니다.
+3. 시스템 내부 파이프라인(`scripts/parse_all.py`)이 KorDoc을 병렬 호출하여 문서를 마크다운으로 초고속 변환(`_parsed_markdown/` 폴더에 저장)하고, SQLite DB 색인, Q&A 분할, 엑셀 통합 DB, 단일 HTML 대시보드 갱신까지 전자동으로 완료합니다.
+
+#### 💻 방식 2: KorDoc CLI 명령어로 직접 변환 후 연동
+터미널에서 개별 문서를 직접 변환하여 적재할 수도 있습니다:
+```bash
+# 기본 한글 문서 변환
+kordoc "입력문서.hwp" -o "_parsed_markdown/2026/입력문서.hwp.md"
+
+# 스캔된 이미지 PDF 문서 한국어 OCR 변환
+kordoc "스캔답변.pdf" --ocr -o "_parsed_markdown/2026/스캔답변.pdf.md"
+```
+변환된 `.md` 파일을 `_parsed_markdown/<연도>/` 폴더에 저장한 뒤 `00_새자료_추가_및_DB동기화.bat`를 실행하면 즉시 검색 DB에 색인됩니다.
+
+#### 🤖 방식 3: Claude Desktop / Cursor / Antigravity AI 에이전트(MCP) 연동
+AI 코딩 도구나 어시스턴트에서 직접 문서를 열람하고 파싱하도록 설정할 수 있습니다:
+* **Claude Desktop 설정** (`%APPDATA%\Claude\claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "kordoc": {
+      "command": "kordoc",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+* AI 에이전트에게 *"새자료_투입폴더의 문서를 kordoc parse_document로 파싱해서 _parsed_markdown에 넣어줘"* 라고 요청하여 지능형 파싱 작업을 수행할 수 있습니다.
+
+> 📖 **더 자세한 안내**: 보다 상세한 옵션과 예시는 저장소 내 [`kordoc_파싱_및_설치_가이드.md`](kordoc_%ED%8C%8C%EC%8B%B1_%EB%B0%8F_%EC%84%A4%EC%B9%98_%EA%B0%80%EC%9D%B4%EB%93%9C.md) 문서를 참고하세요.
+
+---
+
 ## 📁 핵심 폴더 및 파일 구조
 
 ```
