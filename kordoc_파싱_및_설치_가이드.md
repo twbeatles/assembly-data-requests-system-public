@@ -9,6 +9,8 @@
 ## 1. 동봉된 KorDoc AI 설치 파일 (`KorDoc.AI_1.5.1_x64_ko-KR.msi`)
 
 ### 1) 설치 파일 개요
+- **공식 저장소**: [https://github.com/chrisryugj/kordoc](https://github.com/chrisryugj/kordoc)
+- **공식 다운로드 (Releases)**: [https://github.com/chrisryugj/kordoc/releases](https://github.com/chrisryugj/kordoc/releases)
 - **파일명**: `KorDoc.AI_1.5.1_x64_ko-KR.msi` (약 15.3MB)
 - **버전**: KorDoc AI v1.5.1 (x64 Windows 한국어 공식 패키지)
 - **변환 지원 포맷**: `.hwp` (한글 3.0 / 5.0), `.hwpx`, `.pdf` (스캔본 한국어 OCR 내장), `.xlsx`, `.docx`, 이미지
