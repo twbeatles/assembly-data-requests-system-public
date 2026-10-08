@@ -2013,7 +2013,7 @@ let currentMode = 'docs'; // 'docs', 'qa', 'tables'
 let currentView = 'card';
 let currentRenderLimit = 40;
 let currentModalFontSize = 14;
-let favorites = JSON.parse(localStorage.getItem('datareq_db_favorites') || '[]');
+let favorites = JSON.parse(localStorage.getItem('datareq_favorites') || '[]');
 let selectedDocIds = new Set();
 
 let activeFilters = {
@@ -4790,7 +4790,7 @@ function toggleFavorite(id, event) {
   } else {
     favorites.push(id);
   }
-  localStorage.setItem('datareq_db_favorites', JSON.stringify(favorites));
+  localStorage.setItem('datareq_favorites', JSON.stringify(favorites));
   updateFavCount();
   render();
 }
