@@ -1,0 +1,74 @@
+# ==========================================
+# 보안 및 비공개 데이터 제외 규칙 (.gitignore)
+# ==========================================
+
+# 1. 데이터베이스 및 캐시 데이터 (개인정보 및 공문서 답변 포함)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.tmp
+*.temp
+.pipeline.lock
+.pipeline.lock.guard
+*.zip
+.web_server.lock
+
+
+.excel_pending_queue.json
+.excel_pending_queue.corrupt.*.json
+.excel_pending_failed.json
+.ledger_backup/
+.db_backup/
+.maintenance_backup/
+data_requests.json
+parsing_report.json
+.file_hash_cache.json
+.file_hash_cache.json.tmp
+
+# 2. 문서 및 엑셀 원본/결과물
+*.hwp
+*.hwpx
+*.pdf
+*.doc
+*.docx
+*.xlsx
+*.xlsm
+*.xls
+_parsed_markdown/
+자료요구_통합검색_대시보드.html
+배포용_자료요구_통합검색시스템/
+../국회자료요구_스마트시스템_범용배포용/*.db
+../국회자료요구_스마트시스템_범용배포용/*.json
+../국회자료요구_스마트시스템_범용배포용/*.hwp
+
+# 3. 파이썬 빌드 및 임시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+*.exe
+*.msi
+dist/
+build/
+*.egg-info/
+.venv/
+env/
+venv/
+ENV/
+
+# 4. 에디터 및 개발환경 설정
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.codegraph/
+
+# 5. 새자료 투입 임시 폴더
+새자료_투입폴더/**
+!새자료_투입폴더/
+!새자료_투입폴더/README_여기에_파일을_넣으세요.txt

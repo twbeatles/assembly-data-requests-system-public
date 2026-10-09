@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<!-- 전문 보존: 상세 모달은 full_markdown 전체를 렌더한다. 요약/엑셀 잘림본으로 대체하지 말 것. AGENTS.md -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>__PAGE_TITLE__</title>
+<!-- __DASHBOARD_CSS__ -->
+<script>
+/* __MARKED_JS__ */
+</script>
+</head>
+<body>
+
+<div id="app-loading" role="status" aria-live="polite">
+  <div class="box">
+    <div class="spinner" aria-hidden="true"></div>
+    <div id="app-loading-text">검색 데이터를 불러오는 중입니다… 문서가 많으면 몇 초 걸릴 수 있습니다.</div>
+  </div>
+</div>
+<div id="toast-stack" aria-live="polite"></div>
+
+<header>
+  <div class="header-content">
+    <div class="header-title">
+      <h1 id="header-main-title">__HEADER_TITLE__</h1>
+      <p id="header-sub-title">__HEADER_SUBTITLE__</p>
+    </div>
+    <button type="button" class="conn-status" id="conn-status" onclick="showConnectionDetails()" title="연결 상태 자세히 보기">● 확인 중</button>
+  </div>
+  <div class="header-strip">
+    <div class="due-summary" id="due-summary" role="status" aria-live="polite">
+      <span class="strip-label">제출 현황</span>
+      <button type="button" class="due-chip overdue" id="due-chip-overdue" onclick="gotoDueFilter('overdue')" title="마감일이 지났는데 아직 제출하지 않은 요구자료 보기">마감 지남 <strong id="due-num-overdue">0</strong></button>
+      <button type="button" class="due-chip soon" id="due-chip-soon" onclick="gotoDueFilter('soon')" title="7일 안에 마감인 요구자료 보기">7일 안에 마감 <strong id="due-num-soon">0</strong></button>
+      <button type="button" class="due-chip open" id="due-chip-open" onclick="gotoDueFilter('open')" title="아직 제출하지 않은 요구자료 전체 보기">아직 미제출 <strong id="due-num-open">0</strong></button>
+    </div>
+    <div class="stats-bar" aria-label="보유 자료 수">
+      <div class="stat-badge" role="button" tabindex="0" onclick="switchMode('docs')" title="답변서 목록 보기">
+        <span class="lbl">답변서</span> <span class="num" id="stat-docs">0</span>
+      </div>
+      <div class="stat-badge" role="button" tabindex="0" onclick="switchMode('qa')" title="질문별 답변 보기">
+        <span class="lbl">질문·답변</span> <span class="num" id="stat-qa">0</span>
+      </div>
+      <div class="stat-badge" role="button" tabindex="0" onclick="switchMode('tables')" title="표가 들어 있는 답변서 보기">
+        <span class="lbl">표 있는 답변서</span> <span class="num" id="stat-tables">0</span>
+      </div>
+      <div class="stat-badge" role="button" tabindex="0" onclick="filterFavorites()" title="즐겨찾기한 답변서만 보기">
+        <span class="lbl">★ 즐겨찾기</span> <span class="num" id="stat-favs">0</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- 탭 + 주요 작업 -->
+  <div class="top-tabs-row">
+    <div class="mode-switcher" role="group" aria-label="보기 전환">
+      <div class="mode-tab active" role="button" tabindex="0" aria-pressed="true" id="tab-mode-docs" onclick="switchMode('docs')" title="제출했던 답변서를 문서 단위로 찾습니다">답변서 <span class="tab-total" id="count-mode-docs">0</span><span class="tab-count" id="tab-count-docs"></span></div>
+      <div class="mode-tab" role="button" tabindex="0" aria-pressed="false" id="tab-mode-qa" onclick="switchMode('qa')" title="답변서를 질문 하나하나로 나눠서 찾습니다">질문·답변 <span class="tab-total" id="count-mode-qa">0</span><span class="tab-count" id="tab-count-qa"></span></div>
+      <div class="mode-tab" role="button" tabindex="0" aria-pressed="false" id="tab-mode-tables" onclick="switchMode('tables')" title="통계표가 들어 있는 답변서만 모아 봅니다">표 있는 답변서 <span class="tab-total" id="count-mode-tables">0</span><span class="tab-count" id="tab-count-tables"></span></div>
+      <div class="mode-tab" role="button" tabindex="0" aria-pressed="false" id="tab-mode-ledger" onclick="switchMode('ledger')" title="접수한 요구자료의 마감·제출 상태를 관리합니다">요구자료 관리대장 <span class="tab-total" id="count-mode-ledger">0</span><span class="tab-count" id="tab-count-ledger"></span></div>
+    </div>
+    <div class="top-action-tools">
+      <button class="btn btn-success" id="btn-open-add-ledger" onclick="openAddLedgerModal()" title="새로 받은 요구자료를 관리대장에 올립니다">＋ 요구자료 등록</button>
+      <button class="btn btn-secondary" id="btn-trigger-sync" onclick="triggerServerSync()" title="새자료_투입폴더에 넣은 문서를 읽어 검색 자료에 추가합니다">새 문서 반영</button>
+      <button class="btn btn-secondary" id="btn-toggle-analytics" onclick="toggleAnalytics()" aria-expanded="false">통계 보기</button>
+      <button class="btn btn-secondary" id="btn-show-favs" onclick="filterFavorites()" aria-pressed="false">★ 즐겨찾기만</button>
+      <button class="btn btn-secondary btn-icon" id="btn-open-config" onclick="openConfigModal()" title="부서명·화면 제목 설정" aria-label="설정">⚙</button>
+    </div>
+  </div>
+
+  <!-- 통계 -->
+  <div class="analytics-section" id="analytics-section">
+    <div class="analytics-header">
+      <div class="analytics-title">한눈에 보는 통계 <span class="analytics-hint">막대를 누르면 해당 자료만 골라 보여줍니다</span></div>
+      <button class="btn btn-secondary btn-sm" onclick="toggleAnalytics()">접기</button>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h4>자료를 많이 요구한 의원·기관 (상위 8)</h4>
+        <div id="chart-requesters"></div>
+      </div>
+      <div class="chart-card">
+        <h4>많이 다룬 주제 (상위 8)</h4>
+        <div id="chart-topics"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 검색·필터 -->
+  <div class="control-panel">
+    <div class="search-row">
+      <div class="search-input-wrapper">
+        <span class="search-icon" id="search-icon" aria-hidden="true">🔍</span>
+        <input type="text" id="search-input" list="recent-searches" autocomplete="off" aria-label="통합 검색어" placeholder="제목·본문·의원명으로 검색 (Ctrl+K)">
+        <button type="button" class="search-clear" id="search-clear" onclick="clearOneFilter('query')" aria-label="검색어 지우기" title="검색어 지우기" hidden>&times;</button>
+        <datalist id="recent-searches"></datalist>
+      </div>
+      <button class="btn btn-secondary" id="btn-export" title="지금 목록에 보이는 결과를 엑셀에서 열 수 있는 CSV 파일로 저장합니다">목록 내려받기 (CSV)</button>
+      <a href="국회_대외기관_자료요구_통합DB.xlsx" id="link-excel-db" class="btn btn-secondary" download title="전체 자료가 정리된 엑셀 파일을 엽니다">엑셀 파일 열기</a>
+    </div>
+    <div class="search-status" aria-live="polite">
+      <span id="search-spinner" class="search-spinner" style="display:none;" role="status">검색 중…</span>
+      <span id="search-scope-hint" class="search-scope-hint" style="display:none;"></span>
+    </div>
+    <div class="grammar-chips" id="grammar-chips" aria-label="검색 방법 바로 넣기">
+      <span class="grammar-label">검색 팁</span>
+      <button type="button" class="g-chip" data-insert=" OR " title="둘 중 하나라도 들어간 자료">A 또는 B</button>
+      <button type="button" class="g-chip" data-insert=" -" title="뒤에 적은 단어가 들어간 자료는 뺍니다">단어 빼기</button>
+      <button type="button" class="g-chip" data-insert='""' data-caret="-1" title="따옴표 안에 적은 그대로 찾습니다">“그대로 찾기”</button>
+      <button type="button" class="g-chip" data-jump="search-help" title="검색 방법 전체 보기">검색 방법 더 보기</button>
+      <label class="option-check" title="‘과기부’로 찾으면 ‘과학기술정보통신부’도, ‘트위터’로 찾으면 ‘엑스’도 함께 찾습니다">
+        <input type="checkbox" id="chk-synonyms" checked> 비슷한 말도 함께 찾기
+      </label>
+    </div>
+    <details class="search-help" id="search-help">
+      <summary>검색 방법 안내</summary>
+      <table>
+        <tr><td><code>딥페이크 시정요구</code></td><td>두 단어가 모두 들어간 자료 (띄어쓰기·조사는 신경 쓰지 않아도 됩니다)</td></tr>
+        <tr><td><code>텔레그램 OR 트위터</code></td><td>둘 중 하나라도 들어간 자료 (<code>|</code>도 가능)</td></tr>
+        <tr><td><code>딥페이크 -텔레그램</code></td><td>앞 단어는 있고 뒤 단어는 없는 자료</td></tr>
+        <tr><td><code>"최근 3년"</code></td><td>따옴표 안에 적은 그대로</td></tr>
+        <tr><td><code>ㄷㅍㅇㅋ</code>, <code>딥ㅍㅇㅋ</code></td><td>초성만 쳐도 찾습니다</td></tr>
+        <tr><td>비슷한 말</td><td><code>과기부</code> ↔ <code>과학기술정보통신부</code>처럼 같은 뜻의 말을 함께 찾습니다 (위 체크박스로 끌 수 있습니다)</td></tr>
+      </table>
+    </details>
+
+    <div class="filters-row">
+      <div class="filter-group">
+        <span class="filter-label">연도</span>
+        <div class="filter-chips" id="year-chips">
+          <span class="chip active" data-filter="year" data-val="ALL">전체</span>
+          <!-- 연도 칩은 데이터에 있는 연도로 자동 생성한다(buildDynamicFilters). -->
+        </div>
+      </div>
+
+      <div class="filter-group" id="filter-group-inst">
+        <span class="filter-label">요구 기관</span>
+        <div class="filter-chips">
+          <span class="chip active" data-filter="inst" data-val="ALL">전체</span>
+          <span class="chip" data-filter="inst" data-val="국회">국회</span>
+          <span class="chip" data-filter="inst" data-val="상급감독기관">상급감독기관/대외기관</span>
+          <span class="chip" data-filter="inst" data-val="국회입법조사처">입법조사처</span>
+        </div>
+      </div>
+
+      <div class="filter-group" id="filter-group-topic">
+        <span class="filter-label">주제</span>
+        <div class="filter-chips" id="topic-chips">
+          <span class="chip active" data-filter="topic" data-val="ALL">전체</span>
+          <span class="chip" data-filter="topic" data-val="딥페이크">딥페이크</span>
+          <span class="chip" data-filter="topic" data-val="텔레그램">텔레그램</span>
+          <span class="chip" data-filter="topic" data-val="시정요구/차단">시정요구/차단</span>
+          <span class="chip" data-filter="topic" data-val="주요플랫폼">플랫폼</span>
+          <span class="chip" data-filter="topic" data-val="심의적체/대기">심의적체/대기</span>
+          <span class="chip" data-filter="topic" data-val="처리기간/소요시간">소요시간</span>
+          <span class="chip" data-filter="topic" data-val="모니터링">모니터링</span>
+          <span class="chip" data-filter="topic" data-val="수사공조">수사공조</span>
+        </div>
+      </div>
+
+      <div class="filter-group" id="filter-group-due" style="display:none;">
+        <span class="filter-label">마감</span>
+        <div class="filter-chips">
+          <span class="chip active" data-filter="due" data-val="ALL">전체</span>
+          <span class="chip" data-filter="due" data-val="overdue">마감 지남</span>
+          <span class="chip" data-filter="due" data-val="soon">7일 안에 마감</span>
+          <span class="chip" data-filter="due" data-val="open">아직 미제출</span>
+        </div>
+      </div>
+      <div class="filter-group" id="filter-group-status" style="display:none;">
+        <span class="filter-label">진행 상태</span>
+        <div class="filter-chips" id="status-chips">
+          <span class="chip active" data-filter="status" data-val="ALL">전체</span>
+          <!-- 진행상태 칩은 대장에 실제로 있는 값으로 자동 생성한다(buildDynamicFilters). -->
+        </div>
+      </div>
+
+      <div class="filter-group" id="filter-group-tables-only">
+        <label class="option-check">
+          <input type="checkbox" id="chk-tables-only"> 표가 있는 자료만
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 웹 관리 서버 모드: 엑셀 반영 대기·실패 상태 -->
+  <div id="server-excel-banner" role="status" aria-live="polite"></div>
+  <!-- 이 브라우저에만 임시 저장된 등록분 -->
+  <div id="offline-sync-banner" class="notice notice-warn" style="display:none;">
+    <div class="notice-text">
+      <span id="offline-sync-text">이 브라우저에만 임시 저장된 요구자료가 <strong id="offline-sync-count">0</strong>건 있습니다.</span>
+    </div>
+    <div class="notice-actions">
+      <button id="offline-sync-send" class="btn btn-primary btn-sm" onclick="syncOfflineLedgerToServer()">관리대장에 정식 등록</button>
+      <button id="offline-sync-export" class="btn btn-secondary btn-sm" onclick="exportLocalLedger()">파일로 저장</button>
+    </div>
+  </div>
+
+  <!-- 오프라인(01번) 화면에서 저장한 임시 등록 파일 가져오기: 웹 관리 서버 모드에서만 노출 -->
+  <div id="local-import-bar" class="notice notice-quiet" style="display:none;">
+    <span class="notice-text">서버 없이 연 화면(01번)에서 임시로 등록한 자료가 있나요? 거기서 저장한 파일을 고르면 관리대장에 정식 등록됩니다.</span>
+    <input type="file" id="local-import-file" accept=".json,application/json" onchange="importLocalLedgerFile(this)" aria-label="임시 등록 파일 고르기">
+  </div>
+
+  <!-- 결과 머리줄 -->
+  <div class="results-header">
+    <div class="results-left">
+      <div class="results-count">
+        <strong id="count-filtered">0</strong>건 <span class="results-total">/ 전체 <span id="count-total">0</span>건</span>
+        <span id="active-tag-indicator"></span>
+      </div>
+      <div class="active-chips" id="active-filter-chips" aria-live="polite"></div>
+    </div>
+    <div class="results-tools">
+      <label class="option-check" id="select-all-wrap">
+        <input type="checkbox" id="chk-select-all" onchange="toggleSelectAll(this.checked)"> 전체 선택
+      </label>
+      <label class="sort-wrap">
+        <span>정렬</span>
+        <select id="sel-sort" onchange="changeSort(this.value)" class="sort-select">
+          <option value="date-desc">최신순</option>
+          <option value="date-asc">오래된순</option>
+          <option value="relevance">검색어와 가까운 순</option>
+          <option value="deadline-asc">마감 급한 순</option>
+          <option value="qa-count">질문 많은 순</option>
+          <option value="table-first">표 있는 자료 먼저</option>
+        </select>
+      </label>
+      <div class="view-toggle" role="group" aria-label="보기 방식">
+        <button type="button" class="view-btn active" aria-pressed="true" id="btn-view-card">카드</button>
+        <button type="button" class="view-btn" aria-pressed="false" id="btn-view-table">표</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-grid" id="card-container"></div>
+  <div class="empty-state" id="empty-state" role="status" aria-live="polite">
+    <h3>조건에 맞는 자료가 없습니다</h3>
+    <div id="empty-state-reason"></div>
+    <ul id="empty-state-hints"></ul>
+    <div class="empty-actions">
+      <button type="button" class="btn btn-secondary" id="empty-clear-filters" onclick="clearAllFilters()">검색어·필터 모두 지우기</button>
+    </div>
+  </div>
+
+  <div class="table-container" id="table-container">
+    <table class="data-table">
+      <thead id="table-head"></thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+
+  <div id="load-more-container" class="load-more-container" style="display: none;">
+    <button id="btn-load-more" class="load-more-btn" onclick="loadMoreItems()">
+      더 보기 (남은 <span id="load-more-remaining">0</span>건)
+    </button>
+  </div>
+
+  <!-- 선택한 답변서 작업 막대 -->
+  <div class="selection-bar" id="selection-bar">
+    <div>
+      선택한 답변서 <strong id="selected-count">0</strong>건
+    </div>
+    <div class="selection-actions">
+      <button class="btn btn-primary btn-sm" onclick="printSelectedReport()">묶어서 인쇄 / PDF 저장</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportSelectedCsv()">목록 내려받기 (CSV)</button>
+      <button class="btn btn-secondary btn-sm" onclick="clearSelection()">선택 해제</button>
+    </div>
+  </div>
+</main>
+
+<!-- 요구자료 등록 -->
+<div class="modal-backdrop" id="add-ledger-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-ledger-title">
+  <div class="modal-dialog modal-form">
+    <div class="modal-header">
+      <div class="modal-title">
+        <h2 id="add-ledger-title">요구자료 등록</h2>
+        <p class="modal-sub" id="add-ledger-sub">등록하면 관리대장과 대장 엑셀 파일에 바로 반영됩니다.</p>
+      </div>
+      <button class="btn-close" aria-label="닫기" onclick="closeAddLedgerModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-add-ledger" class="ledger-form" onsubmit="event.preventDefault(); submitNewLedgerItem();">
+        <div class="form-section-title">누가 요구했나요</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="add-requester">의원명 / 요구자 <span class="req">*</span></label>
+            <input type="text" id="add-requester" required placeholder="예: 홍길동 의원" list="requester-candidates" autocomplete="off">
+            <datalist id="requester-candidates"></datalist>
+          </div>
+          <div class="field">
+            <label for="add-party">소속 정당 / 기관</label>
+            <input type="text" id="add-party" placeholder="예: ○○당, 국회입법조사처">
+          </div>
+          <div class="field">
+            <label for="add-aide">보좌관</label>
+            <input type="text" id="add-aide" placeholder="담당 보좌관 이름">
+          </div>
+        </div>
+
+        <div class="form-section-title">무엇을 요구했나요</div>
+        <div class="field">
+          <label for="add-title">요구자료 제목 <span class="req">*</span></label>
+          <input type="text" id="add-title" required placeholder="예: 딥페이크 성범죄 영상 삭제·차단 현황">
+        </div>
+        <div class="field">
+          <label for="add-details">세부 요구내역</label>
+          <textarea id="add-details" rows="5" placeholder="1. 최근 3년간 연도별 심의 및 시정요구 건수&#10;2. 주요 플랫폼별 삭제 소요시간&#10;3. 수사의뢰 및 관계기관 공조 현황"></textarea>
+        </div>
+
+        <div class="similar-panel" id="similar-answers" aria-live="polite">
+          <div class="similar-title">예전에 비슷한 요구에 낸 답변 <span id="similar-count"></span></div>
+          <div class="similar-hint">제목이나 세부 요구내역을 적으면 과거 답변서 가운데 비슷한 것을 찾아 보여줍니다. 누르면 바로 열립니다.</div>
+          <div id="similar-list"></div>
+        </div>
+
+        <div class="form-section-title">일정과 진행 상태</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="add-req-date">요구일</label>
+            <input type="text" id="add-req-date" placeholder="예: 2026-09-08" autocomplete="off">
+            <div class="date-preview" id="add-req-date-preview" aria-live="polite"></div>
+          </div>
+          <div class="field">
+            <label for="add-deadline">제출 마감일</label>
+            <input type="text" id="add-deadline" placeholder="예: 2026-09-10 또는 9/10" autocomplete="off">
+            <div class="date-preview" id="add-deadline-preview" aria-live="polite"></div>
+          </div>
+          <div class="field">
+            <label for="add-submit-date">실제 제출일</label>
+            <input type="text" id="add-submit-date" placeholder="제출한 뒤에 적습니다" autocomplete="off">
+            <div class="date-preview" id="add-submit-date-preview" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="add-status">진행 상태</label>
+            <select id="add-status">
+              <option value="작성중">작성중</option>
+              <option value="검토중">검토중</option>
+              <option value="제출">제출</option>
+              <option value="완료">완료</option>
+              <option value="업무설명">업무설명</option>
+              <option value="미제출">미제출</option>
+              <option value="해당없음">해당없음</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="add-req-type">요청 형태</label>
+            <select id="add-req-type">
+              <option value="시스템">시스템</option>
+              <option value="메일">메일</option>
+              <option value="유선">유선</option>
+              <option value="서면">서면</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="add-dept">담당 부서</label>
+            <input type="text" id="add-dept" value="__DEFAULT_DEPT__">
+          </div>
+        </div>
+
+        <div class="form-section-title">그 밖의 정보</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="add-year">연도 <span class="req">*</span></label>
+            <input type="text" id="add-year" required placeholder="예: 2026" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="add-seq-no">연번 (요구번호)</label>
+            <input type="text" id="add-seq-no" placeholder="예: 564, 구두">
+          </div>
+          <div class="field">
+            <label for="add-note">비고</label>
+            <input type="text" id="add-note" placeholder="특이사항 메모">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeAddLedgerModal()">취소</button>
+          <button type="submit" class="btn btn-success">등록하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 요구자료 수정 -->
+<div class="modal-backdrop" id="edit-ledger-backdrop" role="dialog" aria-modal="true" aria-labelledby="edit-ledger-title">
+  <div class="modal-dialog modal-form">
+    <div class="modal-header">
+      <div class="modal-title">
+        <h2 id="edit-ledger-title">요구자료 수정</h2>
+        <p class="modal-sub">바꾼 칸만 관리대장과 대장 엑셀 파일에 반영됩니다.</p>
+      </div>
+      <button class="btn-close" aria-label="닫기" onclick="closeEditLedgerModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-edit-ledger" class="ledger-form" onsubmit="event.preventDefault(); submitEditLedgerItem();">
+        <input type="hidden" id="edit-id">
+        <div class="form-section-title">누가 요구했나요</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="edit-requester">의원명 / 요구자 <span class="req">*</span></label>
+            <input type="text" id="edit-requester" required list="requester-candidates" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="edit-party">소속 정당 / 기관</label>
+            <input type="text" id="edit-party">
+          </div>
+          <div class="field">
+            <label for="edit-aide">보좌관</label>
+            <input type="text" id="edit-aide">
+          </div>
+        </div>
+
+        <div class="form-section-title">무엇을 요구했나요</div>
+        <div class="field">
+          <label for="edit-title">요구자료 제목 <span class="req">*</span></label>
+          <input type="text" id="edit-title" required>
+        </div>
+        <div class="field">
+          <label for="edit-details">세부 요구내역</label>
+          <textarea id="edit-details" rows="5"></textarea>
+        </div>
+
+        <div class="form-section-title">일정과 진행 상태</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="edit-req-date">요구일</label>
+            <input type="text" id="edit-req-date" autocomplete="off">
+            <div class="date-preview" id="edit-req-date-preview" aria-live="polite"></div>
+          </div>
+          <div class="field">
+            <label for="edit-deadline">제출 마감일</label>
+            <input type="text" id="edit-deadline" autocomplete="off">
+            <div class="date-preview" id="edit-deadline-preview" aria-live="polite"></div>
+          </div>
+          <div class="field">
+            <label for="edit-submit-date">실제 제출일</label>
+            <input type="text" id="edit-submit-date" autocomplete="off">
+            <div class="date-preview" id="edit-submit-date-preview" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="edit-status">진행 상태</label>
+            <select id="edit-status">
+              <option value="작성중">작성중</option>
+              <option value="검토중">검토중</option>
+              <option value="제출">제출</option>
+              <option value="완료">완료</option>
+              <option value="업무설명">업무설명</option>
+              <option value="미제출">미제출</option>
+              <option value="해당없음">해당없음</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="edit-req-type">요청 형태</label>
+            <select id="edit-req-type">
+              <option value="시스템">시스템</option>
+              <option value="메일">메일</option>
+              <option value="유선">유선</option>
+              <option value="서면">서면</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="edit-dept">담당 부서</label>
+            <input type="text" id="edit-dept">
+          </div>
+        </div>
+
+        <div class="form-section-title">그 밖의 정보</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="edit-display-id">대장 ID</label>
+            <input type="text" id="edit-display-id" class="mono" disabled>
+          </div>
+          <div class="field">
+            <label for="edit-seq-no">연번 (요구번호)</label>
+            <input type="text" id="edit-seq-no">
+          </div>
+          <div class="field">
+            <label for="edit-note">비고</label>
+            <input type="text" id="edit-note">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeEditLedgerModal()">취소</button>
+          <button type="submit" class="btn btn-primary">변경 내용 저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 요구자료 상세 -->
+<div class="modal-backdrop" id="ledger-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ledger-detail-title">
+  <div class="modal-dialog modal-detail">
+    <div class="modal-header">
+      <div class="modal-title">
+        <div class="modal-badges">
+          <span class="badge-id" id="ledger-detail-id">REQ-2026-001</span>
+          <span class="status-pill" id="ledger-detail-status-badge">상태</span>
+          <span id="ledger-detail-due"></span>
+        </div>
+        <h2 id="ledger-detail-title">요구자료명</h2>
+        <div class="modal-meta" id="ledger-detail-meta">
+          <span id="ledger-detail-req">의원실</span>
+          <span id="ledger-detail-seq">연번</span>
+          <span id="ledger-detail-dept">부서</span>
+          <span id="ledger-detail-date">일자</span>
+        </div>
+      </div>
+      <button class="btn-close" aria-label="닫기" onclick="closeLedgerModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <dl class="detail-grid">
+        <div><dt>요구일</dt><dd id="ledger-detail-reqdate">-</dd></div>
+        <div><dt>제출 마감일</dt><dd id="ledger-detail-deadline">-</dd></div>
+        <div><dt>실제 제출일</dt><dd id="ledger-detail-submitdate">-</dd></div>
+        <div><dt>보좌관</dt><dd id="ledger-detail-aide">-</dd></div>
+        <div><dt>담당 부서</dt><dd id="ledger-detail-department">-</dd></div>
+        <div><dt>요청 형태</dt><dd id="ledger-detail-reqtype">-</dd></div>
+        <div class="wide"><dt>비고</dt><dd id="ledger-detail-notes">-</dd></div>
+      </dl>
+
+      <section class="detail-section">
+        <h4>세부 요구내역</h4>
+        <div id="ledger-detail-body" class="detail-body"></div>
+      </section>
+
+      <section class="detail-section">
+        <h4>답변서</h4>
+        <div id="ledger-detail-linked-box" class="linked-box" style="display:none;">
+          <div>
+            <strong>연결된 답변서가 있습니다</strong>
+            <div class="linked-text" id="ledger-detail-linked-text">DOC-2026-xxx</div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-goto-linked-doc">답변서 열기 →</button>
+        </div>
+        <div class="ledger-linkrow">
+          <label for="ledger-link-select">답변서 연결</label>
+          <select id="ledger-link-select"></select>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-save-ledger-link" onclick="saveLedgerDocLink()">연결 저장</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-clear-ledger-link" onclick="clearLedgerDocLink()">연결 끊기</button>
+        </div>
+      </section>
+
+      <section class="detail-section ledger-history" id="ledger-history-box">
+        <h4>바뀐 기록 <span id="ledger-history-count"></span></h4>
+        <div id="ledger-history-list"></div>
+        <div class="history-offline" id="ledger-history-offline" style="display:none;">서버 없이 연 화면(01번)에는 바뀐 기록이 들어 있지 않습니다. 02번 화면에서 확인하세요.</div>
+      </section>
+    </div>
+    <div class="modal-footer">
+      <div class="footer-group">
+        <button class="btn btn-success" id="btn-mark-submitted" onclick="markLedgerSubmitted()" title="진행 상태를 ‘제출’로, 실제 제출일을 오늘로 바꿉니다">✓ 제출 완료로 표시</button>
+        <button class="btn btn-secondary" id="btn-edit-ledger" onclick="openEditLedgerModal()">수정</button>
+        <button class="btn btn-danger-outline" id="btn-delete-ledger" onclick="deleteCurrentLedgerItem()">삭제</button>
+      </div>
+      <div class="footer-group">
+        <button class="btn btn-secondary" id="btn-copy-ledger-detail" onclick="copyLedgerDetails()">내용 복사</button>
+        <button class="btn btn-secondary" onclick="closeLedgerModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 엑셀에 반영하지 못한 변경 (02번 웹관리서버 전용) -->
+<div class="modal-backdrop" id="quarantine-modal-backdrop" role="dialog" aria-modal="true" aria-label="엑셀에 반영하지 못한 변경">
+  <div class="modal-dialog modal-detail">
+    <div class="modal-header">
+      <div class="modal-title">
+        <h2>엑셀에 반영하지 못한 변경</h2>
+        <p class="modal-sub">화면에서 고친 내용 가운데 대장 엑셀 파일에 끝내 적지 못한 것입니다. 엑셀 파일을 닫고 [다시 시도]를 누르세요. 엑셀을 직접 고쳐서 맞췄다면 [목록에서 지우기]를 누르면 됩니다.</p>
+      </div>
+      <button class="btn-close" aria-label="닫기" onclick="closeQuarantineModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="quarantine-list"></div>
+    </div>
+    <div class="modal-footer">
+      <span></span>
+      <div class="footer-group">
+        <button type="button" class="btn btn-secondary" onclick="loadQuarantineList()">새로고침</button>
+        <button type="button" class="btn btn-secondary" onclick="closeQuarantineModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 설정 -->
+<div class="modal-backdrop" id="config-modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-label="화면 설정">
+  <div class="modal-dialog modal-small">
+    <div class="modal-header">
+      <div class="modal-title">
+        <h2>화면 설정</h2>
+        <p class="modal-sub">부서 이름과 화면 맨 위 제목을 바꿉니다.</p>
+      </div>
+      <button class="btn-close" aria-label="닫기" onclick="closeConfigModal()">&times;</button>
+    </div>
+    <form id="config-form" onsubmit="handleConfigSubmit(event)">
+      <div class="modal-body">
+        <div class="field">
+          <label for="cfg-dept">부서명 <span class="req">*</span></label>
+          <input type="text" id="cfg-dept" required placeholder="예: 기획예산팀">
+        </div>
+        <div class="field">
+          <label for="cfg-agency">소속 기관명</label>
+          <input type="text" id="cfg-agency" placeholder="예: 공공기관">
+        </div>
+        <div class="field">
+          <label for="cfg-title">화면 제목</label>
+          <input type="text" id="cfg-title" placeholder="예: 국회 요구자료 관리·검색">
+        </div>
+        <div class="field">
+          <label for="cfg-subtitle">제목 아래 설명</label>
+          <input type="text" id="cfg-subtitle" placeholder="예: 요구자료 관리대장과 과거 답변서 검색">
+        </div>
+        <p class="form-note">02번(웹 관리 서버)으로 연 화면에서는 모든 사용자에게 적용됩니다. 서버 없이 연 화면에서는 이 브라우저에서만 바뀝니다.</p>
+      </div>
+      <div class="modal-footer">
+        <span></span>
+        <div class="footer-group">
+          <button type="button" class="btn btn-secondary" onclick="closeConfigModal()">취소</button>
+          <button type="submit" class="btn btn-primary">저장</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 답변서 상세 -->
+<div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-dialog" id="main-modal-dialog">
+    <div class="modal-header">
+      <div class="modal-title">
+        <div class="modal-title-row">
+          <button class="btn-star" id="modal-star" onclick="toggleModalFavorite()" title="즐겨찾기 추가/해제" aria-label="즐겨찾기">★</button>
+          <h2 id="modal-title">문서 제목</h2>
+        </div>
+        <div class="modal-meta">
+          <span class="badge-id" id="modal-id">DOC-000</span>
+          <span id="modal-date">2026-00-00</span>
+          <span id="modal-requester">요구자</span>
+          <span id="modal-dept">담당부서</span>
+        </div>
+      </div>
+      <div class="modal-header-tools">
+        <div class="font-size-ctrl" title="본문 글자 크기">
+          <button class="font-size-btn" onclick="changeFontSize(-1)" aria-label="글자 작게">가−</button>
+          <button class="font-size-btn" onclick="changeFontSize(1)" aria-label="글자 크게">가＋</button>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btn-modal-max" onclick="toggleModalMaximize()" title="창을 크게/원래대로">크게 보기</button>
+        <button class="btn-close" aria-label="닫기" id="modal-close">&times;</button>
+      </div>
+    </div>
+
+    <div class="modal-tabs">
+      <button class="modal-tab-btn active" data-tab="formatted" onclick="switchModalTab('formatted')">전문 보기</button>
+      <button class="modal-tab-btn" data-tab="qa" onclick="switchModalTab('qa')">질문별로 보기</button>
+      <button class="modal-tab-btn" data-tab="text" onclick="switchModalTab('text')">글자만 보기</button>
+      <span class="modal-tabs-spacer"></span>
+      <button class="modal-tab-action" onclick="openComparePicker()" title="다른 답변서와 나란히 놓고 비교합니다">다른 답변서와 비교</button>
+    </div>
+
+    <div class="modal-body">
+      <div id="modal-view-formatted" class="modal-rendered-view"></div>
+      <div id="modal-view-text" style="display: none;"><pre id="modal-text-content"></pre></div>
+      <div id="modal-view-qa" style="display: none;"></div>
+    </div>
+
+    <div class="modal-footer">
+      <div class="footer-group">
+        <span class="footer-label">복사</span>
+        <button class="btn btn-secondary btn-sm" id="btn-copy-full" title="답변서 전체 글을 복사합니다">전문</button>
+        <button class="btn btn-secondary btn-sm" id="btn-copy-html-table" title="엑셀이나 한글에 붙여 넣어도 표 모양이 유지됩니다">표</button>
+        <button class="btn btn-secondary btn-sm" id="btn-copy-gov" title="□ ○ - 기호로 정리한 보고용 글로 복사합니다">보고용 개조식</button>
+        <button class="btn btn-secondary btn-sm" id="btn-copy-msg" title="메신저·메일에 붙일 짧은 요약을 복사합니다">짧은 요약</button>
+        <button class="btn btn-secondary btn-sm" id="btn-copy-link" title="이 답변서를 바로 여는 주소를 복사합니다">주소</button>
+      </div>
+      <div class="footer-group">
+        <button class="btn btn-secondary btn-sm" id="btn-goto-ledger" style="display:none;" onclick="gotoLinkedLedgerFromDoc()">관리대장에서 보기</button>
+        <a href="#" id="modal-link-md" class="btn btn-secondary btn-sm" target="_blank" title="변환된 전문을 새 탭에서 엽니다">새 탭에서 전문 열기</a>
+        <a href="#" id="modal-link-orig" class="btn btn-primary btn-sm" target="_blank" title="원본 파일이 있는 폴더를 엽니다">원본 파일 위치 열기</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 두 답변서 나란히 비교 -->
+<div class="modal-backdrop" id="compare-backdrop" role="dialog" aria-modal="true" aria-label="두 답변서 나란히 비교">
+  <div class="modal-dialog compare-dialog">
+    <div class="modal-header">
+      <div class="modal-title">
+        <h2>두 답변서 나란히 비교</h2>
+        <p class="modal-sub">왼쪽은 지금 보던 답변서, 오른쪽은 아래에서 고른 답변서입니다.</p>
+      </div>
+      <button class="btn-close" aria-label="닫기" onclick="closeCompareModal()">&times;</button>
+    </div>
+    <div class="compare-picker">
+      <label for="compare-select-b">오른쪽에 놓을 답변서</label>
+      <select id="compare-select-b" onchange="updateCompareRightPane()"></select>
+    </div>
+    <div class="modal-body">
+      <div class="compare-grid">
+        <div class="compare-pane" id="compare-pane-left"></div>
+        <div class="compare-pane" id="compare-pane-right"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script id="COMPRESSED_DATA" type="text/plain">__B64_GZIP_DATA__</script>
+<!-- __DASHBOARD_JS__ -->
+</body>
+</html>
