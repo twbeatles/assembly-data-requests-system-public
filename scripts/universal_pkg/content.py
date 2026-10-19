@@ -240,7 +240,7 @@ HTML_MANUAL_CONTENT_UNIVERSAL = """<!DOCTYPE html>
         <h3 style="color:#047857;">👥 일반 부서원 (조회 / 검색 / 공문서식 복사)</h3>
         <p><span class="badge badge-green">Python 100% 불필요</span> <strong>완전 무설치 사용 가능</strong></p>
         <ul style="margin:10px 0 0 18px; font-size:13px; line-height:1.7;">
-          <li><code>01_웹대시보드_실행.bat</code>: 브라우저에서 즉시 초성/유사어 검색 및 Q&A 상세 열람</li>
+          <li><code>01_웹대시보드_실행.bat</code>: 브라우저에서 즉시 초성/유사어 검색 및 Q&A 상세 열람 (<code>요구자:홍길동</code>, <code>기간:2025-01..2025-06</code> 같은 필드 한정 검색, 문서 안 검색어 이동 <code>F3</code> 지원)</li>
           <li><code>05_통합검색프로그램_실행.bat</code>: 무설치 단일 실행 프로그램(GUI)으로 바로 검색</li>
           <li><code>04_부서명_간편설정.bat</code>: 파이썬이 없어도 메모장으로 자동 전환되어 부서명 수정 가능</li>
           <li>파이썬이나 별도 라이브러리를 설치할 필요가 전혀 없습니다.</li>

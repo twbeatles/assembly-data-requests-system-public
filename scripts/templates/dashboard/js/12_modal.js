@@ -185,6 +185,8 @@ async function openDocModal(doc, targetQNum = null) {
     }, 150);
   } else {
     switchModalTab('formatted');
+    // 검색해서 연 답변서면 첫 검색어 자리를 바로 보여 준다.
+    if (highlightTokens.length) refreshSearchHits(true);
   }
 
   const isWebMode = window.location.protocol.startsWith('http');
@@ -324,6 +326,50 @@ function switchModalTab(tab) {
   document.getElementById('modal-view-formatted').style.display = tab === 'formatted' ? 'block' : 'none';
   document.getElementById('modal-view-text').style.display = tab === 'text' ? 'block' : 'none';
   document.getElementById('modal-view-qa').style.display = tab === 'qa' ? 'block' : 'none';
+  refreshSearchHits(false);
+}
+
+// ---------------------------------------------------------------------------
+// 열린 답변서 안에서 검색어 위치로 옮겨 다닌다(▲/▼, F3/Shift+F3). 수십 쪽짜리 답변서에서
+// 검색어가 어디 있는지 스크롤로 찾지 않아도 된다. 강조(mark.highlight)가 있는 보기에서만 뜬다.
+// ---------------------------------------------------------------------------
+let SEARCH_HITS = [];
+let SEARCH_HIT_IDX = -1;
+
+function visibleModalView() {
+  for (const id of ['modal-view-formatted', 'modal-view-qa']) {
+    const el = document.getElementById(id);
+    if (el && el.style.display !== 'none') return el;
+  }
+  return null;
+}
+
+function updateSearchHitPos() {
+  const pos = document.getElementById('hit-pos');
+  if (pos) pos.textContent = SEARCH_HITS.length ? `${Math.max(SEARCH_HIT_IDX + 1, 0)}/${SEARCH_HITS.length}` : '0/0';
+}
+
+function refreshSearchHits(autoJump) {
+  SEARCH_HITS.forEach(m => m.classList.remove('hit-current'));
+  const view = visibleModalView();
+  SEARCH_HITS = view ? Array.from(view.querySelectorAll('mark.highlight')) : [];
+  SEARCH_HIT_IDX = -1;
+  const nav = document.getElementById('hit-nav');
+  if (nav) nav.hidden = !SEARCH_HITS.length;
+  updateSearchHitPos();
+  if (autoJump && SEARCH_HITS.length) gotoSearchHit(1, true);
+}
+
+function gotoSearchHit(delta, gentle) {
+  if (!SEARCH_HITS.length) return;
+  const n = SEARCH_HITS.length;
+  if (SEARCH_HITS[SEARCH_HIT_IDX]) SEARCH_HITS[SEARCH_HIT_IDX].classList.remove('hit-current');
+  SEARCH_HIT_IDX = SEARCH_HIT_IDX < 0 ? (delta > 0 ? 0 : n - 1) : (SEARCH_HIT_IDX + delta + n) % n;
+  const el = SEARCH_HITS[SEARCH_HIT_IDX];
+  el.classList.add('hit-current');
+  // 처음 열 때는 이미 보이는 자리면 화면을 움직이지 않는다. 직접 누르면 가운데로 가져온다.
+  try { el.scrollIntoView({ block: gentle ? 'nearest' : 'center' }); } catch (e) { el.scrollIntoView(); }
+  updateSearchHitPos();
 }
 
 function closeModal() {

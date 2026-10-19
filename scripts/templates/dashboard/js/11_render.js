@@ -21,7 +21,7 @@ async function render() {
   if (typeof hideSearchSpinner === 'function') hideSearchSpinner();
   if (filtered === null || seq !== RENDER_SEQ) return;
   if (typeof updateBodyLoadStatus === 'function') updateBodyLoadStatus();
-  if (typeof refreshSearchExtras === 'function') refreshSearchExtras();
+  if (typeof refreshSearchExtras === 'function') refreshSearchExtras(filtered);
 
   document.getElementById('count-filtered').innerText = filtered.length;
   let totalCount = DOCUMENTS.length;
@@ -44,11 +44,14 @@ async function render() {
     }
   }
 
+  // 지금 보기 방식(카드/표) 하나만 만든다. 예전에는 둘 다 만들어 숨겨 두어 DOM이 두 배였다.
+  // 보기 방식을 바꾸면 다시 그린다(13_events.js). 조각(fragment)에 모아 한 번에 붙인다.
   const cardContainer = document.getElementById('card-container');
-  cardContainer.innerHTML = '';
   const tableHead = document.getElementById('table-head');
   const tableBody = document.getElementById('table-body');
-  tableBody.innerHTML = '';
+  const wantCards = currentView !== 'table';
+  const cardSink = document.createDocumentFragment();
+  const rowSink = document.createDocumentFragment();
 
   if (currentMode === 'docs' || currentMode === 'tables') {
     tableHead.innerHTML = `
@@ -63,84 +66,88 @@ async function render() {
       const isChecked = selectedDocIds.has(doc.doc_id);
       // 인라인 핸들러에 넣는 ID는 JSON 문자열로 만든 뒤 HTML 이스케이프한다(따옴표가 든 ID도 안전).
       const docIdJs = escapeHtml(JSON.stringify(doc.doc_id));
-
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.onclick = () => openDocModal(doc);
-
-      const docQas = DOC_QAS_MAP[doc.doc_id] || [];
-      let qaChipsHtml = '';
-      if (docQas.length > 0) {
-        qaChipsHtml = `<div class="card-qa-chips">` +
-          // 인라인 onclick은 전역 스코프에서 실행되므로 지역 변수 doc을 볼 수 없다(ReferenceError).
-          // 전역 DOCS_MAP에서 문서를 다시 찾는다. (감사 R3-19a)
-          docQas.slice(0, 5).map(q => `<span class="badge-qa-chip" onclick="event.stopPropagation(); openDocModal(DOCS_MAP[${docIdJs}], ${Number(q.q_num) || 1});" title="${escapeHtml(q.question_title)} — 이 질문의 답변으로 바로 가기">질문 ${Number(q.q_num) || 1}. ${escapeHtml(q.question_title.length > 20 ? q.question_title.slice(0, 20) + '...' : q.question_title)}</span>`).join('') +
-          (docQas.length > 5 ? `<span class="badge-qa-more" onclick="event.stopPropagation(); openDocModal(DOCS_MAP[${docIdJs}], 1);">+${docQas.length - 5}개 더</span>` : '') +
-          `</div>`;
-      }
-
-      const bodyText = doc.full_markdown || doc.answer_full_text || doc.question_list;
-      let snippet = getSnippet(highlightTokens.length ? bodyText : cardPreviewText(bodyText), highlightTokens);
-      if (currentMode === 'tables' && doc.table_summary) {
-        snippet = `<div class="table-summary-note"><strong>들어 있는 표:</strong> ${highlightTextString(doc.table_summary, highlightTokens)}</div>` + snippet;
-      }
       const titleHighlighted = highlightTextString(doc.title, highlightTokens);
       const reqHighlighted = highlightTextString(doc.requester, highlightTokens);
       const dateText = escapeHtml(doc.request_date || doc.year);
 
-      const tagsHtml = (doc.topic_tags ? doc.topic_tags.split(',') : [])
-        .slice(0, 3)
-        .map(t => `<span class="card-tag">${escapeHtml(t.trim())}</span>`).join('');
+      if (wantCards) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = () => openDocModal(doc);
 
-      card.innerHTML = `
-        <div class="card-header-actions" onclick="event.stopPropagation();">
-          <div class="card-meta">
+        const docQas = DOC_QAS_MAP[doc.doc_id] || [];
+        let qaChipsHtml = '';
+        if (docQas.length > 0) {
+          qaChipsHtml = `<div class="card-qa-chips">` +
+            // 인라인 onclick은 전역 스코프에서 실행되므로 지역 변수 doc을 볼 수 없다(ReferenceError).
+            // 전역 DOCS_MAP에서 문서를 다시 찾는다. (감사 R3-19a)
+            docQas.slice(0, 5).map(q => `<span class="badge-qa-chip" onclick="event.stopPropagation(); openDocModal(DOCS_MAP[${docIdJs}], ${Number(q.q_num) || 1});" title="${escapeHtml(q.question_title)} — 이 질문의 답변으로 바로 가기">질문 ${Number(q.q_num) || 1}. ${escapeHtml(String(q.question_title || '').length > 20 ? String(q.question_title).slice(0, 20) + '...' : (q.question_title || ''))}</span>`).join('') +
+            (docQas.length > 5 ? `<span class="badge-qa-more" onclick="event.stopPropagation(); openDocModal(DOCS_MAP[${docIdJs}], 1);">+${docQas.length - 5}개 더</span>` : '') +
+            `</div>`;
+        }
+
+        const bodyText = doc.full_markdown || doc.answer_full_text || doc.question_list;
+        let snippet = highlightTokens.length ? getSnippet(bodyText, highlightTokens, 160, cardPreviewText) : getSnippet(cardPreviewText(bodyText), highlightTokens);
+        if (currentMode === 'tables' && doc.table_summary) {
+          snippet = `<div class="table-summary-note"><strong>들어 있는 표:</strong> ${highlightTextString(doc.table_summary, highlightTokens)}</div>` + snippet;
+        }
+
+        const tagsHtml = (doc.topic_tags ? doc.topic_tags.split(',') : [])
+          .slice(0, 3)
+          .map(t => `<span class="card-tag">${escapeHtml(t.trim())}</span>`).join('');
+
+        card.innerHTML = `
+          <div class="card-header-actions" onclick="event.stopPropagation();">
+            <div class="card-meta">
+              <input type="checkbox" class="card-checkbox" aria-label="이 답변서 선택" ${isChecked ? 'checked' : ''} onchange="toggleSelectDoc(${docIdJs}, this.checked)">
+              <span class="badge-id">${escapeHtml(doc.doc_id)}</span>
+              <span class="card-date">${dateText}</span>
+            </div>
+            <div class="card-top-icons">
+              <button class="btn-star ${isFav ? 'active' : ''}" data-fav-id="${escapeHtml(doc.doc_id)}" onclick="toggleFavorite(${docIdJs}, event)" title="${isFav ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기'}" aria-label="즐겨찾기" aria-pressed="${isFav ? 'true' : 'false'}">★</button>
+            </div>
+          </div>
+          <div class="card-requester">
+            <span class="badge-inst">${escapeHtml(doc.institution)}</span>
+            <span>${reqHighlighted}</span>
+            ${doc.doc_number ? `<span class="sub">(${escapeHtml(doc.doc_number)})</span>` : ''}
+          </div>
+          <div class="card-title">${titleHighlighted}</div>
+          <div class="card-snippet">${snippet}</div>
+          ${qaChipsHtml}
+          <div class="card-footer">
+            <div class="card-tags">${tagsHtml}</div>
+            <div class="card-foot-right">
+              ${doc.has_tables === 'Y' ? `<span class="has-table-badge">표 ${escapeHtml(doc.table_count)}개</span>` : ''}
+              ${docQas.length > 0 ? `<span class="qa-count-badge">질문 ${docQas.length}개</span>` : ''}
+              <span class="card-link">열어 보기 &rarr;</span>
+            </div>
+          </div>
+        `;
+        cardSink.appendChild(card);
+      }
+
+      if (!wantCards) {
+        const tr = document.createElement('tr');
+        tr.onclick = () => openDocModal(doc);
+        tr.innerHTML = `
+          <td class="cell-center" onclick="event.stopPropagation();">
             <input type="checkbox" class="card-checkbox" aria-label="이 답변서 선택" ${isChecked ? 'checked' : ''} onchange="toggleSelectDoc(${docIdJs}, this.checked)">
-            <span class="badge-id">${escapeHtml(doc.doc_id)}</span>
-            <span class="card-date">${dateText}</span>
-          </div>
-          <div class="card-top-icons">
-            <button class="btn-star ${isFav ? 'active' : ''}" onclick="toggleFavorite(${docIdJs}, event)" title="${isFav ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기'}" aria-label="즐겨찾기" aria-pressed="${isFav ? 'true' : 'false'}">★</button>
-          </div>
-        </div>
-        <div class="card-requester">
-          <span class="badge-inst">${escapeHtml(doc.institution)}</span>
-          <span>${reqHighlighted}</span>
-          ${doc.doc_number ? `<span class="sub">(${escapeHtml(doc.doc_number)})</span>` : ''}
-        </div>
-        <div class="card-title">${titleHighlighted}</div>
-        <div class="card-snippet">${snippet}</div>
-        ${qaChipsHtml}
-        <div class="card-footer">
-          <div class="card-tags">${tagsHtml}</div>
-          <div class="card-foot-right">
-            ${doc.has_tables === 'Y' ? `<span class="has-table-badge">표 ${escapeHtml(doc.table_count)}개</span>` : ''}
-            ${docQas.length > 0 ? `<span class="qa-count-badge">질문 ${docQas.length}개</span>` : ''}
-            <span class="card-link">열어 보기 &rarr;</span>
-          </div>
-        </div>
-      `;
-      cardContainer.appendChild(card);
-
-      const tr = document.createElement('tr');
-      tr.onclick = () => openDocModal(doc);
-      tr.innerHTML = `
-        <td class="cell-center" onclick="event.stopPropagation();">
-          <input type="checkbox" class="card-checkbox" aria-label="이 답변서 선택" ${isChecked ? 'checked' : ''} onchange="toggleSelectDoc(${docIdJs}, this.checked)">
-        </td>
-        <td class="cell-id">${escapeHtml(doc.doc_id)}</td>
-        <td class="cell-nowrap">${dateText}</td>
-        <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
-        <td class="cell-title">${titleHighlighted}</td>
-        <td class="cell-clip">${escapeHtml(doc.answer_summary || doc.question_list)}</td>
-        <td class="cell-center cell-nowrap">${doc.has_tables === 'Y' ? `${escapeHtml(doc.table_count)}개` : '-'}</td>
-        <td>${escapeHtml(doc.topic_tags || '-')}</td>
-        <td class="cell-nowrap" onclick="event.stopPropagation();">
-          <a href="${escapeHtml(getDocMdUrl(doc.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a> ·
-          <a href="${escapeHtml(getDocOrigUrl(doc.original_path))}" onclick="return handleOrigClick(event, ${escapeHtml(JSON.stringify(doc.original_path || ''))});" target="_blank" title="원본 파일(서버 화면에서는 파일이 있는 폴더)을 엽니다">원본</a>
-        </td>
-      `;
-      tableBody.appendChild(tr);
+          </td>
+          <td class="cell-id">${escapeHtml(doc.doc_id)}</td>
+          <td class="cell-nowrap">${dateText}</td>
+          <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
+          <td class="cell-title">${titleHighlighted}</td>
+          <td class="cell-clip">${escapeHtml(doc.answer_summary || doc.question_list)}</td>
+          <td class="cell-center cell-nowrap">${doc.has_tables === 'Y' ? `${escapeHtml(doc.table_count)}개` : '-'}</td>
+          <td>${escapeHtml(doc.topic_tags || '-')}</td>
+          <td class="cell-nowrap" onclick="event.stopPropagation();">
+            <a href="${escapeHtml(getDocMdUrl(doc.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a> ·
+            <a href="${escapeHtml(getDocOrigUrl(doc.original_path))}" onclick="return handleOrigClick(event, ${escapeHtml(JSON.stringify(doc.original_path || ''))});" target="_blank" title="원본 파일(서버 화면에서는 파일이 있는 폴더)을 엽니다">원본</a>
+          </td>
+        `;
+        rowSink.appendChild(tr);
+      }
     });
   } else if (currentMode === 'ledger') {
     tableHead.innerHTML = `
@@ -158,65 +165,69 @@ async function render() {
     `;
     displayItems.forEach(item => {
       const dueClass = dueRowClass(item);
-      const card = document.createElement('div');
-      card.className = dueClass ? `card ${dueClass}` : 'card';
-      card.onclick = () => openLedgerModal(item);
-
       const titleHighlighted = highlightTextString(item.title, highlightTokens);
       const reqHighlighted = highlightTextString(`${item.party || ''} ${item.requester || ''}`.trim(), highlightTokens);
-      const nameHighlighted = highlightTextString(item.requester || '', highlightTokens);
-      const detailsSnippet = getSnippet(item.details, highlightTokens);
       const dateText = escapeHtml(item.request_date || item.year);
       const linkedDoc = item.linked_doc_id ? DOCS_MAP[item.linked_doc_id] : null;
-      const footMeta = [
-        item.deadline ? `마감 ${escapeHtml(item.deadline)}` : '마감일 없음',
-        item.submit_date ? `제출 ${escapeHtml(item.submit_date)}` : '',
-        item.department ? escapeHtml(item.department) : ''
-      ].filter(Boolean).join(' · ');
+      if (wantCards) {
+        const card = document.createElement('div');
+        card.className = dueClass ? `card ${dueClass}` : 'card';
+        card.onclick = () => openLedgerModal(item);
 
-      card.innerHTML = `
-        <div class="card-header-actions">
-          <div class="card-meta">
-            <span class="badge-id">${escapeHtml(item.ledger_id)}</span>
-            ${item.seq_no ? `<span class="meta-pill">연번 ${escapeHtml(item.seq_no)}</span>` : ''}
-            <span class="card-date">${dateText}</span>
-          </div>
-          <span class="card-badges">${dueBadgeHtml(item)}${statusPillHtml(item)}</span>
-        </div>
-        <div class="card-requester">
-          ${item.party ? `<span class="badge-inst">${escapeHtml(item.party)}</span>` : ''}
-          <span>${nameHighlighted || '요구자 모름'}</span>
-          ${item.aide ? `<span class="sub">(보좌관 ${escapeHtml(item.aide)})</span>` : ''}
-        </div>
-        <div class="card-title">${titleHighlighted}</div>
-        <div class="card-snippet">${detailsSnippet || '<span class="muted">적어 둔 세부 요구내역이 없습니다</span>'}</div>
-        <div class="card-footer">
-          <div class="card-foot-meta">${footMeta}</div>
-          <div class="card-foot-right">
-            ${linkedDoc ? `<span class="linked-badge">답변서 있음</span>` : ''}
-            <span class="card-link">열어 보기 &rarr;</span>
-          </div>
-        </div>
-      `;
-      cardContainer.appendChild(card);
+        const nameHighlighted = highlightTextString(item.requester || '', highlightTokens);
+        const detailsSnippet = getSnippet(item.details, highlightTokens);
+        const footMeta = [
+          item.deadline ? `마감 ${escapeHtml(item.deadline)}` : '마감일 없음',
+          item.submit_date ? `제출 ${escapeHtml(item.submit_date)}` : '',
+          item.department ? escapeHtml(item.department) : ''
+        ].filter(Boolean).join(' · ');
 
-      const tr = document.createElement('tr');
-      if (dueClass) tr.className = dueClass;
-      tr.onclick = () => openLedgerModal(item);
-      tr.innerHTML = `
-        <td class="cell-id">${escapeHtml(item.ledger_id)}</td>
-        <td class="cell-center">${escapeHtml(item.seq_no || '-')}</td>
-        <td class="cell-nowrap">${dateText}</td>
-        <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
-        <td class="cell-title">${titleHighlighted}</td>
-        <td class="cell-clip">${escapeHtml(item.details || '-')}</td>
-        <td class="cell-nowrap">${escapeHtml(item.deadline || '-')} ${dueBadgeHtml(item)}</td>
-        <td class="cell-center">${statusPillHtml(item)}</td>
-        <td class="cell-center" onclick="event.stopPropagation();">
-          ${linkedDoc ? `<a href="#" onclick="openDocModal(DOCS_MAP[${escapeHtml(JSON.stringify(item.linked_doc_id))}]); return false;">열기</a>` : '<span class="muted">-</span>'}
-        </td>
-      `;
-      tableBody.appendChild(tr);
+        card.innerHTML = `
+          <div class="card-header-actions">
+            <div class="card-meta">
+              <span class="badge-id">${escapeHtml(item.ledger_id)}</span>
+              ${item.seq_no ? `<span class="meta-pill">연번 ${escapeHtml(item.seq_no)}</span>` : ''}
+              <span class="card-date">${dateText}</span>
+            </div>
+            <span class="card-badges">${dueBadgeHtml(item)}${statusPillHtml(item)}</span>
+          </div>
+          <div class="card-requester">
+            ${item.party ? `<span class="badge-inst">${escapeHtml(item.party)}</span>` : ''}
+            <span>${nameHighlighted || '요구자 모름'}</span>
+            ${item.aide ? `<span class="sub">(보좌관 ${escapeHtml(item.aide)})</span>` : ''}
+          </div>
+          <div class="card-title">${titleHighlighted}</div>
+          <div class="card-snippet">${detailsSnippet || '<span class="muted">적어 둔 세부 요구내역이 없습니다</span>'}</div>
+          <div class="card-footer">
+            <div class="card-foot-meta">${footMeta}</div>
+            <div class="card-foot-right">
+              ${linkedDoc ? `<span class="linked-badge">답변서 있음</span>` : ''}
+              <span class="card-link">열어 보기 &rarr;</span>
+            </div>
+          </div>
+        `;
+        cardSink.appendChild(card);
+      }
+
+      if (!wantCards) {
+        const tr = document.createElement('tr');
+        if (dueClass) tr.className = dueClass;
+        tr.onclick = () => openLedgerModal(item);
+        tr.innerHTML = `
+          <td class="cell-id">${escapeHtml(item.ledger_id)}</td>
+          <td class="cell-center">${escapeHtml(item.seq_no || '-')}</td>
+          <td class="cell-nowrap">${dateText}</td>
+          <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
+          <td class="cell-title">${titleHighlighted}</td>
+          <td class="cell-clip">${escapeHtml(item.details || '-')}</td>
+          <td class="cell-nowrap">${escapeHtml(item.deadline || '-')} ${dueBadgeHtml(item)}</td>
+          <td class="cell-center">${statusPillHtml(item)}</td>
+          <td class="cell-center" onclick="event.stopPropagation();">
+            ${linkedDoc ? `<a href="#" onclick="openDocModal(DOCS_MAP[${escapeHtml(JSON.stringify(item.linked_doc_id))}]); return false;">열기</a>` : '<span class="muted">-</span>'}
+          </td>
+        `;
+        rowSink.appendChild(tr);
+      }
     });
   } else {
     tableHead.innerHTML = `
@@ -231,53 +242,59 @@ async function render() {
         if (parentDoc) openDocModal(parentDoc, qa.q_num);
         else notify('이 질문이 들어 있던 답변서를 찾을 수 없습니다.', 'warn');
       };
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.onclick = openParent;
-
-      const snippet = getSnippet(highlightTokens.length ? qa.answer_full : cardPreviewText(qa.answer_full), highlightTokens);
       const qTitleHighlighted = highlightTextString(qa.question_title, highlightTokens);
       const reqHighlighted = highlightTextString(qa.requester, highlightTokens);
       const dateText = escapeHtml(qa.request_date || qa.year);
+      if (wantCards) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = openParent;
 
-      card.innerHTML = `
-        <div class="card-header-actions">
-          <div class="card-meta">
-            <span class="badge-id">${escapeHtml(qa.qa_id)}</span>
-            <span class="card-date">${dateText}</span>
+        const snippet = highlightTokens.length ? getSnippet(qa.answer_full, highlightTokens, 160, cardPreviewText) : getSnippet(cardPreviewText(qa.answer_full), highlightTokens);
+
+        card.innerHTML = `
+          <div class="card-header-actions">
+            <div class="card-meta">
+              <span class="badge-id">${escapeHtml(qa.qa_id)}</span>
+              <span class="card-date">${dateText}</span>
+            </div>
           </div>
-        </div>
-        <div class="card-requester">
-          <span class="badge-inst">${escapeHtml(qa.institution)}</span>
-          <span>${reqHighlighted}</span>
-          <span class="sub">(질문 ${escapeHtml(qa.q_num)})</span>
-        </div>
-        <div class="card-title">${qTitleHighlighted}</div>
-        <div class="card-snippet">${snippet}</div>
-        <div class="card-footer">
-          <div>${qa.has_tables === 'Y' ? '<span class="has-table-badge">표 있음</span>' : ''}</div>
-          <span class="card-link">답변 보기 &rarr;</span>
-        </div>
-      `;
-      cardContainer.appendChild(card);
+          <div class="card-requester">
+            <span class="badge-inst">${escapeHtml(qa.institution)}</span>
+            <span>${reqHighlighted}</span>
+            <span class="sub">(질문 ${escapeHtml(qa.q_num)})</span>
+          </div>
+          <div class="card-title">${qTitleHighlighted}</div>
+          <div class="card-snippet">${snippet}</div>
+          <div class="card-footer">
+            <div>${qa.has_tables === 'Y' ? '<span class="has-table-badge">표 있음</span>' : ''}</div>
+            <span class="card-link">답변 보기 &rarr;</span>
+          </div>
+        `;
+        cardSink.appendChild(card);
+      }
 
-      const tr = document.createElement('tr');
-      tr.onclick = openParent;
-      tr.innerHTML = `
-        <td class="cell-id">${escapeHtml(qa.qa_id)}</td>
-        <td class="cell-id">${escapeHtml(qa.doc_id)}</td>
-        <td class="cell-nowrap">${dateText}</td>
-        <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
-        <td class="cell-title">${qTitleHighlighted}</td>
-        <td class="cell-clip">${escapeHtml(cardPreviewText(qa.answer_full).slice(0, 200))}</td>
-        <td class="cell-center">${qa.has_tables === 'Y' ? '있음' : '-'}</td>
-        <td class="cell-nowrap" onclick="event.stopPropagation();">
-          <a href="${escapeHtml(getDocMdUrl(qa.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a>
-        </td>
-      `;
-      tableBody.appendChild(tr);
+      if (!wantCards) {
+        const tr = document.createElement('tr');
+        tr.onclick = openParent;
+        tr.innerHTML = `
+          <td class="cell-id">${escapeHtml(qa.qa_id)}</td>
+          <td class="cell-id">${escapeHtml(qa.doc_id)}</td>
+          <td class="cell-nowrap">${dateText}</td>
+          <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
+          <td class="cell-title">${qTitleHighlighted}</td>
+          <td class="cell-clip">${escapeHtml(cardPreviewText(qa.answer_full).slice(0, 200))}</td>
+          <td class="cell-center">${qa.has_tables === 'Y' ? '있음' : '-'}</td>
+          <td class="cell-nowrap" onclick="event.stopPropagation();">
+            <a href="${escapeHtml(getDocMdUrl(qa.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a>
+          </td>
+        `;
+        rowSink.appendChild(tr);
+      }
     });
   }
+  cardContainer.replaceChildren(cardSink);
+  tableBody.replaceChildren(rowSink);
 }
 
 // 카드 미리보기용: 마크다운 기호(#, |, ---, ** 등)와 HTML 태그를 걷어 낸 앞부분 글.
@@ -303,9 +320,20 @@ function toggleFavorite(id, event) {
   } else {
     favorites.push(id);
   }
-  localStorage.setItem('datareq_favorites', JSON.stringify(favorites));
+  try { localStorage.setItem('datareq_favorites', JSON.stringify(favorites)); } catch (e) {}
   updateFavCount();
-  render();
+  // '즐겨찾기만' 보기일 때만 목록이 바뀐다. 그 밖에는 별 모양만 고친다(전체 검색을 다시 돌리지 않는다).
+  if (activeFilters.onlyFavorites) {
+    render();
+    return;
+  }
+  const on = favorites.includes(id);
+  document.querySelectorAll('.btn-star[data-fav-id]').forEach(btn => {
+    if (btn.getAttribute('data-fav-id') !== String(id)) return;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.title = on ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기';
+  });
 }
 
 function toggleModalFavorite() {

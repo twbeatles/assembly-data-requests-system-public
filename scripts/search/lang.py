@@ -16,10 +16,14 @@ NOSPACE_CODEPOINTS = (
     8232, 8233, 8239, 8287, 12288,
 )
 KOREAN_PARTICLES = (
-    "에서", "으로", "에게", "까지", "부터", "보다", "처럼",
+    "에서는", "에게는", "으로는", "에서도",
+    "에서", "으로", "에게", "까지", "부터", "보다", "처럼", "에는", "에도", "로는", "이나",
     "을", "를", "이", "가", "은", "는", "의", "에", "로",
-    "과", "와", "도", "만", "나", "이나",
+    "과", "와", "도", "만", "나",
 )
+# 긴 조사부터 본다. 예전에는 "나"를 "이나"보다 먼저 봐서 "예산이나"가 "예산이"로 잘렸다.
+# 대시보드 `01_search.js`의 KOREAN_PARTICLES_LONGEST_FIRST와 같은 규칙이다.
+_PARTICLES_LONGEST_FIRST = tuple(sorted(KOREAN_PARTICLES, key=len, reverse=True))
 CHOSEONG_LIST = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
 # 초성 사본을 만들 최대 길이. 문서 전문에 초성 변환을 걸면 검색 한 번에 수백만 글자를 돈다.
 # 초성 검색은 제목·요구자처럼 짧은 필드에서만 뜻이 있다.
@@ -50,7 +54,7 @@ def _clean_term(term: str) -> str:
 def strip_particle(word: str) -> str:
     if not word or len(word) <= 2:
         return word
-    for p in KOREAN_PARTICLES:
+    for p in _PARTICLES_LONGEST_FIRST:
         if len(word) > len(p) + 1 and word.endswith(p):
             return word[: -len(p)]
     return word

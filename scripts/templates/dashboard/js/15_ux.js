@@ -271,11 +271,33 @@ function buildTopicChips() {
   if (entries.length) rebuildChipGroup('topic-chips', 'topic', entries);
 }
 
+// 기관 칩도 데이터의 institution 빈도로 만든다. 고정 칩(국회·상급감독기관 등)은 다른 부서·기관
+// 배포본에서 0건 칩이 되거나, 실제로 많은 기관이 빠졌다. 건수는 필터와 같은 규칙(부분일치)으로 센다.
+function buildInstChips() {
+  if (!_UXD || typeof rebuildChipGroup !== 'function') return;
+  const docs = (typeof DOCUMENTS !== 'undefined' && DOCUMENTS) || [];
+  const names = new Map();
+  docs.forEach(d => {
+    const v = String((d && d.institution) || '').trim();
+    if (v) names.set(v, (names.get(v) || 0) + 1);
+  });
+  if (!names.size) return;
+  const top = Array.from(names.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([v]) => v);
+  const entries = top.map(v => ({
+    value: v,
+    label: `${v} (${docs.filter(d => d && d.institution && String(d.institution).includes(v)).length})`
+  }));
+  rebuildChipGroup('inst-chips', 'inst', entries);
+}
+
 if (typeof _UXG.buildDynamicFilters === 'function') {
   const _buildDynamicFilters = _UXG.buildDynamicFilters;
   _UXG.buildDynamicFilters = function (...args) {
     const r = _buildDynamicFilters.apply(this, args);
+    try { buildInstChips(); } catch (e) {}
     try { buildTopicChips(); } catch (e) {}
+    // 위에서 다시 만든 칩도 Tab·Enter로 누를 수 있게 한다(원래 함수의 syncChipA11y는 그 전에 돌았다).
+    try { if (typeof syncChipA11y === 'function') syncChipA11y(); } catch (e) {}
     try { refreshDueSummary(); } catch (e) {}
     return r;
   };
@@ -291,31 +313,66 @@ function hasActiveSearch() {
     || (f.due && f.due !== 'ALL') || f.tablesOnly || f.onlyFavorites);
 }
 
-function refreshSearchExtras() {
+// 탭별 건수 계산 차례. 새 검색이 시작되면 하던 계산은 버린다.
+let SEARCH_EXTRAS_SEQ = 0;
+
+// 같은 matchSearchItem으로 목록을 시간 조각(약 12ms)으로 나눠 평가한다(불변조건 51 — 결과 일치).
+// 예전에는 렌더할 때마다 네 목록을 한 번에 동기로 다시 훑어, 시간 조각으로 나눈 화면 검색의
+// 이득을 이 계산이 다 까먹었다(문서가 많으면 입력이 멈췄다).
+async function collectMatchesAsync(items, prepared, isStale) {
+  const out = [];
+  const list = items || [];
+  let i = 0;
+  while (i < list.length) {
+    const started = Date.now();
+    while (i < list.length) {
+      if (matchSearchItem(list[i], prepared, false) >= 0) out.push(list[i]);
+      i += 1;
+      if ((i & 7) === 0 && Date.now() - started >= 12) break;
+    }
+    if (i < list.length) {
+      await new Promise(r => setTimeout(r, 0));
+      if (isStale()) return null;
+    }
+  }
+  return out;
+}
+
+async function refreshTabCounts(currentFiltered, setTab) {
+  const seq = ++SEARCH_EXTRAS_SEQ;
+  const isStale = () => seq !== SEARCH_EXTRAS_SEQ;
+  // 결과 목록을 먼저 그리고 나서 센다.
+  await new Promise(r => setTimeout(r, 0));
+  if (isStale()) return;
+  const prepared = prepareSearchQuery(activeFilters.query);
+  const mode = (typeof currentMode !== 'undefined') ? currentMode : 'docs';
+  const reuse = (m) => (mode === m && Array.isArray(currentFiltered)) ? currentFiltered : null;
+  try {
+    // '표 있는 답변서' = 답변서 가운데 표가 있는 것. 같은 조건이므로 답변서 결과에서 바로 센다.
+    const docs = reuse('docs') || await collectMatchesAsync(DOCUMENTS, prepared, isStale);
+    if (docs === null || isStale()) return;
+    setTab('tab-count-docs', docs.length);
+    setTab('tab-count-tables', docs.filter(d => d && d.has_tables === 'Y').length);
+    const ledger = reuse('ledger') || await collectMatchesAsync(REQUEST_LEDGER, prepared, isStale);
+    if (ledger === null || isStale()) return;
+    setTab('tab-count-ledger', ledger.length);
+    const qas = reuse('qa') || await collectMatchesAsync(QA_ITEMS, prepared, isStale);
+    if (qas === null || isStale()) return;
+    setTab('tab-count-qa', qas.length);
+  } catch (e) { /* 본문 로딩 중 실패하면 예전 값을 둔다 */ }
+}
+
+function refreshSearchExtras(currentFiltered) {
   if (!_UXD) return;
-  const show = hasActiveSearch() && (typeof filterItemsFromList === 'function');
+  const show = hasActiveSearch() && (typeof matchSearchItem === 'function');
   const setTab = (id, v) => {
     const el = _UXD.getElementById(id);
     if (el) el.textContent = show ? ` · ${v}건` : '';
   };
   if (show) {
-    // 같은 matchSearchItem으로 세 목록을 각각 센다(불변조건 51 — 결과 일치).
-    let docs = 0;
-    let qas = 0;
-    let ledger = 0;
-    let tables = 0;
-    try {
-      docs = filterItemsFromList(DOCUMENTS, false).length;
-      qas = filterItemsFromList(QA_ITEMS, false).length;
-      ledger = filterItemsFromList(REQUEST_LEDGER, false).length;
-      tables = filterItemsFromList(
-        (DOCUMENTS || []).filter(d => d && d.has_tables === 'Y'), false).length;
-    } catch (e) { /* 본문 로딩 중 실패하면 0건으로 둔다 */ }
-    setTab('tab-count-docs', docs);
-    setTab('tab-count-qa', qas);
-    setTab('tab-count-tables', tables);
-    setTab('tab-count-ledger', ledger);
+    refreshTabCounts(currentFiltered, setTab);
   } else {
+    SEARCH_EXTRAS_SEQ += 1;
     ['tab-count-docs', 'tab-count-qa', 'tab-count-tables', 'tab-count-ledger'].forEach(id => setTab(id, ''));
   }
   try { renderActiveChips(); } catch (e) {}
@@ -639,25 +696,36 @@ function refreshSimilarPanel() {
   if (typeof bodiesLoading === 'function' && bodiesLoading()) {
     list.innerHTML = '<div class="similar-hint">답변서 본문을 불러오는 중입니다. 잠시 뒤에 더 정확하게 찾아 줍니다.</div>';
   }
-  let prepared = null;
+  // 낱말마다 따로 평가해, 겹치는 낱말이 많은 답변이 앞에 오게 한다. 예전에는 'A OR B OR C'로
+  // 한 번에 봐서 낱말 하나만 걸린 답변과 셋 다 걸린 답변이 같은 줄에 섰다.
+  // 화면의 연도·기관·즐겨찾기 칩은 보지 않는다 — 추천이 메인 목록 필터에 묶이면 안 된다.
+  let preparedList = null;
   try {
-    prepared = prepareSearchQuery(keys.join(' OR '));
+    preparedList = keys.map(k => prepareSearchQuery(k));
   } catch (e) {
     return;
   }
   const scored = [];
   const push = (item, kind) => {
-    let s = -1;
-    try {
-      s = matchSearchItem(item, prepared, false);
-    } catch (e) {
-      s = -1;
+    let hits = 0;
+    let total = 0;
+    for (const prepared of preparedList) {
+      let s = -1;
+      try {
+        s = matchSearchItem(item, prepared, false, true);
+      } catch (e) {
+        s = -1;
+      }
+      if (s >= 0) {
+        hits += 1;
+        total += s;
+      }
     }
-    if (s >= 0) scored.push({ item, kind, score: s });
+    if (hits) scored.push({ item, kind, hits, score: total });
   };
   ((typeof DOCUMENTS !== 'undefined' && DOCUMENTS) || []).forEach(d => push(d, 'doc'));
   ((typeof QA_ITEMS !== 'undefined' && QA_ITEMS) || []).forEach(q => push(q, 'qa'));
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => (b.hits - a.hits) || (b.score - a.score));
   const top = scored.slice(0, 5);
   if (count) count.textContent = top.length ? `${top.length}건` : '';
   list.innerHTML = '';

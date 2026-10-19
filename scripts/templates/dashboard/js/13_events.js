@@ -27,6 +27,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
+      // 새 검색어면 결과 앞쪽부터 보여 준다(앞 검색에서 [더 보기]로 늘린 한도를 이어 쓰지 않는다).
+      currentRenderLimit = 40;
       render();
     }, 200);
     clearTimeout(recentSearchTimer);
@@ -64,14 +66,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     render();
   });
 
+  // 지금 보기 방식만 그리므로(11_render.js) 바꾸면 다시 그린다.
   document.getElementById('btn-view-card').addEventListener('click', () => {
+    if (currentView === 'card') return;
     setView('card');
     saveViewPrefs();
+    render();
   });
 
   document.getElementById('btn-view-table').addEventListener('click', () => {
+    if (currentView === 'table') return;
     setView('table');
     saveViewPrefs();
+    render();
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -95,6 +102,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.addEventListener('keydown', (e) => {
+    // 답변서 창이 열려 있으면 F3 / Shift+F3으로 검색어 위치를 옮긴다(브라우저 찾기 대신).
+    if (e.key === 'F3' && isModalOpen('modal-backdrop') && SEARCH_HITS.length) {
+      e.preventDefault();
+      gotoSearchHit(e.shiftKey ? -1 : 1);
+      return;
+    }
     if (e.key === 'Escape') {
       if (typeof closeTopModal === 'function' && closeTopModal()) return;
       closeModal();
