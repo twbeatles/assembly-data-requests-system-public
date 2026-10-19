@@ -461,6 +461,14 @@
   .modal-tabs-spacer { flex: 1; }
   .modal-tab-action { background: none; border: 0; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 8px 4px; }
   .modal-tab-action:hover { text-decoration: underline; }
+  .hit-nav { display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: 12px; color: var(--text-muted); }
+  .hit-nav[hidden] { display: none; }
+  .hit-nav-label { font-weight: 600; }
+  .hit-nav-btn { border: 1px solid var(--border-strong); background: var(--card-bg); color: var(--text); border-radius: var(--radius-sm); width: 26px; height: 24px; cursor: pointer; font-size: 11px; line-height: 1; }
+  .hit-nav-btn:hover { background: var(--tag-bg); border-color: var(--accent); }
+  .hit-nav-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .hit-pos { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+  mark.highlight.hit-current { background: #fb923c; color: #fff; box-shadow: 0 0 0 2px #fb923c; }
   .modal-body { padding: 20px 22px; overflow-y: auto; font-size: 14px; flex: 1; line-height: 1.6; background: #fff; min-height: 0; }
   #modal-text-content { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; line-height: 1.7; }
   .modal-footer {
@@ -800,6 +808,8 @@
       <button type="button" class="g-chip" data-insert=" OR " title="둘 중 하나라도 들어간 자료">A 또는 B</button>
       <button type="button" class="g-chip" data-insert=" -" title="뒤에 적은 단어가 들어간 자료는 뺍니다">단어 빼기</button>
       <button type="button" class="g-chip" data-insert='""' data-caret="-1" title="따옴표 안에 적은 그대로 찾습니다">“그대로 찾기”</button>
+      <button type="button" class="g-chip" data-insert="요구자:" title="이 사람이 요구한 자료만 (예: 요구자:홍길동)">요구자로</button>
+      <button type="button" class="g-chip" data-insert="기간:" title="요구일 기간으로 거르기 (예: 기간:2025-01..2025-06)">기간으로</button>
       <button type="button" class="g-chip" data-jump="search-help" title="검색 방법 전체 보기">검색 방법 더 보기</button>
       <label class="option-check" title="‘과기부’로 찾으면 ‘과학기술정보통신부’도, ‘트위터’로 찾으면 ‘엑스’도 함께 찾습니다">
         <input type="checkbox" id="chk-synonyms" checked> 비슷한 말도 함께 찾기
@@ -813,6 +823,8 @@
         <tr><td><code>딥페이크 -텔레그램</code></td><td>앞 단어는 있고 뒤 단어는 없는 자료</td></tr>
         <tr><td><code>"최근 3년"</code></td><td>따옴표 안에 적은 그대로</td></tr>
         <tr><td><code>ㄷㅍㅇㅋ</code>, <code>딥ㅍㅇㅋ</code></td><td>초성만 쳐도 찾습니다</td></tr>
+        <tr><td><code>요구자:홍길동</code>, <code>상태:제출완료</code></td><td>칸을 정해서 찾습니다 (요구자·의원·상태·연도·기관·정당·부서·연번·문서번호)</td></tr>
+        <tr><td><code>기간:2025-01..2025-06</code></td><td>요구일이 그 기간 안인 자료 (<code>기간:2025</code>, <code>기간:2025-03</code>도 됩니다)</td></tr>
         <tr><td>비슷한 말</td><td><code>과기부</code> ↔ <code>과학기술정보통신부</code>처럼 같은 뜻의 말을 함께 찾습니다 (위 체크박스로 끌 수 있습니다)</td></tr>
       </table>
     </details>
@@ -828,7 +840,8 @@
 
       <div class="filter-group" id="filter-group-inst">
         <span class="filter-label">요구 기관</span>
-        <div class="filter-chips">
+        <!-- 기관 칩은 데이터에 있는 기관으로 다시 만든다(buildInstChips). 아래는 데이터가 없을 때의 기본값. -->
+        <div class="filter-chips" id="inst-chips">
           <span class="chip active" data-filter="inst" data-val="ALL">전체</span>
           <span class="chip" data-filter="inst" data-val="국회">국회</span>
           <span class="chip" data-filter="inst" data-val="상급감독기관">상급감독기관/대외기관</span>
@@ -1356,6 +1369,12 @@
       <button class="modal-tab-btn" data-tab="qa" onclick="switchModalTab('qa')">질문별로 보기</button>
       <button class="modal-tab-btn" data-tab="text" onclick="switchModalTab('text')">글자만 보기</button>
       <span class="modal-tabs-spacer"></span>
+      <span class="hit-nav" id="hit-nav" role="group" aria-label="검색어 위치 이동" hidden>
+        <span class="hit-nav-label">검색어</span>
+        <button type="button" class="hit-nav-btn" id="hit-prev" onclick="gotoSearchHit(-1)" title="앞 검색어로 (Shift+F3)" aria-label="앞 검색어로">▲</button>
+        <span class="hit-pos" id="hit-pos" aria-live="polite">0/0</span>
+        <button type="button" class="hit-nav-btn" id="hit-next" onclick="gotoSearchHit(1)" title="다음 검색어로 (F3)" aria-label="다음 검색어로">▼</button>
+      </span>
       <button class="modal-tab-action" onclick="openComparePicker()" title="다른 답변서와 나란히 놓고 비교합니다">다른 답변서와 비교</button>
     </div>
 
@@ -1910,15 +1929,19 @@ const SYNONYMS = {
 };
 
 // Korean Particles to strip for stemming
+// 파이썬 정본 `search/lang.py`의 KOREAN_PARTICLES와 같은 목록이다. 한쪽만 고치면 화면과 서버 결과가 갈린다.
 const KOREAN_PARTICLES = [
-  '에서', '으로', '에게', '까지', '부터', '보다', '처럼',
+  '에서는', '에게는', '으로는', '에서도',
+  '에서', '으로', '에게', '까지', '부터', '보다', '처럼', '에는', '에도', '로는', '이나',
   '을', '를', '이', '가', '은', '는', '의', '에', '로',
-  '과', '와', '도', '만', '나', '이나'
+  '과', '와', '도', '만', '나'
 ];
+// 긴 조사부터 본다. 예전에는 '나'를 '이나'보다 먼저 봐서 '예산이나'가 '예산이'로 잘렸다.
+const KOREAN_PARTICLES_LONGEST_FIRST = KOREAN_PARTICLES.slice().sort((a, b) => b.length - a.length);
 
 function stripKoreanParticle(word) {
   if (!word || word.length <= 2) return word;
-  for (const p of KOREAN_PARTICLES) {
+  for (const p of KOREAN_PARTICLES_LONGEST_FIRST) {
     if (word.length > p.length + 1 && word.endsWith(p)) {
       return word.slice(0, -p.length);
     }
@@ -2013,7 +2036,15 @@ let currentMode = 'docs'; // 'docs', 'qa', 'tables'
 let currentView = 'card';
 let currentRenderLimit = 40;
 let currentModalFontSize = 14;
-let favorites = JSON.parse(localStorage.getItem('datareq_favorites') || '[]');
+// 저장소가 막혔거나 값이 깨져도 화면은 떠야 한다(예전에는 여기서 예외가 나면 대시보드 전체가 멈췄다).
+let favorites = (() => {
+  try {
+    const v = JSON.parse(localStorage.getItem('datareq_favorites') || '[]');
+    return Array.isArray(v) ? v : [];
+  } catch (e) {
+    return [];
+  }
+})();
 let selectedDocIds = new Set();
 
 let activeFilters = {
@@ -2336,11 +2367,89 @@ function handleOrigClick(event, relPath) {
 }
 
 
+// `필드:값` 한정자. 서버 정본 `search/lang.py`의 FIELD_ALIASES와 같은 이름·규칙이다(불변조건 19 취지).
+// 여기 있는 이름만 한정자로 본다. 모르는 접두사(`테스트:질의`)는 평범한 검색어로 둔다.
+const SEARCH_FIELD_ALIASES = {
+  '요구자': 'requester', '의원': 'requester', 'requester': 'requester',
+  '상태': 'status', '진행상태': 'status', 'status': 'status',
+  '연도': 'year', '년도': 'year', 'year': 'year',
+  '문서번호': 'doc_number', 'docno': 'doc_number',
+  '연번': 'seq_no', 'seq': 'seq_no',
+  '정당': 'party', 'party': 'party',
+  '부서': 'department', '담당부서': 'department', 'department': 'department',
+  '기관': 'institution', 'institution': 'institution',
+  '기간': 'date', '일자': 'date', 'date': 'date'
+};
+// 값 전체가 같아야 하는 필드. 부분일치로 두면 `상태:제출`이 `미제출`에도 걸린다.
+const SEARCH_EXACT_FIELDS = ['status', 'year', 'seq_no', 'doc_number'];
+
+// `2026`, `2026-03`, `2026.03.01`을 비교 가능한 `YYYY-MM-DD`로 편다. 파이썬 normalize_date와 같은 규칙.
+function normalizeSearchDate(value, endOfRange) {
+  const v = String(value || '').trim().replace(/\./g, '-');
+  const parts = v.split('-').filter(Boolean);
+  if (!parts.length || !/^\d+$/.test(parts[0])) return '';
+  const year = parts[0].padStart(4, '0');
+  if (parts.length === 1) return endOfRange ? `${year}-12-31` : `${year}-01-01`;
+  const month = parts[1].padStart(2, '0');
+  if (parts.length === 2) {
+    if (!endOfRange) return `${year}-${month}-01`;
+    const last = new Date(Number(year), Number(month), 0).getDate();
+    return `${year}-${month}-${String(Number.isFinite(last) && last > 0 ? last : 28).padStart(2, '0')}`;
+  }
+  return `${year}-${month}-${parts[2].padStart(2, '0')}`;
+}
+
+// 한정자 토큰이면 fields에 담고 true. 서버 search/parse.py `_take_field`와 같은 규칙.
+function takeSearchField(raw, fields) {
+  const m = /^([0-9A-Za-z가-힣]+):(.*)$/.exec(raw);
+  if (!m) return false;
+  const key = SEARCH_FIELD_ALIASES[m[1].toLowerCase()];
+  if (!key) return false;
+  const value = m[2].trim().replace(/^"+|"+$/g, '');
+  if (!value) return true;
+  if (key === 'date') {
+    const rng = /^([0-9][0-9\-.]*)?\.\.([0-9][0-9\-.]*)?$/.exec(value);
+    const start = normalizeSearchDate(rng ? (rng[1] || '') : value, false);
+    const end = normalizeSearchDate(rng ? (rng[2] || '') : value, true);
+    if (start) fields.date_from = start;
+    if (end) fields.date_to = end;
+    return true;
+  }
+  (fields[key] = fields[key] || []).push(value.toLowerCase());
+  return true;
+}
+
+// 한정자를 항목 하나에 적용한다. 서버 search/match.py `fields_match`와 같은 규칙.
+function searchFieldsMatch(fields, item) {
+  if (!fields) return true;
+  const ns = (x) => String(x == null ? '' : x).replace(/\s+/g, '').toLowerCase();
+  for (const key of Object.keys(fields)) {
+    if (key === 'date_from' || key === 'date_to') continue;
+    let raw = item[key];
+    if (key === 'department' && !raw) raw = item.contact_person;
+    const actual = ns(raw);
+    const wanted = fields[key];
+    if (SEARCH_EXACT_FIELDS.includes(key)) {
+      if (!wanted.some(w => ns(w) === actual)) return false;
+    } else if (!wanted.some(w => actual.includes(ns(w)))) {
+      return false;
+    }
+  }
+  if (fields.date_from || fields.date_to) {
+    const actual = String(item.request_date || '').trim();
+    if (!actual) return false;
+    if (fields.date_from && actual < fields.date_from) return false;
+    if (fields.date_to && actual > fields.date_to) return false;
+  }
+  return true;
+}
+
 function parseSearchTokens(query) {
-  if (!query) return { posGroups: [], neg: [], allHighlightTokens: [] };
+  if (!query) return { posGroups: [], neg: [], fields: null, allHighlightTokens: [] };
 
   const useSynonyms = document.getElementById('chk-synonyms') ? document.getElementById('chk-synonyms').checked : true;
   const neg = [];
+  const fields = {};
   const allHighlightTokens = new Set();
 
   let cleanQuery = query.trim();
@@ -2393,6 +2502,11 @@ function parseSearchTokens(query) {
     rawTokens.forEach(t => {
       if (t.startsWith('-') && t.length > 1) {
         neg.push(t.slice(1).toLowerCase());
+      } else if (t && takeSearchField(t, fields)) {
+        // 이름·기관처럼 부분일치하는 한정자 값은 화면에서도 강조한다.
+        const key = SEARCH_FIELD_ALIASES[t.split(':')[0].toLowerCase()];
+        const value = t.slice(t.indexOf(':') + 1).replace(/^"+|"+$/g, '').toLowerCase();
+        if (value && key !== 'date' && !SEARCH_EXACT_FIELDS.includes(key)) allHighlightTokens.add(value);
       } else if (t) {
         const lower = t.toLowerCase();
         const isCho = isChoseongOnly(lower);
@@ -2430,6 +2544,7 @@ function parseSearchTokens(query) {
   return {
     posGroups: posGroups,
     neg: Array.from(new Set(neg)),
+    fields: Object.keys(fields).length ? fields : null,
     allHighlightTokens: Array.from(allHighlightTokens)
   };
 }
@@ -2516,11 +2631,20 @@ function safeMarkedParse(md) {
 }
 
 
+// 검색은 띄어쓰기를 무시하므로(‘시정요구’로 ‘시정 요구’도 찾는다) 강조·미리보기도 같은 규칙을 따른다.
+// 공백 없는 낱말은 글자 사이에 공백이 끼어도 맞게 만든다. 너무 긴 낱말은 그대로 둔다(정규식 비용).
+function looseTokenPattern(token) {
+  const t = String(token || '');
+  const esc = (c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (t.length < 2 || t.length > 30 || /\s/.test(t)) return esc(t);
+  return Array.from(t).map(esc).join('\\s*');
+}
+
 function applyDomHighlight(element, tokens) {
   if (!tokens || !tokens.length) return;
   const validTokens = tokens.filter(t => t && !isChoseongOnly(t));
   if (!validTokens.length) return;
-  const escapedTokens = validTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).filter(t => t.length > 0);
+  const escapedTokens = validTokens.map(looseTokenPattern).filter(t => t.length > 0);
   if (!escapedTokens.length) return;
   const pattern = `(${escapedTokens.join('|')})`;
   // split용(g)과 판정용(g 없음)을 나눈다. g 플래그 정규식에 test()를 반복 호출하면 lastIndex가
@@ -2562,7 +2686,7 @@ let __highlightRegexCache = { key: null, regex: null };
 function highlightRegexFor(tokens) {
   const validTokens = (tokens || []).filter(t => t && !isChoseongOnly(t));
   if (!validTokens.length) return null;
-  const escapedTokens = validTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).filter(t => t.length > 0);
+  const escapedTokens = validTokens.map(looseTokenPattern).filter(t => t.length > 0);
   if (!escapedTokens.length) return null;
   const key = escapedTokens.join('');
   if (__highlightRegexCache.key === key && __highlightRegexCache.regex) return __highlightRegexCache.regex;
@@ -2585,11 +2709,14 @@ function highlightTextString(text, tokens) {
   return safeText.replace(regex, '<mark class="highlight">$1</mark>');
 }
 
-function getSnippet(fullText, tokens, maxLen = 140) {
+// clean: 잘라 낸 미리보기 조각을 다듬는 함수(카드에서는 마크다운 기호를 걷어 내는 cardPreviewText).
+// 검색어 자리는 원문에서 찾고, 보여 줄 조각만 다듬는다 — 다듬은 뒤에 찾으면 앞 1500자 밖의 검색어를 놓친다.
+function getSnippet(fullText, tokens, maxLen = 140, clean = null) {
   if (!fullText) return '';
+  const tidy = (x) => (clean ? clean(x) : x);
   const validTokens = tokens ? tokens.filter(t => t && !isChoseongOnly(t)) : [];
   if (!validTokens.length) {
-    return escapeHtml(fullText.slice(0, maxLen) + (fullText.length > maxLen ? '...' : ''));
+    return escapeHtml(tidy(fullText.slice(0, maxLen)) + (fullText.length > maxLen ? '...' : ''));
   }
   const lower = fullText.toLowerCase();
   let firstIdx = -1;
@@ -2600,11 +2727,21 @@ function getSnippet(fullText, tokens, maxLen = 140) {
     }
   }
   if (firstIdx === -1) {
-    return escapeHtml(fullText.slice(0, maxLen) + (fullText.length > maxLen ? '...' : ''));
+    // 본문에 띄어쓰기가 다르게 들어 있는 경우(‘시정요구’ ↔ ‘시정 요구’)도 그 자리를 보여 준다.
+    const loose = highlightRegexFor(validTokens);
+    if (loose) {
+      loose.lastIndex = 0;
+      const m = loose.exec(fullText);
+      loose.lastIndex = 0;
+      if (m) firstIdx = m.index;
+    }
+  }
+  if (firstIdx === -1) {
+    return escapeHtml(tidy(fullText.slice(0, maxLen)) + (fullText.length > maxLen ? '...' : ''));
   }
   const start = Math.max(0, firstIdx - 40);
   const end = Math.min(fullText.length, firstIdx + maxLen - 40);
-  let snippet = (start > 0 ? '...' : '') + fullText.slice(start, end) + (end < fullText.length ? '...' : '');
+  let snippet = (start > 0 ? '...' : '') + tidy(fullText.slice(start, end)) + (end < fullText.length ? '...' : '');
   return highlightTextString(snippet, validTokens);
 }
 
@@ -3275,7 +3412,7 @@ function escapeRegExpLiteral(text) {
 // 토큰마다 동의어 변형을 정규식 하나로 묶어 둔다. 전문(수만 자)은 변형마다 따로 훑지 않고
 // 토큰당 한 번만 훑는다. 동의어가 10개로 퍼지는 낱말이면 전문 비교가 10배 줄어든다.
 function prepareSearchQuery(query) {
-  const { posGroups, neg } = parseSearchTokens(query);
+  const { posGroups, neg, fields } = parseSearchTokens(query);
   for (const group of posGroups) {
     for (const tok of group.andTokens) {
       if (tok.isCho || tok.hybridRe || !tok.expanded) continue;
@@ -3285,18 +3422,23 @@ function prepareSearchQuery(query) {
       tok.bodyRe = variants.length ? new RegExp(variants.map(escapeRegExpLiteral).join('|')) : null;
     }
   }
-  return { posGroups, neg, active: !!(posGroups.length || neg.length) };
+  return { posGroups, neg, fields, active: !!(posGroups.length || neg.length || fields) };
 }
 
 // 항목 하나를 평가한다. 걸러지면 -1, 통과하면 점수(0 이상).
-function matchSearchItem(item, prepared, skipQuery) {
+// ignoreScreenFilters: 화면의 연도·기관·즐겨찾기 칩을 보지 않고 검색어만 본다(등록 폼의 유사 답변 추천용).
+function matchSearchItem(item, prepared, skipQuery, ignoreScreenFilters) {
   const itemId = item.doc_id || item.qa_id || item.ledger_id;
-  if (activeFilters.onlyFavorites && !favorites.includes(itemId)) return -1;
-  if (activeFilters.year !== 'ALL' && String(item.year || '') !== String(activeFilters.year)) return -1;
   // 관리대장 항목에는 기관·주제·통계표 값이 없다. 문서용 필터를 대장에 적용하면 결과가 0건이 되고,
   // 반대로 진행상태·마감 필터는 대장에만 의미가 있다.
   const isLedgerItem = !!item.ledger_id && !item.doc_id && !item.qa_id;
-  if (isLedgerItem) {
+  if (ignoreScreenFilters) {
+    // 아래 칩 필터를 건너뛴다.
+  } else if (activeFilters.onlyFavorites && !favorites.includes(itemId)) {
+    return -1;
+  } else if (activeFilters.year !== 'ALL' && String(item.year || '') !== String(activeFilters.year)) {
+    return -1;
+  } else if (isLedgerItem) {
     if (activeFilters.status && activeFilters.status !== 'ALL' && String(item.status || '').trim() !== activeFilters.status) return -1;
     if (activeFilters.due && activeFilters.due !== 'ALL' && !matchesDueFilter(item, activeFilters.due)) return -1;
   } else {
@@ -3309,7 +3451,8 @@ function matchSearchItem(item, prepared, skipQuery) {
   }
 
   if (skipQuery || !prepared.active) return 0;
-  const { posGroups, neg } = prepared;
+  const { posGroups, neg, fields } = prepared;
+  if (fields && !searchFieldsMatch(fields, item)) return -1;
 
   const title = item.title || item.question_title || '';
   const titleLower = title.toLowerCase();
@@ -4508,7 +4651,7 @@ async function render() {
   if (typeof hideSearchSpinner === 'function') hideSearchSpinner();
   if (filtered === null || seq !== RENDER_SEQ) return;
   if (typeof updateBodyLoadStatus === 'function') updateBodyLoadStatus();
-  if (typeof refreshSearchExtras === 'function') refreshSearchExtras();
+  if (typeof refreshSearchExtras === 'function') refreshSearchExtras(filtered);
 
   document.getElementById('count-filtered').innerText = filtered.length;
   let totalCount = DOCUMENTS.length;
@@ -4531,11 +4674,14 @@ async function render() {
     }
   }
 
+  // 지금 보기 방식(카드/표) 하나만 만든다. 예전에는 둘 다 만들어 숨겨 두어 DOM이 두 배였다.
+  // 보기 방식을 바꾸면 다시 그린다(13_events.js). 조각(fragment)에 모아 한 번에 붙인다.
   const cardContainer = document.getElementById('card-container');
-  cardContainer.innerHTML = '';
   const tableHead = document.getElementById('table-head');
   const tableBody = document.getElementById('table-body');
-  tableBody.innerHTML = '';
+  const wantCards = currentView !== 'table';
+  const cardSink = document.createDocumentFragment();
+  const rowSink = document.createDocumentFragment();
 
   if (currentMode === 'docs' || currentMode === 'tables') {
     tableHead.innerHTML = `
@@ -4550,84 +4696,88 @@ async function render() {
       const isChecked = selectedDocIds.has(doc.doc_id);
       // 인라인 핸들러에 넣는 ID는 JSON 문자열로 만든 뒤 HTML 이스케이프한다(따옴표가 든 ID도 안전).
       const docIdJs = escapeHtml(JSON.stringify(doc.doc_id));
-
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.onclick = () => openDocModal(doc);
-
-      const docQas = DOC_QAS_MAP[doc.doc_id] || [];
-      let qaChipsHtml = '';
-      if (docQas.length > 0) {
-        qaChipsHtml = `<div class="card-qa-chips">` +
-          // 인라인 onclick은 전역 스코프에서 실행되므로 지역 변수 doc을 볼 수 없다(ReferenceError).
-          // 전역 DOCS_MAP에서 문서를 다시 찾는다. (감사 R3-19a)
-          docQas.slice(0, 5).map(q => `<span class="badge-qa-chip" onclick="event.stopPropagation(); openDocModal(DOCS_MAP[${docIdJs}], ${Number(q.q_num) || 1});" title="${escapeHtml(q.question_title)} — 이 질문의 답변으로 바로 가기">질문 ${Number(q.q_num) || 1}. ${escapeHtml(q.question_title.length > 20 ? q.question_title.slice(0, 20) + '...' : q.question_title)}</span>`).join('') +
-          (docQas.length > 5 ? `<span class="badge-qa-more" onclick="event.stopPropagation(); openDocModal(DOCS_MAP[${docIdJs}], 1);">+${docQas.length - 5}개 더</span>` : '') +
-          `</div>`;
-      }
-
-      const bodyText = doc.full_markdown || doc.answer_full_text || doc.question_list;
-      let snippet = getSnippet(highlightTokens.length ? bodyText : cardPreviewText(bodyText), highlightTokens);
-      if (currentMode === 'tables' && doc.table_summary) {
-        snippet = `<div class="table-summary-note"><strong>들어 있는 표:</strong> ${highlightTextString(doc.table_summary, highlightTokens)}</div>` + snippet;
-      }
       const titleHighlighted = highlightTextString(doc.title, highlightTokens);
       const reqHighlighted = highlightTextString(doc.requester, highlightTokens);
       const dateText = escapeHtml(doc.request_date || doc.year);
 
-      const tagsHtml = (doc.topic_tags ? doc.topic_tags.split(',') : [])
-        .slice(0, 3)
-        .map(t => `<span class="card-tag">${escapeHtml(t.trim())}</span>`).join('');
+      if (wantCards) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = () => openDocModal(doc);
 
-      card.innerHTML = `
-        <div class="card-header-actions" onclick="event.stopPropagation();">
-          <div class="card-meta">
+        const docQas = DOC_QAS_MAP[doc.doc_id] || [];
+        let qaChipsHtml = '';
+        if (docQas.length > 0) {
+          qaChipsHtml = `<div class="card-qa-chips">` +
+            // 인라인 onclick은 전역 스코프에서 실행되므로 지역 변수 doc을 볼 수 없다(ReferenceError).
+            // 전역 DOCS_MAP에서 문서를 다시 찾는다. (감사 R3-19a)
+            docQas.slice(0, 5).map(q => `<span class="badge-qa-chip" onclick="event.stopPropagation(); openDocModal(DOCS_MAP[${docIdJs}], ${Number(q.q_num) || 1});" title="${escapeHtml(q.question_title)} — 이 질문의 답변으로 바로 가기">질문 ${Number(q.q_num) || 1}. ${escapeHtml(String(q.question_title || '').length > 20 ? String(q.question_title).slice(0, 20) + '...' : (q.question_title || ''))}</span>`).join('') +
+            (docQas.length > 5 ? `<span class="badge-qa-more" onclick="event.stopPropagation(); openDocModal(DOCS_MAP[${docIdJs}], 1);">+${docQas.length - 5}개 더</span>` : '') +
+            `</div>`;
+        }
+
+        const bodyText = doc.full_markdown || doc.answer_full_text || doc.question_list;
+        let snippet = highlightTokens.length ? getSnippet(bodyText, highlightTokens, 160, cardPreviewText) : getSnippet(cardPreviewText(bodyText), highlightTokens);
+        if (currentMode === 'tables' && doc.table_summary) {
+          snippet = `<div class="table-summary-note"><strong>들어 있는 표:</strong> ${highlightTextString(doc.table_summary, highlightTokens)}</div>` + snippet;
+        }
+
+        const tagsHtml = (doc.topic_tags ? doc.topic_tags.split(',') : [])
+          .slice(0, 3)
+          .map(t => `<span class="card-tag">${escapeHtml(t.trim())}</span>`).join('');
+
+        card.innerHTML = `
+          <div class="card-header-actions" onclick="event.stopPropagation();">
+            <div class="card-meta">
+              <input type="checkbox" class="card-checkbox" aria-label="이 답변서 선택" ${isChecked ? 'checked' : ''} onchange="toggleSelectDoc(${docIdJs}, this.checked)">
+              <span class="badge-id">${escapeHtml(doc.doc_id)}</span>
+              <span class="card-date">${dateText}</span>
+            </div>
+            <div class="card-top-icons">
+              <button class="btn-star ${isFav ? 'active' : ''}" data-fav-id="${escapeHtml(doc.doc_id)}" onclick="toggleFavorite(${docIdJs}, event)" title="${isFav ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기'}" aria-label="즐겨찾기" aria-pressed="${isFav ? 'true' : 'false'}">★</button>
+            </div>
+          </div>
+          <div class="card-requester">
+            <span class="badge-inst">${escapeHtml(doc.institution)}</span>
+            <span>${reqHighlighted}</span>
+            ${doc.doc_number ? `<span class="sub">(${escapeHtml(doc.doc_number)})</span>` : ''}
+          </div>
+          <div class="card-title">${titleHighlighted}</div>
+          <div class="card-snippet">${snippet}</div>
+          ${qaChipsHtml}
+          <div class="card-footer">
+            <div class="card-tags">${tagsHtml}</div>
+            <div class="card-foot-right">
+              ${doc.has_tables === 'Y' ? `<span class="has-table-badge">표 ${escapeHtml(doc.table_count)}개</span>` : ''}
+              ${docQas.length > 0 ? `<span class="qa-count-badge">질문 ${docQas.length}개</span>` : ''}
+              <span class="card-link">열어 보기 &rarr;</span>
+            </div>
+          </div>
+        `;
+        cardSink.appendChild(card);
+      }
+
+      if (!wantCards) {
+        const tr = document.createElement('tr');
+        tr.onclick = () => openDocModal(doc);
+        tr.innerHTML = `
+          <td class="cell-center" onclick="event.stopPropagation();">
             <input type="checkbox" class="card-checkbox" aria-label="이 답변서 선택" ${isChecked ? 'checked' : ''} onchange="toggleSelectDoc(${docIdJs}, this.checked)">
-            <span class="badge-id">${escapeHtml(doc.doc_id)}</span>
-            <span class="card-date">${dateText}</span>
-          </div>
-          <div class="card-top-icons">
-            <button class="btn-star ${isFav ? 'active' : ''}" onclick="toggleFavorite(${docIdJs}, event)" title="${isFav ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기'}" aria-label="즐겨찾기" aria-pressed="${isFav ? 'true' : 'false'}">★</button>
-          </div>
-        </div>
-        <div class="card-requester">
-          <span class="badge-inst">${escapeHtml(doc.institution)}</span>
-          <span>${reqHighlighted}</span>
-          ${doc.doc_number ? `<span class="sub">(${escapeHtml(doc.doc_number)})</span>` : ''}
-        </div>
-        <div class="card-title">${titleHighlighted}</div>
-        <div class="card-snippet">${snippet}</div>
-        ${qaChipsHtml}
-        <div class="card-footer">
-          <div class="card-tags">${tagsHtml}</div>
-          <div class="card-foot-right">
-            ${doc.has_tables === 'Y' ? `<span class="has-table-badge">표 ${escapeHtml(doc.table_count)}개</span>` : ''}
-            ${docQas.length > 0 ? `<span class="qa-count-badge">질문 ${docQas.length}개</span>` : ''}
-            <span class="card-link">열어 보기 &rarr;</span>
-          </div>
-        </div>
-      `;
-      cardContainer.appendChild(card);
-
-      const tr = document.createElement('tr');
-      tr.onclick = () => openDocModal(doc);
-      tr.innerHTML = `
-        <td class="cell-center" onclick="event.stopPropagation();">
-          <input type="checkbox" class="card-checkbox" aria-label="이 답변서 선택" ${isChecked ? 'checked' : ''} onchange="toggleSelectDoc(${docIdJs}, this.checked)">
-        </td>
-        <td class="cell-id">${escapeHtml(doc.doc_id)}</td>
-        <td class="cell-nowrap">${dateText}</td>
-        <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
-        <td class="cell-title">${titleHighlighted}</td>
-        <td class="cell-clip">${escapeHtml(doc.answer_summary || doc.question_list)}</td>
-        <td class="cell-center cell-nowrap">${doc.has_tables === 'Y' ? `${escapeHtml(doc.table_count)}개` : '-'}</td>
-        <td>${escapeHtml(doc.topic_tags || '-')}</td>
-        <td class="cell-nowrap" onclick="event.stopPropagation();">
-          <a href="${escapeHtml(getDocMdUrl(doc.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a> ·
-          <a href="${escapeHtml(getDocOrigUrl(doc.original_path))}" onclick="return handleOrigClick(event, ${escapeHtml(JSON.stringify(doc.original_path || ''))});" target="_blank" title="원본 파일(서버 화면에서는 파일이 있는 폴더)을 엽니다">원본</a>
-        </td>
-      `;
-      tableBody.appendChild(tr);
+          </td>
+          <td class="cell-id">${escapeHtml(doc.doc_id)}</td>
+          <td class="cell-nowrap">${dateText}</td>
+          <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
+          <td class="cell-title">${titleHighlighted}</td>
+          <td class="cell-clip">${escapeHtml(doc.answer_summary || doc.question_list)}</td>
+          <td class="cell-center cell-nowrap">${doc.has_tables === 'Y' ? `${escapeHtml(doc.table_count)}개` : '-'}</td>
+          <td>${escapeHtml(doc.topic_tags || '-')}</td>
+          <td class="cell-nowrap" onclick="event.stopPropagation();">
+            <a href="${escapeHtml(getDocMdUrl(doc.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a> ·
+            <a href="${escapeHtml(getDocOrigUrl(doc.original_path))}" onclick="return handleOrigClick(event, ${escapeHtml(JSON.stringify(doc.original_path || ''))});" target="_blank" title="원본 파일(서버 화면에서는 파일이 있는 폴더)을 엽니다">원본</a>
+          </td>
+        `;
+        rowSink.appendChild(tr);
+      }
     });
   } else if (currentMode === 'ledger') {
     tableHead.innerHTML = `
@@ -4645,65 +4795,69 @@ async function render() {
     `;
     displayItems.forEach(item => {
       const dueClass = dueRowClass(item);
-      const card = document.createElement('div');
-      card.className = dueClass ? `card ${dueClass}` : 'card';
-      card.onclick = () => openLedgerModal(item);
-
       const titleHighlighted = highlightTextString(item.title, highlightTokens);
       const reqHighlighted = highlightTextString(`${item.party || ''} ${item.requester || ''}`.trim(), highlightTokens);
-      const nameHighlighted = highlightTextString(item.requester || '', highlightTokens);
-      const detailsSnippet = getSnippet(item.details, highlightTokens);
       const dateText = escapeHtml(item.request_date || item.year);
       const linkedDoc = item.linked_doc_id ? DOCS_MAP[item.linked_doc_id] : null;
-      const footMeta = [
-        item.deadline ? `마감 ${escapeHtml(item.deadline)}` : '마감일 없음',
-        item.submit_date ? `제출 ${escapeHtml(item.submit_date)}` : '',
-        item.department ? escapeHtml(item.department) : ''
-      ].filter(Boolean).join(' · ');
+      if (wantCards) {
+        const card = document.createElement('div');
+        card.className = dueClass ? `card ${dueClass}` : 'card';
+        card.onclick = () => openLedgerModal(item);
 
-      card.innerHTML = `
-        <div class="card-header-actions">
-          <div class="card-meta">
-            <span class="badge-id">${escapeHtml(item.ledger_id)}</span>
-            ${item.seq_no ? `<span class="meta-pill">연번 ${escapeHtml(item.seq_no)}</span>` : ''}
-            <span class="card-date">${dateText}</span>
-          </div>
-          <span class="card-badges">${dueBadgeHtml(item)}${statusPillHtml(item)}</span>
-        </div>
-        <div class="card-requester">
-          ${item.party ? `<span class="badge-inst">${escapeHtml(item.party)}</span>` : ''}
-          <span>${nameHighlighted || '요구자 모름'}</span>
-          ${item.aide ? `<span class="sub">(보좌관 ${escapeHtml(item.aide)})</span>` : ''}
-        </div>
-        <div class="card-title">${titleHighlighted}</div>
-        <div class="card-snippet">${detailsSnippet || '<span class="muted">적어 둔 세부 요구내역이 없습니다</span>'}</div>
-        <div class="card-footer">
-          <div class="card-foot-meta">${footMeta}</div>
-          <div class="card-foot-right">
-            ${linkedDoc ? `<span class="linked-badge">답변서 있음</span>` : ''}
-            <span class="card-link">열어 보기 &rarr;</span>
-          </div>
-        </div>
-      `;
-      cardContainer.appendChild(card);
+        const nameHighlighted = highlightTextString(item.requester || '', highlightTokens);
+        const detailsSnippet = getSnippet(item.details, highlightTokens);
+        const footMeta = [
+          item.deadline ? `마감 ${escapeHtml(item.deadline)}` : '마감일 없음',
+          item.submit_date ? `제출 ${escapeHtml(item.submit_date)}` : '',
+          item.department ? escapeHtml(item.department) : ''
+        ].filter(Boolean).join(' · ');
 
-      const tr = document.createElement('tr');
-      if (dueClass) tr.className = dueClass;
-      tr.onclick = () => openLedgerModal(item);
-      tr.innerHTML = `
-        <td class="cell-id">${escapeHtml(item.ledger_id)}</td>
-        <td class="cell-center">${escapeHtml(item.seq_no || '-')}</td>
-        <td class="cell-nowrap">${dateText}</td>
-        <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
-        <td class="cell-title">${titleHighlighted}</td>
-        <td class="cell-clip">${escapeHtml(item.details || '-')}</td>
-        <td class="cell-nowrap">${escapeHtml(item.deadline || '-')} ${dueBadgeHtml(item)}</td>
-        <td class="cell-center">${statusPillHtml(item)}</td>
-        <td class="cell-center" onclick="event.stopPropagation();">
-          ${linkedDoc ? `<a href="#" onclick="openDocModal(DOCS_MAP[${escapeHtml(JSON.stringify(item.linked_doc_id))}]); return false;">열기</a>` : '<span class="muted">-</span>'}
-        </td>
-      `;
-      tableBody.appendChild(tr);
+        card.innerHTML = `
+          <div class="card-header-actions">
+            <div class="card-meta">
+              <span class="badge-id">${escapeHtml(item.ledger_id)}</span>
+              ${item.seq_no ? `<span class="meta-pill">연번 ${escapeHtml(item.seq_no)}</span>` : ''}
+              <span class="card-date">${dateText}</span>
+            </div>
+            <span class="card-badges">${dueBadgeHtml(item)}${statusPillHtml(item)}</span>
+          </div>
+          <div class="card-requester">
+            ${item.party ? `<span class="badge-inst">${escapeHtml(item.party)}</span>` : ''}
+            <span>${nameHighlighted || '요구자 모름'}</span>
+            ${item.aide ? `<span class="sub">(보좌관 ${escapeHtml(item.aide)})</span>` : ''}
+          </div>
+          <div class="card-title">${titleHighlighted}</div>
+          <div class="card-snippet">${detailsSnippet || '<span class="muted">적어 둔 세부 요구내역이 없습니다</span>'}</div>
+          <div class="card-footer">
+            <div class="card-foot-meta">${footMeta}</div>
+            <div class="card-foot-right">
+              ${linkedDoc ? `<span class="linked-badge">답변서 있음</span>` : ''}
+              <span class="card-link">열어 보기 &rarr;</span>
+            </div>
+          </div>
+        `;
+        cardSink.appendChild(card);
+      }
+
+      if (!wantCards) {
+        const tr = document.createElement('tr');
+        if (dueClass) tr.className = dueClass;
+        tr.onclick = () => openLedgerModal(item);
+        tr.innerHTML = `
+          <td class="cell-id">${escapeHtml(item.ledger_id)}</td>
+          <td class="cell-center">${escapeHtml(item.seq_no || '-')}</td>
+          <td class="cell-nowrap">${dateText}</td>
+          <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
+          <td class="cell-title">${titleHighlighted}</td>
+          <td class="cell-clip">${escapeHtml(item.details || '-')}</td>
+          <td class="cell-nowrap">${escapeHtml(item.deadline || '-')} ${dueBadgeHtml(item)}</td>
+          <td class="cell-center">${statusPillHtml(item)}</td>
+          <td class="cell-center" onclick="event.stopPropagation();">
+            ${linkedDoc ? `<a href="#" onclick="openDocModal(DOCS_MAP[${escapeHtml(JSON.stringify(item.linked_doc_id))}]); return false;">열기</a>` : '<span class="muted">-</span>'}
+          </td>
+        `;
+        rowSink.appendChild(tr);
+      }
     });
   } else {
     tableHead.innerHTML = `
@@ -4718,53 +4872,59 @@ async function render() {
         if (parentDoc) openDocModal(parentDoc, qa.q_num);
         else notify('이 질문이 들어 있던 답변서를 찾을 수 없습니다.', 'warn');
       };
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.onclick = openParent;
-
-      const snippet = getSnippet(highlightTokens.length ? qa.answer_full : cardPreviewText(qa.answer_full), highlightTokens);
       const qTitleHighlighted = highlightTextString(qa.question_title, highlightTokens);
       const reqHighlighted = highlightTextString(qa.requester, highlightTokens);
       const dateText = escapeHtml(qa.request_date || qa.year);
+      if (wantCards) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = openParent;
 
-      card.innerHTML = `
-        <div class="card-header-actions">
-          <div class="card-meta">
-            <span class="badge-id">${escapeHtml(qa.qa_id)}</span>
-            <span class="card-date">${dateText}</span>
+        const snippet = highlightTokens.length ? getSnippet(qa.answer_full, highlightTokens, 160, cardPreviewText) : getSnippet(cardPreviewText(qa.answer_full), highlightTokens);
+
+        card.innerHTML = `
+          <div class="card-header-actions">
+            <div class="card-meta">
+              <span class="badge-id">${escapeHtml(qa.qa_id)}</span>
+              <span class="card-date">${dateText}</span>
+            </div>
           </div>
-        </div>
-        <div class="card-requester">
-          <span class="badge-inst">${escapeHtml(qa.institution)}</span>
-          <span>${reqHighlighted}</span>
-          <span class="sub">(질문 ${escapeHtml(qa.q_num)})</span>
-        </div>
-        <div class="card-title">${qTitleHighlighted}</div>
-        <div class="card-snippet">${snippet}</div>
-        <div class="card-footer">
-          <div>${qa.has_tables === 'Y' ? '<span class="has-table-badge">표 있음</span>' : ''}</div>
-          <span class="card-link">답변 보기 &rarr;</span>
-        </div>
-      `;
-      cardContainer.appendChild(card);
+          <div class="card-requester">
+            <span class="badge-inst">${escapeHtml(qa.institution)}</span>
+            <span>${reqHighlighted}</span>
+            <span class="sub">(질문 ${escapeHtml(qa.q_num)})</span>
+          </div>
+          <div class="card-title">${qTitleHighlighted}</div>
+          <div class="card-snippet">${snippet}</div>
+          <div class="card-footer">
+            <div>${qa.has_tables === 'Y' ? '<span class="has-table-badge">표 있음</span>' : ''}</div>
+            <span class="card-link">답변 보기 &rarr;</span>
+          </div>
+        `;
+        cardSink.appendChild(card);
+      }
 
-      const tr = document.createElement('tr');
-      tr.onclick = openParent;
-      tr.innerHTML = `
-        <td class="cell-id">${escapeHtml(qa.qa_id)}</td>
-        <td class="cell-id">${escapeHtml(qa.doc_id)}</td>
-        <td class="cell-nowrap">${dateText}</td>
-        <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
-        <td class="cell-title">${qTitleHighlighted}</td>
-        <td class="cell-clip">${escapeHtml(cardPreviewText(qa.answer_full).slice(0, 200))}</td>
-        <td class="cell-center">${qa.has_tables === 'Y' ? '있음' : '-'}</td>
-        <td class="cell-nowrap" onclick="event.stopPropagation();">
-          <a href="${escapeHtml(getDocMdUrl(qa.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a>
-        </td>
-      `;
-      tableBody.appendChild(tr);
+      if (!wantCards) {
+        const tr = document.createElement('tr');
+        tr.onclick = openParent;
+        tr.innerHTML = `
+          <td class="cell-id">${escapeHtml(qa.qa_id)}</td>
+          <td class="cell-id">${escapeHtml(qa.doc_id)}</td>
+          <td class="cell-nowrap">${dateText}</td>
+          <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
+          <td class="cell-title">${qTitleHighlighted}</td>
+          <td class="cell-clip">${escapeHtml(cardPreviewText(qa.answer_full).slice(0, 200))}</td>
+          <td class="cell-center">${qa.has_tables === 'Y' ? '있음' : '-'}</td>
+          <td class="cell-nowrap" onclick="event.stopPropagation();">
+            <a href="${escapeHtml(getDocMdUrl(qa.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a>
+          </td>
+        `;
+        rowSink.appendChild(tr);
+      }
     });
   }
+  cardContainer.replaceChildren(cardSink);
+  tableBody.replaceChildren(rowSink);
 }
 
 // 카드 미리보기용: 마크다운 기호(#, |, ---, ** 등)와 HTML 태그를 걷어 낸 앞부분 글.
@@ -4790,9 +4950,20 @@ function toggleFavorite(id, event) {
   } else {
     favorites.push(id);
   }
-  localStorage.setItem('datareq_favorites', JSON.stringify(favorites));
+  try { localStorage.setItem('datareq_favorites', JSON.stringify(favorites)); } catch (e) {}
   updateFavCount();
-  render();
+  // '즐겨찾기만' 보기일 때만 목록이 바뀐다. 그 밖에는 별 모양만 고친다(전체 검색을 다시 돌리지 않는다).
+  if (activeFilters.onlyFavorites) {
+    render();
+    return;
+  }
+  const on = favorites.includes(id);
+  document.querySelectorAll('.btn-star[data-fav-id]').forEach(btn => {
+    if (btn.getAttribute('data-fav-id') !== String(id)) return;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.title = on ? '즐겨찾기에서 빼기' : '즐겨찾기에 담기';
+  });
 }
 
 function toggleModalFavorite() {
@@ -5110,6 +5281,8 @@ async function openDocModal(doc, targetQNum = null) {
     }, 150);
   } else {
     switchModalTab('formatted');
+    // 검색해서 연 답변서면 첫 검색어 자리를 바로 보여 준다.
+    if (highlightTokens.length) refreshSearchHits(true);
   }
 
   const isWebMode = window.location.protocol.startsWith('http');
@@ -5249,6 +5422,50 @@ function switchModalTab(tab) {
   document.getElementById('modal-view-formatted').style.display = tab === 'formatted' ? 'block' : 'none';
   document.getElementById('modal-view-text').style.display = tab === 'text' ? 'block' : 'none';
   document.getElementById('modal-view-qa').style.display = tab === 'qa' ? 'block' : 'none';
+  refreshSearchHits(false);
+}
+
+// ---------------------------------------------------------------------------
+// 열린 답변서 안에서 검색어 위치로 옮겨 다닌다(▲/▼, F3/Shift+F3). 수십 쪽짜리 답변서에서
+// 검색어가 어디 있는지 스크롤로 찾지 않아도 된다. 강조(mark.highlight)가 있는 보기에서만 뜬다.
+// ---------------------------------------------------------------------------
+let SEARCH_HITS = [];
+let SEARCH_HIT_IDX = -1;
+
+function visibleModalView() {
+  for (const id of ['modal-view-formatted', 'modal-view-qa']) {
+    const el = document.getElementById(id);
+    if (el && el.style.display !== 'none') return el;
+  }
+  return null;
+}
+
+function updateSearchHitPos() {
+  const pos = document.getElementById('hit-pos');
+  if (pos) pos.textContent = SEARCH_HITS.length ? `${Math.max(SEARCH_HIT_IDX + 1, 0)}/${SEARCH_HITS.length}` : '0/0';
+}
+
+function refreshSearchHits(autoJump) {
+  SEARCH_HITS.forEach(m => m.classList.remove('hit-current'));
+  const view = visibleModalView();
+  SEARCH_HITS = view ? Array.from(view.querySelectorAll('mark.highlight')) : [];
+  SEARCH_HIT_IDX = -1;
+  const nav = document.getElementById('hit-nav');
+  if (nav) nav.hidden = !SEARCH_HITS.length;
+  updateSearchHitPos();
+  if (autoJump && SEARCH_HITS.length) gotoSearchHit(1, true);
+}
+
+function gotoSearchHit(delta, gentle) {
+  if (!SEARCH_HITS.length) return;
+  const n = SEARCH_HITS.length;
+  if (SEARCH_HITS[SEARCH_HIT_IDX]) SEARCH_HITS[SEARCH_HIT_IDX].classList.remove('hit-current');
+  SEARCH_HIT_IDX = SEARCH_HIT_IDX < 0 ? (delta > 0 ? 0 : n - 1) : (SEARCH_HIT_IDX + delta + n) % n;
+  const el = SEARCH_HITS[SEARCH_HIT_IDX];
+  el.classList.add('hit-current');
+  // 처음 열 때는 이미 보이는 자리면 화면을 움직이지 않는다. 직접 누르면 가운데로 가져온다.
+  try { el.scrollIntoView({ block: gentle ? 'nearest' : 'center' }); } catch (e) { el.scrollIntoView(); }
+  updateSearchHitPos();
 }
 
 function closeModal() {
@@ -5355,6 +5572,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
+      // 새 검색어면 결과 앞쪽부터 보여 준다(앞 검색에서 [더 보기]로 늘린 한도를 이어 쓰지 않는다).
+      currentRenderLimit = 40;
       render();
     }, 200);
     clearTimeout(recentSearchTimer);
@@ -5392,14 +5611,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     render();
   });
 
+  // 지금 보기 방식만 그리므로(11_render.js) 바꾸면 다시 그린다.
   document.getElementById('btn-view-card').addEventListener('click', () => {
+    if (currentView === 'card') return;
     setView('card');
     saveViewPrefs();
+    render();
   });
 
   document.getElementById('btn-view-table').addEventListener('click', () => {
+    if (currentView === 'table') return;
     setView('table');
     saveViewPrefs();
+    render();
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -5423,6 +5647,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.addEventListener('keydown', (e) => {
+    // 답변서 창이 열려 있으면 F3 / Shift+F3으로 검색어 위치를 옮긴다(브라우저 찾기 대신).
+    if (e.key === 'F3' && isModalOpen('modal-backdrop') && SEARCH_HITS.length) {
+      e.preventDefault();
+      gotoSearchHit(e.shiftKey ? -1 : 1);
+      return;
+    }
     if (e.key === 'Escape') {
       if (typeof closeTopModal === 'function' && closeTopModal()) return;
       closeModal();
@@ -5915,11 +6145,33 @@ function buildTopicChips() {
   if (entries.length) rebuildChipGroup('topic-chips', 'topic', entries);
 }
 
+// 기관 칩도 데이터의 institution 빈도로 만든다. 고정 칩(국회·상급감독기관 등)은 다른 부서·기관
+// 배포본에서 0건 칩이 되거나, 실제로 많은 기관이 빠졌다. 건수는 필터와 같은 규칙(부분일치)으로 센다.
+function buildInstChips() {
+  if (!_UXD || typeof rebuildChipGroup !== 'function') return;
+  const docs = (typeof DOCUMENTS !== 'undefined' && DOCUMENTS) || [];
+  const names = new Map();
+  docs.forEach(d => {
+    const v = String((d && d.institution) || '').trim();
+    if (v) names.set(v, (names.get(v) || 0) + 1);
+  });
+  if (!names.size) return;
+  const top = Array.from(names.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([v]) => v);
+  const entries = top.map(v => ({
+    value: v,
+    label: `${v} (${docs.filter(d => d && d.institution && String(d.institution).includes(v)).length})`
+  }));
+  rebuildChipGroup('inst-chips', 'inst', entries);
+}
+
 if (typeof _UXG.buildDynamicFilters === 'function') {
   const _buildDynamicFilters = _UXG.buildDynamicFilters;
   _UXG.buildDynamicFilters = function (...args) {
     const r = _buildDynamicFilters.apply(this, args);
+    try { buildInstChips(); } catch (e) {}
     try { buildTopicChips(); } catch (e) {}
+    // 위에서 다시 만든 칩도 Tab·Enter로 누를 수 있게 한다(원래 함수의 syncChipA11y는 그 전에 돌았다).
+    try { if (typeof syncChipA11y === 'function') syncChipA11y(); } catch (e) {}
     try { refreshDueSummary(); } catch (e) {}
     return r;
   };
@@ -5935,31 +6187,66 @@ function hasActiveSearch() {
     || (f.due && f.due !== 'ALL') || f.tablesOnly || f.onlyFavorites);
 }
 
-function refreshSearchExtras() {
+// 탭별 건수 계산 차례. 새 검색이 시작되면 하던 계산은 버린다.
+let SEARCH_EXTRAS_SEQ = 0;
+
+// 같은 matchSearchItem으로 목록을 시간 조각(약 12ms)으로 나눠 평가한다(불변조건 51 — 결과 일치).
+// 예전에는 렌더할 때마다 네 목록을 한 번에 동기로 다시 훑어, 시간 조각으로 나눈 화면 검색의
+// 이득을 이 계산이 다 까먹었다(문서가 많으면 입력이 멈췄다).
+async function collectMatchesAsync(items, prepared, isStale) {
+  const out = [];
+  const list = items || [];
+  let i = 0;
+  while (i < list.length) {
+    const started = Date.now();
+    while (i < list.length) {
+      if (matchSearchItem(list[i], prepared, false) >= 0) out.push(list[i]);
+      i += 1;
+      if ((i & 7) === 0 && Date.now() - started >= 12) break;
+    }
+    if (i < list.length) {
+      await new Promise(r => setTimeout(r, 0));
+      if (isStale()) return null;
+    }
+  }
+  return out;
+}
+
+async function refreshTabCounts(currentFiltered, setTab) {
+  const seq = ++SEARCH_EXTRAS_SEQ;
+  const isStale = () => seq !== SEARCH_EXTRAS_SEQ;
+  // 결과 목록을 먼저 그리고 나서 센다.
+  await new Promise(r => setTimeout(r, 0));
+  if (isStale()) return;
+  const prepared = prepareSearchQuery(activeFilters.query);
+  const mode = (typeof currentMode !== 'undefined') ? currentMode : 'docs';
+  const reuse = (m) => (mode === m && Array.isArray(currentFiltered)) ? currentFiltered : null;
+  try {
+    // '표 있는 답변서' = 답변서 가운데 표가 있는 것. 같은 조건이므로 답변서 결과에서 바로 센다.
+    const docs = reuse('docs') || await collectMatchesAsync(DOCUMENTS, prepared, isStale);
+    if (docs === null || isStale()) return;
+    setTab('tab-count-docs', docs.length);
+    setTab('tab-count-tables', docs.filter(d => d && d.has_tables === 'Y').length);
+    const ledger = reuse('ledger') || await collectMatchesAsync(REQUEST_LEDGER, prepared, isStale);
+    if (ledger === null || isStale()) return;
+    setTab('tab-count-ledger', ledger.length);
+    const qas = reuse('qa') || await collectMatchesAsync(QA_ITEMS, prepared, isStale);
+    if (qas === null || isStale()) return;
+    setTab('tab-count-qa', qas.length);
+  } catch (e) { /* 본문 로딩 중 실패하면 예전 값을 둔다 */ }
+}
+
+function refreshSearchExtras(currentFiltered) {
   if (!_UXD) return;
-  const show = hasActiveSearch() && (typeof filterItemsFromList === 'function');
+  const show = hasActiveSearch() && (typeof matchSearchItem === 'function');
   const setTab = (id, v) => {
     const el = _UXD.getElementById(id);
     if (el) el.textContent = show ? ` · ${v}건` : '';
   };
   if (show) {
-    // 같은 matchSearchItem으로 세 목록을 각각 센다(불변조건 51 — 결과 일치).
-    let docs = 0;
-    let qas = 0;
-    let ledger = 0;
-    let tables = 0;
-    try {
-      docs = filterItemsFromList(DOCUMENTS, false).length;
-      qas = filterItemsFromList(QA_ITEMS, false).length;
-      ledger = filterItemsFromList(REQUEST_LEDGER, false).length;
-      tables = filterItemsFromList(
-        (DOCUMENTS || []).filter(d => d && d.has_tables === 'Y'), false).length;
-    } catch (e) { /* 본문 로딩 중 실패하면 0건으로 둔다 */ }
-    setTab('tab-count-docs', docs);
-    setTab('tab-count-qa', qas);
-    setTab('tab-count-tables', tables);
-    setTab('tab-count-ledger', ledger);
+    refreshTabCounts(currentFiltered, setTab);
   } else {
+    SEARCH_EXTRAS_SEQ += 1;
     ['tab-count-docs', 'tab-count-qa', 'tab-count-tables', 'tab-count-ledger'].forEach(id => setTab(id, ''));
   }
   try { renderActiveChips(); } catch (e) {}
@@ -6283,25 +6570,36 @@ function refreshSimilarPanel() {
   if (typeof bodiesLoading === 'function' && bodiesLoading()) {
     list.innerHTML = '<div class="similar-hint">답변서 본문을 불러오는 중입니다. 잠시 뒤에 더 정확하게 찾아 줍니다.</div>';
   }
-  let prepared = null;
+  // 낱말마다 따로 평가해, 겹치는 낱말이 많은 답변이 앞에 오게 한다. 예전에는 'A OR B OR C'로
+  // 한 번에 봐서 낱말 하나만 걸린 답변과 셋 다 걸린 답변이 같은 줄에 섰다.
+  // 화면의 연도·기관·즐겨찾기 칩은 보지 않는다 — 추천이 메인 목록 필터에 묶이면 안 된다.
+  let preparedList = null;
   try {
-    prepared = prepareSearchQuery(keys.join(' OR '));
+    preparedList = keys.map(k => prepareSearchQuery(k));
   } catch (e) {
     return;
   }
   const scored = [];
   const push = (item, kind) => {
-    let s = -1;
-    try {
-      s = matchSearchItem(item, prepared, false);
-    } catch (e) {
-      s = -1;
+    let hits = 0;
+    let total = 0;
+    for (const prepared of preparedList) {
+      let s = -1;
+      try {
+        s = matchSearchItem(item, prepared, false, true);
+      } catch (e) {
+        s = -1;
+      }
+      if (s >= 0) {
+        hits += 1;
+        total += s;
+      }
     }
-    if (s >= 0) scored.push({ item, kind, score: s });
+    if (hits) scored.push({ item, kind, hits, score: total });
   };
   ((typeof DOCUMENTS !== 'undefined' && DOCUMENTS) || []).forEach(d => push(d, 'doc'));
   ((typeof QA_ITEMS !== 'undefined' && QA_ITEMS) || []).forEach(q => push(q, 'qa'));
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => (b.hits - a.hits) || (b.score - a.score));
   const top = scored.slice(0, 5);
   if (count) count.textContent = top.length ? `${top.length}건` : '';
   list.innerHTML = '';

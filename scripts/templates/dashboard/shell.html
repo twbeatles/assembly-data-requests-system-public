@@ -109,6 +109,8 @@
       <button type="button" class="g-chip" data-insert=" OR " title="둘 중 하나라도 들어간 자료">A 또는 B</button>
       <button type="button" class="g-chip" data-insert=" -" title="뒤에 적은 단어가 들어간 자료는 뺍니다">단어 빼기</button>
       <button type="button" class="g-chip" data-insert='""' data-caret="-1" title="따옴표 안에 적은 그대로 찾습니다">“그대로 찾기”</button>
+      <button type="button" class="g-chip" data-insert="요구자:" title="이 사람이 요구한 자료만 (예: 요구자:홍길동)">요구자로</button>
+      <button type="button" class="g-chip" data-insert="기간:" title="요구일 기간으로 거르기 (예: 기간:2025-01..2025-06)">기간으로</button>
       <button type="button" class="g-chip" data-jump="search-help" title="검색 방법 전체 보기">검색 방법 더 보기</button>
       <label class="option-check" title="‘과기부’로 찾으면 ‘과학기술정보통신부’도, ‘트위터’로 찾으면 ‘엑스’도 함께 찾습니다">
         <input type="checkbox" id="chk-synonyms" checked> 비슷한 말도 함께 찾기
@@ -122,6 +124,8 @@
         <tr><td><code>딥페이크 -텔레그램</code></td><td>앞 단어는 있고 뒤 단어는 없는 자료</td></tr>
         <tr><td><code>"최근 3년"</code></td><td>따옴표 안에 적은 그대로</td></tr>
         <tr><td><code>ㄷㅍㅇㅋ</code>, <code>딥ㅍㅇㅋ</code></td><td>초성만 쳐도 찾습니다</td></tr>
+        <tr><td><code>요구자:홍길동</code>, <code>상태:제출완료</code></td><td>칸을 정해서 찾습니다 (요구자·의원·상태·연도·기관·정당·부서·연번·문서번호)</td></tr>
+        <tr><td><code>기간:2025-01..2025-06</code></td><td>요구일이 그 기간 안인 자료 (<code>기간:2025</code>, <code>기간:2025-03</code>도 됩니다)</td></tr>
         <tr><td>비슷한 말</td><td><code>과기부</code> ↔ <code>과학기술정보통신부</code>처럼 같은 뜻의 말을 함께 찾습니다 (위 체크박스로 끌 수 있습니다)</td></tr>
       </table>
     </details>
@@ -137,7 +141,8 @@
 
       <div class="filter-group" id="filter-group-inst">
         <span class="filter-label">요구 기관</span>
-        <div class="filter-chips">
+        <!-- 기관 칩은 데이터에 있는 기관으로 다시 만든다(buildInstChips). 아래는 데이터가 없을 때의 기본값. -->
+        <div class="filter-chips" id="inst-chips">
           <span class="chip active" data-filter="inst" data-val="ALL">전체</span>
           <span class="chip" data-filter="inst" data-val="국회">국회</span>
           <span class="chip" data-filter="inst" data-val="상급감독기관">상급감독기관/대외기관</span>
@@ -665,6 +670,12 @@
       <button class="modal-tab-btn" data-tab="qa" onclick="switchModalTab('qa')">질문별로 보기</button>
       <button class="modal-tab-btn" data-tab="text" onclick="switchModalTab('text')">글자만 보기</button>
       <span class="modal-tabs-spacer"></span>
+      <span class="hit-nav" id="hit-nav" role="group" aria-label="검색어 위치 이동" hidden>
+        <span class="hit-nav-label">검색어</span>
+        <button type="button" class="hit-nav-btn" id="hit-prev" onclick="gotoSearchHit(-1)" title="앞 검색어로 (Shift+F3)" aria-label="앞 검색어로">▲</button>
+        <span class="hit-pos" id="hit-pos" aria-live="polite">0/0</span>
+        <button type="button" class="hit-nav-btn" id="hit-next" onclick="gotoSearchHit(1)" title="다음 검색어로 (F3)" aria-label="다음 검색어로">▼</button>
+      </span>
       <button class="modal-tab-action" onclick="openComparePicker()" title="다른 답변서와 나란히 놓고 비교합니다">다른 답변서와 비교</button>
     </div>
 

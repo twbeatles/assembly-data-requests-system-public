@@ -5,15 +5,19 @@
 const SYNONYMS = /* __SYNONYMS_JSON__ */ {};
 
 // Korean Particles to strip for stemming
+// 파이썬 정본 `search/lang.py`의 KOREAN_PARTICLES와 같은 목록이다. 한쪽만 고치면 화면과 서버 결과가 갈린다.
 const KOREAN_PARTICLES = [
-  '에서', '으로', '에게', '까지', '부터', '보다', '처럼',
+  '에서는', '에게는', '으로는', '에서도',
+  '에서', '으로', '에게', '까지', '부터', '보다', '처럼', '에는', '에도', '로는', '이나',
   '을', '를', '이', '가', '은', '는', '의', '에', '로',
-  '과', '와', '도', '만', '나', '이나'
+  '과', '와', '도', '만', '나'
 ];
+// 긴 조사부터 본다. 예전에는 '나'를 '이나'보다 먼저 봐서 '예산이나'가 '예산이'로 잘렸다.
+const KOREAN_PARTICLES_LONGEST_FIRST = KOREAN_PARTICLES.slice().sort((a, b) => b.length - a.length);
 
 function stripKoreanParticle(word) {
   if (!word || word.length <= 2) return word;
-  for (const p of KOREAN_PARTICLES) {
+  for (const p of KOREAN_PARTICLES_LONGEST_FIRST) {
     if (word.length > p.length + 1 && word.endsWith(p)) {
       return word.slice(0, -p.length);
     }

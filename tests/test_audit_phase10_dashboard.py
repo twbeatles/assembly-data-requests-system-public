@@ -79,9 +79,11 @@ let activeFilters = { query: '', year: 'ALL', inst: 'ALL', topic: 'ALL', onlyFav
 
 
 SEARCH_FUNCS = [
-    "SYNONYMS", "KOREAN_PARTICLES", "stripKoreanParticle", "CHOSEONG_LIST", "getChoseong",
+    "SYNONYMS", "KOREAN_PARTICLES", "KOREAN_PARTICLES_LONGEST_FIRST", "stripKoreanParticle",
+    "CHOSEONG_LIST", "getChoseong",
     "getChoseongNoSpace", "isChoseongOnly", "buildHybridKoreanRegex", "searchCacheSignature", "searchCache",
     "noSpaceIncludes",
+    "SEARCH_FIELD_ALIASES", "SEARCH_EXACT_FIELDS", "normalizeSearchDate", "takeSearchField", "searchFieldsMatch",
     "parseSearchTokens", "escapeRegExpLiteral", "prepareSearchQuery", "matchSearchItem", "sortSearchResults",
     "filterItemsFromList",
 ]
@@ -172,6 +174,87 @@ const handler = `openDocModal(DOCS_MAP[${JSON.stringify(doc.doc_id)}], ${Number(
 console.log(JSON.stringify(opened));
 """
         self.assertEqual(run_node(["escapeHtml"], body), ["DOC-2026-001", 3])
+
+
+@unittest.skipUnless(NODE, "node가 없어 대시보드 JS 실행 테스트를 건너뜁니다")
+class TestDashboardSearchUsability(unittest.TestCase):
+    """검색 용이성 점검: 필드 한정자·조사 처리·유사 답변 필터 독립·띄어쓰기 무시 미리보기."""
+
+    ITEMS = [
+        {"doc_id": "D1", "year": "2026", "request_date": "2026-02-10", "title": "딥페이크 예산 현황",
+         "requester": "김철수 의원", "institution": "국회", "full_markdown": "예산 내역"},
+        {"doc_id": "D2", "year": "2025", "request_date": "2025-07-01", "title": "텔레그램 시정 요구 내역",
+         "requester": "이영희 의원", "institution": "국회입법조사처", "full_markdown": "시정 요구 결과"},
+        {"ledger_id": "L1", "year": "2026", "request_date": "2026-03-05", "title": "딥페이크 자료",
+         "requester": "김철수 의원", "status": "제출완료"},
+        {"ledger_id": "L2", "year": "2026", "request_date": "2026-03-06", "title": "딥페이크 추가",
+         "requester": "박민수 의원", "status": "미제출"},
+    ]
+
+    def search(self, queries):
+        body = f"""
+const items = {json.dumps(self.ITEMS, ensure_ascii=False)};
+const out = {{}};
+for (const q of {json.dumps(queries, ensure_ascii=False)}) {{
+  activeFilters.query = q;
+  out[q] = filterItemsFromList(items, false).map(x => x.doc_id || x.ledger_id).sort();
+}}
+console.log(JSON.stringify(out));
+"""
+        return run_node(SEARCH_FUNCS, body)
+
+    def test_field_qualifiers_match_server_grammar(self):
+        res = self.search([
+            "요구자:김철수", "의원:김철수 딥페이크", "기간:2026-03", "기간:2025..2025",
+            "상태:제출완료", "상태:제출", "기관:입법조사처", "모르는칸:값",
+        ])
+        self.assertEqual(res["요구자:김철수"], ["D1", "L1"])
+        self.assertEqual(res["의원:김철수 딥페이크"], ["D1", "L1"])
+        self.assertEqual(res["기간:2026-03"], ["L1", "L2"])
+        self.assertEqual(res["기간:2025..2025"], ["D2"])
+        self.assertEqual(res["상태:제출완료"], ["L1"])
+        # 상태는 값 전체가 같아야 한다(서버 EXACT_MATCH_FIELDS). '제출'이 '미제출'에 걸리면 안 된다.
+        self.assertEqual(res["상태:제출"], [])
+        self.assertEqual(res["기관:입법조사처"], ["D2"])
+        # 모르는 접두사는 한정자가 아니라 평범한 검색어다.
+        self.assertEqual(res["모르는칸:값"], [])
+
+    def test_particle_longest_first(self):
+        out = run_node(SEARCH_FUNCS, """
+console.log(JSON.stringify(['예산이나', '예산에서는', '텔레그램을', '국가'].map(stripKoreanParticle)));
+""")
+        self.assertEqual(out, ["예산", "예산", "텔레그램", "국가"])
+        from search.lang import strip_particle
+        self.assertEqual([strip_particle(w) for w in ["예산이나", "예산에서는", "텔레그램을", "국가"]], out)
+
+    def test_similar_suggestion_ignores_screen_filters(self):
+        body = f"""
+const items = {json.dumps(self.ITEMS, ensure_ascii=False)};
+activeFilters.year = '2025';
+activeFilters.onlyFavorites = true;
+const prepared = prepareSearchQuery('딥페이크');
+console.log(JSON.stringify({{
+  screen: matchSearchItem(items[0], prepared, false),
+  similar: matchSearchItem(items[0], prepared, false, true) >= 0
+}}));
+"""
+        out = run_node(SEARCH_FUNCS, body)
+        self.assertEqual(out["screen"], -1)
+        self.assertTrue(out["similar"])
+
+    def test_snippet_and_highlight_ignore_spacing(self):
+        names = ["escapeHtml", "isChoseongOnly", "looseTokenPattern", "__highlightRegexCache",
+                 "highlightRegexFor", "highlightTextString", "getSnippet"]
+        body = """
+const long = '가'.repeat(300) + ' 시정 요구 결과입니다';
+console.log(JSON.stringify({
+  snippet: getSnippet(long, ['시정요구']),
+  title: highlightTextString('텔레그램 시정 요구 내역', ['시정요구'])
+}));
+"""
+        out = run_node(names, body)
+        self.assertIn('<mark class="highlight">시정 요구</mark>', out["snippet"])
+        self.assertIn('<mark class="highlight">시정 요구</mark>', out["title"])
 
 
 @unittest.skipUnless(NODE, "node가 없어 대시보드 JS 실행 테스트를 건너뜁니다")

@@ -835,7 +835,7 @@ const document = {
   createTextNode(text) { return { text }; },
 };
 """
-        out = run_js(["isChoseongOnly", "applyDomHighlight"], """
+        out = run_js(["isChoseongOnly", "looseTokenPattern", "applyDomHighlight"], """
 applyDomHighlight({}, ['텔레그램']);
 console.log(JSON.stringify(texts.map(t => {
   const f = t.parentNode.replaced;

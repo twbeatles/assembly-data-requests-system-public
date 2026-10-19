@@ -24,7 +24,7 @@ function escapeRegExpLiteral(text) {
 // 토큰마다 동의어 변형을 정규식 하나로 묶어 둔다. 전문(수만 자)은 변형마다 따로 훑지 않고
 // 토큰당 한 번만 훑는다. 동의어가 10개로 퍼지는 낱말이면 전문 비교가 10배 줄어든다.
 function prepareSearchQuery(query) {
-  const { posGroups, neg } = parseSearchTokens(query);
+  const { posGroups, neg, fields } = parseSearchTokens(query);
   for (const group of posGroups) {
     for (const tok of group.andTokens) {
       if (tok.isCho || tok.hybridRe || !tok.expanded) continue;
@@ -34,18 +34,23 @@ function prepareSearchQuery(query) {
       tok.bodyRe = variants.length ? new RegExp(variants.map(escapeRegExpLiteral).join('|')) : null;
     }
   }
-  return { posGroups, neg, active: !!(posGroups.length || neg.length) };
+  return { posGroups, neg, fields, active: !!(posGroups.length || neg.length || fields) };
 }
 
 // 항목 하나를 평가한다. 걸러지면 -1, 통과하면 점수(0 이상).
-function matchSearchItem(item, prepared, skipQuery) {
+// ignoreScreenFilters: 화면의 연도·기관·즐겨찾기 칩을 보지 않고 검색어만 본다(등록 폼의 유사 답변 추천용).
+function matchSearchItem(item, prepared, skipQuery, ignoreScreenFilters) {
   const itemId = item.doc_id || item.qa_id || item.ledger_id;
-  if (activeFilters.onlyFavorites && !favorites.includes(itemId)) return -1;
-  if (activeFilters.year !== 'ALL' && String(item.year || '') !== String(activeFilters.year)) return -1;
   // 관리대장 항목에는 기관·주제·통계표 값이 없다. 문서용 필터를 대장에 적용하면 결과가 0건이 되고,
   // 반대로 진행상태·마감 필터는 대장에만 의미가 있다.
   const isLedgerItem = !!item.ledger_id && !item.doc_id && !item.qa_id;
-  if (isLedgerItem) {
+  if (ignoreScreenFilters) {
+    // 아래 칩 필터를 건너뛴다.
+  } else if (activeFilters.onlyFavorites && !favorites.includes(itemId)) {
+    return -1;
+  } else if (activeFilters.year !== 'ALL' && String(item.year || '') !== String(activeFilters.year)) {
+    return -1;
+  } else if (isLedgerItem) {
     if (activeFilters.status && activeFilters.status !== 'ALL' && String(item.status || '').trim() !== activeFilters.status) return -1;
     if (activeFilters.due && activeFilters.due !== 'ALL' && !matchesDueFilter(item, activeFilters.due)) return -1;
   } else {
@@ -58,7 +63,8 @@ function matchSearchItem(item, prepared, skipQuery) {
   }
 
   if (skipQuery || !prepared.active) return 0;
-  const { posGroups, neg } = prepared;
+  const { posGroups, neg, fields } = prepared;
+  if (fields && !searchFieldsMatch(fields, item)) return -1;
 
   const title = item.title || item.question_title || '';
   const titleLower = title.toLowerCase();
