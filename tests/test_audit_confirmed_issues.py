@@ -111,6 +111,7 @@ class TestIssue001ConcurrentReclaim(unittest.TestCase):
             self.assertTrue(pid_is_alive(winners[0][1]))
             info = ServerInstanceLock(tmp_path).read()
             self.assertIsNotNone(info)
+            assert info is not None
             self.assertEqual(str(info.get("pid")), str(winners[0][1]))
             for _, _, holder in losers:
                 self.assertEqual(holder, winners[0][1],
