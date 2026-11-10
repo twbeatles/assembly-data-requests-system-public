@@ -19,7 +19,6 @@ import sqlite3
 import subprocess
 import sys
 import threading
-import time
 import unittest
 from pathlib import Path
 
@@ -124,7 +123,6 @@ class TestIssue001ConcurrentReclaim(unittest.TestCase):
                     proc.terminate()
 
     def test_concurrent_reclaim_has_single_winner(self):
-        import tempfile
         for _ in range(3):
             with _race_tmp() as tmp_path:
                 self._one_round(Path(tmp_path))

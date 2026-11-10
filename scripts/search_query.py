@@ -17,7 +17,7 @@
 있으면 FTS를 건너뛰고 곧바로 대체 경로로 보낸다(제안서 S2).
 """
 
-import re
+import re  # noqa: F401 # compat re-export shim
 
 
 
@@ -48,13 +48,13 @@ import re
 
 
 
-from search.lang import (
+from search.lang import (  # noqa: F401 # compat re-export shim
     FTS_MIN_TOKEN_LEN, KOREAN_PARTICLES, CHOSEONG_LIST, _CHOSEONG_MAX_LEN,
     _JAMO_RE, _FTS_RESERVED_RE, FIELD_ALIASES, DATE_FIELDS, EXACT_MATCH_FIELDS,
     _FIELD_TOKEN_RE, _DATE_RANGE_RE, _clean_term, strip_particle, get_choseong,
     normalize_date, NOSPACE_CODEPOINTS,
 )
-from search.parse import _take_field, parse_query, _expand_terms, build_fts_match
-from search.match import (
+from search.parse import _take_field, parse_query, _expand_terms, build_fts_match  # noqa: F401 # compat re-export shim
+from search.match import (  # noqa: F401 # compat re-export shim
     _nospace_lower, _term_matches, fields_match, row_matches, score_row, plan_is_empty,
 )

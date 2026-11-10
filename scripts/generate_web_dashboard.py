@@ -8,7 +8,6 @@ Preserves HTML_TEMPLATE string in-file for unit test validation (e.g. XSS saniti
 
 from typing import Any, cast
 import sys
-import time
 from pathlib import Path
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')

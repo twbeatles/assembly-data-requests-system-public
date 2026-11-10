@@ -8,7 +8,6 @@
 - 파이프라인 계획: 파일 이동·DB 변경 없음.
 """
 
-import json
 import sqlite3
 
 import agent_fixtures

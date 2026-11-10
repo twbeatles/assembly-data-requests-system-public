@@ -1,7 +1,5 @@
 from typing import Any, cast
-import os
 import sys
-import re
 from pathlib import Path
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
@@ -13,7 +11,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import system_config
 
 WORKSPACE_ROOT = system_config.find_workspace_root(SYSTEM_DIR)
-from bats.content import (
+from bats.content import (  # noqa: F401 # re-export (build_universal_package + tests import via shim)
     MIN_PYTHON, PY_VERSION_CHECK, PY_DETECT, DEPS_CHECK,
     NO_PYTHON_REASON, NO_DEPS_BLOCK, _fill,
     SYSTEM_BAT_00, SYSTEM_BAT_01, SYSTEM_BAT_02, SYSTEM_BAT_03,

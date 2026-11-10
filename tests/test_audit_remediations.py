@@ -113,8 +113,10 @@ class TestAuditRemediations(unittest.TestCase):
                 results.append(res)
 
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(12)]
-        for thread in threads: thread.start()
-        for thread in threads: thread.join()
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
         self.assertTrue(all(result["success"] for result in results), results)
         ids = [result["item"]["ledger_id"] for result in results]
         self.assertEqual(len(ids), len(set(ids)))

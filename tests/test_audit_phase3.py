@@ -1,11 +1,8 @@
 from typing import Any
-import os
 import sys
 import unittest
 import tempfile
-import json
 import sqlite3
-import re
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 
@@ -18,10 +15,8 @@ if str(SCRIPTS_DIR) not in sys.path:
 import add_documents_smart
 import extract_and_build_db
 import parse_all
-import generate_web_dashboard
 import web_server
 import system_config
-import launcher_gui
 
 class TestAuditPhase3(unittest.TestCase):
     """
@@ -99,7 +94,6 @@ class TestAuditPhase3(unittest.TestCase):
         """Verify parse_all terminates cleanly with 0 files without ZeroDivisionError"""
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_root = Path(tmp_dir)
-            out_dir = tmp_root / "_parsed_markdown"
             # find_target_files on empty directory
             files = parse_all.find_target_files(tmp_root)
             self.assertEqual(len(files), 0)

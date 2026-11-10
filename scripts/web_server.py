@@ -9,17 +9,13 @@ Maintains 100% backwards compatibility with all existing CLI commands, tests, an
 """
 
 from typing import Any, cast
-import os
 import sys
 import re
-import json
-import sqlite3
-import datetime
 import threading
 import webbrowser
 from pathlib import Path
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs, unquote
+from urllib.parse import urlparse
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 
@@ -29,7 +25,9 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from web.security import SecurityMixin
-from web.pagination import MAX_PAGE_LIMIT, parse_page_params, page_slice, paged_response
+from web.pagination import (  # noqa: F401 # shim re-export (identity contract)
+    MAX_PAGE_LIMIT, parse_page_params, page_slice, paged_response,
+)
 from web.body import JsonBodyMixin
 from web.static import StaticPolicyMixin
 from web.ledger_api import LedgerApiMixin

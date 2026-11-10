@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """_parsed_markdown 연도별 정리 및 경로 판별 단위 테스트."""
-import os
 import shutil
 import sys
 import tempfile

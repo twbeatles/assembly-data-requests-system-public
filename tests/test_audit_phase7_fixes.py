@@ -17,14 +17,12 @@ Verifies all 14 audit issues addressed in PROJECT_AUDIT.md:
 
 import os
 import sys
-import json
-import sqlite3
 import subprocess
 import tempfile
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 TESTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = TESTS_DIR.parent

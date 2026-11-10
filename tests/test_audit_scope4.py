@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """SCOPE4 감사 개선 회귀 테스트."""
 
-import hashlib
 import sqlite3
 import sys
 import tempfile
@@ -15,7 +14,6 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 import extract_and_build_db
 import add_documents_smart
-import generate_excel_db
 import write_all_bats
 from extractors.text_extractor import extract_metadata
 from set_department import validate_label

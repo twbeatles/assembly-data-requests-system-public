@@ -2,7 +2,7 @@
 import sys
 import re
 from pathlib import Path
-from typing import Any, List, cast
+from typing import Any, cast
 import openpyxl
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]

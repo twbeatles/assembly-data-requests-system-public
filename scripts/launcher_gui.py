@@ -1,11 +1,8 @@
-import os
 import sys
-import re
 import sqlite3
-import webbrowser
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext, filedialog
+from tkinter import ttk, messagebox
 import threading
 import queue
 
@@ -19,7 +16,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from gui.search_text import (CHOSEONG, get_choseong, is_choseong_only, clean_fts_query,
+from gui.search_text import (get_choseong, is_choseong_only, clean_fts_query,
                              service_search, target_key, highlight_terms)
 from gui.views import ViewsMixin
 from gui.actions import ActionsMixin
@@ -560,7 +557,7 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
 
 def main():
     root = tk.Tk()
-    app = LauncherApp(root)
+    LauncherApp(root)
     root.mainloop()
 
 if __name__ == "__main__":

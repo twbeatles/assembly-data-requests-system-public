@@ -18,7 +18,6 @@ from typing import Any, cast
 
 import argparse
 import ast
-import json
 import re
 import sys
 from pathlib import Path
@@ -133,7 +132,7 @@ def main(argv=None) -> int:
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
 
-    from _symbol_inventory import PYTHON_TARGETS, PACKAGE_DIRS as TARGET_DIRS, collect_python_target_names, load_snapshot
+    from _symbol_inventory import PYTHON_TARGETS, collect_python_target_names, load_snapshot
 
     corpus = [(p, p.read_text(encoding="utf-8", errors="replace"))
               for root in (SCRIPTS_DIR, TESTS_DIR, SYSTEM_DIR / "tools")

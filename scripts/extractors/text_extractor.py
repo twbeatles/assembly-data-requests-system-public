@@ -10,7 +10,7 @@ import sys
 import re
 import datetime
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 SYSTEM_DIR = SCRIPTS_DIR.parent

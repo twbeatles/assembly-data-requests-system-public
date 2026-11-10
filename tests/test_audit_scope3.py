@@ -9,7 +9,6 @@ import tempfile
 import unittest
 import shutil
 from pathlib import Path
-from unittest.mock import patch
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 SYSTEM_DIR = SCRIPTS_DIR.parent
@@ -26,7 +25,6 @@ from db.database_manager import DatabaseManager
 import build_universal_package
 import write_all_bats
 import package_distribution
-import launcher_gui
 
 
 class TestAuditScope3(unittest.TestCase):

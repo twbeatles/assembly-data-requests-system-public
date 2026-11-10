@@ -13,11 +13,8 @@ Maintains full backwards compatibility with all existing callers and unit tests.
 from typing import Any, cast
 import os
 import sys
-import re
 import json
 import sqlite3
-import time
-import shutil
 import datetime
 from pathlib import Path
 
@@ -39,7 +36,7 @@ JSON_PATH = SYSTEM_DIR / "data_requests.json"
 DIST_MANIFEST = SYSTEM_DIR / ".distribution_manifest.json"
 
 # Import and re-export all functions for 100% backwards compatibility
-from extractors.text_extractor import (
+from extractors.text_extractor import (  # noqa: F401 # snapshot public surface
     clean_for_excel,
     mask_pii,
     parse_date,
@@ -47,11 +44,11 @@ from extractors.text_extractor import (
     extract_content_details,
     TextExtractor
 )
-from extractors.qa_splitter import (
+from extractors.qa_splitter import (  # noqa: F401 # snapshot public surface
     split_into_qa_items,
     QASplitter
 )
-from extractors.ledger_parser import (
+from extractors.ledger_parser import (  # noqa: F401 # snapshot public surface
     normalize_ledger_date,
     load_request_ledger,
     LedgerParser
@@ -66,8 +63,8 @@ def _mtime(path) -> float:
         return Path(path).stat().st_mtime
     except OSError:
         return 0.0
-from build_db.docids import (
-    file_sha256, _remember_doc_keys, load_existing_id_map, assign_doc_id,
+from build_db.docids import (  # noqa: F401 # re-export (tests import via shim)
+    file_sha256, load_existing_id_map, assign_doc_id,
 )
 
 

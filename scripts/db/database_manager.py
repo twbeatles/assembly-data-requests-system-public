@@ -9,11 +9,10 @@ and safe atomic shadow-database swap.
 import os
 import sys
 import sqlite3
-import shutil
 import time
 import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from . import fts_spec
 from .migrations import (

@@ -26,7 +26,6 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import package_distribution
-import build_universal_package
 import write_all_bats
 from template_renderer import DashboardRenderer
 

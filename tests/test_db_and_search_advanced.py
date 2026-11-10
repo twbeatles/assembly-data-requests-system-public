@@ -1,7 +1,5 @@
 from typing import Any
-import os
 import sys
-import json
 import sqlite3
 import shutil
 import tempfile
@@ -13,10 +11,8 @@ SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-import extract_and_build_db
 from db import fts_spec
 import web_server
-import generate_web_dashboard
 
 class TestDbAndSearchAdvanced(unittest.TestCase):
     @classmethod

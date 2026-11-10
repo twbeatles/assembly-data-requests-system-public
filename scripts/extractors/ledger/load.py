@@ -4,7 +4,6 @@ import re
 import sqlite3
 import datetime
 from pathlib import Path
-from typing import List
 import openpyxl
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]

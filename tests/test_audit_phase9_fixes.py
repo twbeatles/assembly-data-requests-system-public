@@ -19,7 +19,6 @@ PROJECT_AUDIT.md (2026-09-13 회차) ISSUE-001~008 및 기능 공백 개선 회�
 
 import importlib
 import json
-import os
 import shutil
 import sqlite3
 import subprocess
@@ -40,7 +39,6 @@ if str(SCRIPTS_DIR) not in sys.path:
 import openpyxl
 
 import parse_all
-import system_config
 from db.database_manager import DatabaseManager
 from services.excel_sync_service import ExcelSyncService, MAX_PENDING_ATTEMPTS
 from services.ledger_service import LedgerService

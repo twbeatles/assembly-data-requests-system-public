@@ -1,10 +1,7 @@
 import os
 import sys
 import time
-import contextlib
 import subprocess
-import hashlib
-import html
 import re
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,7 +9,6 @@ from pathlib import Path
 from typing import Any, Optional, cast
 import json
 import shutil
-import openpyxl
 
 KORDOC_CMD = shutil.which('kordoc.cmd') or shutil.which('kordoc') or 'kordoc.cmd'
 # MCP parse_document와 동일한 엔진 옵션: 스캔본 OCR, 표 빈칸·빈 문단 보존
@@ -61,10 +57,11 @@ excel_db_stem = Path(cfg.get("excel_filename", "국회_대외기관_자료요구
 EXCLUDE_FILE_PREFIXES = {'~$', excel_db_stem, '국회_대외기관_자료요구_통합DB', '국회_기관_자료요구_통합DB'}
 
 from pipeline.parse.discovery import get_exclude_dirs, is_excluded_dir, find_target_files
-from pipeline.parse.safe_copy import CMD_UNSAFE_CHARS, needs_safe_copy, safe_kordoc_target, kordoc_paths
+from pipeline.parse.safe_copy import (  # noqa: F401 # shim re-export (identity contract)
+    CMD_UNSAFE_CHARS, needs_safe_copy, safe_kordoc_target, kordoc_paths,
+)
 from pipeline.parse.xlsx_fallback import handle_large_xlsx_fallback
 from pipeline.parse.images import is_image_only_markdown, _collect_extract_images, _image_to_ocr_png
-from pipeline.parse.year_detect import detect_target_year, YEAR_DIR_RE
 from pipeline.parse.layout import (
     expected_output_path, consolidate_layout, default_backup_dir, write_text_atomic,
 )

@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-import os
 import sys
 import re
 import time
-import shutil
 import json
 import sqlite3
 import hashlib
@@ -11,7 +9,7 @@ from db.ledger_outbox import enqueue as enqueue_excel
 import datetime
 import threading
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple  # noqa: F401 # snapshot public surface (refactor-split contract)
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_BASE_DIR = SCRIPTS_DIR.parent

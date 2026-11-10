@@ -27,7 +27,6 @@ def _fetch_source(facade, source_id):
     kind, stable = source_id.split(":", 1)
     if kind == "doc":
         detail = facade.get_document(stable, max_chars=policy.MAX_EXCERPT_CHARS)
-        body_key = "full_markdown"
         title = detail.get("title", "")
         year = detail.get("year", "")
         doc_id = stable

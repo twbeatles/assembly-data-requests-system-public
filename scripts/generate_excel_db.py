@@ -4,12 +4,8 @@ import sys
 import json
 import shutil
 from pathlib import Path
-from collections import Counter
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
 
-from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 
@@ -21,14 +17,8 @@ SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 import system_config
-from excel_report.text import _excel_body, sanitize_text
-from excel_report.styles import (
-    NAVY_HEADER, SUB_HEADER, ACCENT_BLUE, ZEBRA_FILL, WHITE, BORDER_GRAY,
-    thin_side, cell_border, header_font, sub_header_font, title_font,
-    section_font, regular_font, bold_font, link_font, header_fill,
-    sub_header_fill, accent_fill, zebra_fill, apply_table_header,
-)
-from excel_report.links import resolve_excel_hyperlink_path
+from excel_report.text import _excel_body, sanitize_text  # noqa: F401 # re-export (tests import via shim)
+from excel_report.links import resolve_excel_hyperlink_path  # noqa: F401 # re-export (tests import via shim)
 from excel_report.sheets import (
     build_dashboard_sheet, build_master_list_sheet, build_qa_detail_sheet,
     build_statistics_index_sheet, build_ledger_sheet,

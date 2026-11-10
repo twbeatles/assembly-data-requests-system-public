@@ -4,7 +4,7 @@ import json
 import sqlite3
 import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(SCRIPTS_DIR) not in sys.path:
@@ -12,7 +12,6 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 try:
     import openpyxl
-    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 except ImportError:
     openpyxl = None
 

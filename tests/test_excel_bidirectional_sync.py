@@ -10,7 +10,6 @@ Tests both directions:
 import os
 import sys
 import time
-import json
 import shutil
 import tempfile
 import sqlite3
@@ -25,7 +24,6 @@ import openpyxl
 from db.database_manager import DatabaseManager
 from services.ledger_service import LedgerService
 from services.excel_sync_service import ExcelSyncService
-import web_server
 
 
 class TestExcelBidirectionalSync(unittest.TestCase):
@@ -209,7 +207,7 @@ class TestExcelBidirectionalSync(unittest.TestCase):
 
     def test_07_file_lock_deferred_queue(self):
         # Simulate an exclusive lock by keeping file open in write mode
-        with open(self.excel_path, "r+b") as locked_fp:
+        with open(self.excel_path, "r+b"):
             # While file is locked, web inserts a new item
             new_item = {
                 "year": "2026",

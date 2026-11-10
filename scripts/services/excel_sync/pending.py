@@ -7,7 +7,7 @@ import sqlite3
 import datetime
 import uuid
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(SCRIPTS_DIR) not in sys.path:
@@ -17,7 +17,6 @@ from write_guard import ensure_writable, ProductionWriteBlocked
 
 try:
     import openpyxl
-    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 except ImportError:
     openpyxl = None
 

@@ -3,7 +3,6 @@ import datetime
 import sys
 import re
 from pathlib import Path
-from typing import List
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_SYSTEM_DIR = SCRIPTS_DIR.parent

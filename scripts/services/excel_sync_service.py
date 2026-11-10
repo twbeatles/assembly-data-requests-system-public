@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 """호환 진입점. 구현은 services.excel_sync."""
-import json
-import threading
-import time
 try:
     import openpyxl
 except ImportError:

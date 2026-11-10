@@ -14,7 +14,6 @@ Tests:
 """
 
 from typing import Any
-import os
 import sys
 import json
 import shutil
@@ -22,14 +21,13 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 ROOT_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-import system_config
 from db.database_manager import DatabaseManager
 from services.ledger_service import LedgerService
 from services.excel_sync_service import ExcelSyncService

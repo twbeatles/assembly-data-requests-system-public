@@ -26,8 +26,8 @@ def split_into_qa_items(doc_id: str, meta: dict, md_text: str, parsed_md_path: s
     EXCLUDE_PREFIXES = ('단위', '참고', '※', '출처', '붙임', '구분', 'http', '작성자', '담당자', '개요', '추진경과', '추진실적', '향후계획', '주요실적', '조치계획', '검토의견', '현황 및', '추진배경', '주요내용', '보고순서')
 
     in_table = False
-    for idx, l in enumerate(lines):
-        ls = l.strip()
+    for idx, line in enumerate(lines):
+        ls = line.strip()
         # 대부분의 줄에는 '<'가 없다. 줄마다 lower()로 복사본을 만들지 않는다.
         ls_lower = ls.lower() if '<' in ls else ''
         if '<table' in ls_lower:

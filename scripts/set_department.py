@@ -1,5 +1,4 @@
 from typing import Any, cast
-import os
 import sys
 import re
 from pathlib import Path
@@ -37,7 +36,7 @@ def main():
     curr_agency = cfg.get("agency_name", "공공기관")
     curr_title = cfg.get("system_title", "국회·대외기관 자료요구 스마트 관리 및 검색 시스템")
 
-    print(f"\n[현재 설정 정보]")
+    print("\n[현재 설정 정보]")
     print(f" 1. 담당 부서명 : {curr_dept}")
     print(f" 2. 소속 기관명 : {curr_agency}")
     print(f" 3. 시스템 제목 : {curr_title}")

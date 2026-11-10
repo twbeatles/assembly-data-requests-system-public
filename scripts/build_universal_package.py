@@ -1,11 +1,7 @@
 from typing import Any, Optional, cast
-import os
 import sys
 import json
 import shutil
-import sqlite3
-import gzip
-import base64
 from pathlib import Path
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
@@ -33,7 +29,7 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
         target_dir = WORKSPACE_ROOT / "국회자료요구_스마트시스템_범용배포용"
 
     print("=" * 65)
-    print(f"📦 타 부서 전용 클린 배포 패키지 구축 시작")
+    print("📦 타 부서 전용 클린 배포 패키지 구축 시작")
     print(f"📍 대상 폴더: {target_dir}")
     print("=" * 65)
 
@@ -160,9 +156,9 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
     print("✓ 깨끗하게 초기화된 독립 DB 및 웹 대시보드 생성 완료")
 
     print("\n" + "=" * 65)
-    print(f"🎉 타 부서 전용 클린 배포 패키지 구축 성공!")
+    print("🎉 타 부서 전용 클린 배포 패키지 구축 성공!")
     print(f"📍 폴더 위치: {target_dir}")
-    print(f"💡 이 폴더를 ZIP으로 압축하여 타 부서에 전달하시면 됩니다.")
+    print("💡 이 폴더를 ZIP으로 압축하여 타 부서에 전달하시면 됩니다.")
     print("=" * 65)
     return target_dir
 

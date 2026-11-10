@@ -1,11 +1,8 @@
 from typing import Any
-import os
 import sys
 import unittest
 import tempfile
-import shutil
 import sqlite3
-import re
 from pathlib import Path
 
 # Add scripts directory to sys.path

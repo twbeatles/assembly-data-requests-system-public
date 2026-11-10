@@ -1,5 +1,4 @@
 from typing import Any, cast
-import os
 import sys
 from pathlib import Path
 import openpyxl

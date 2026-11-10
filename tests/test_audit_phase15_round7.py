@@ -12,7 +12,6 @@ from typing import Any
 import contextlib
 import io
 import json
-import os
 import shutil
 import sqlite3
 import sys
@@ -425,7 +424,7 @@ class TestBuilderDedupAndHeader(LayoutFixture):
         return res, rows, qas
 
     def test_two_copies_of_one_source_load_as_one_document(self):
-        src = self.source("홍길동 519/260901 홍길동의원 요구자료.hwp")
+        self.source("홍길동 519/260901 홍길동의원 요구자료.hwp")
         self.source("2026/260902 이의원 요구자료.hwp")
         body = "# 요구자료\n\n1. 질의 내용입니다?\n\n○ 답변 내용이 여기에 있습니다 충분히 긴 문장.\n"
         self.md("홍길동 519/260901 홍길동의원 요구자료.hwp.md", body)

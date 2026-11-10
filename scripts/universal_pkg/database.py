@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """타 부서용 클린 DB·대시보드 생성(SRP: 클린 패키지 DB)."""
-import base64
-import gzip
 import json
 import sqlite3
 from pathlib import Path
@@ -11,7 +9,6 @@ def build_clean_database(dist_dir: Path, dept_name="자료요구담당부서", a
     """Creates a clean, initialized database for another department."""
     db_file = dist_dir / "data_requests.db"
     json_file = dist_dir / "data_requests.json"
-    excel_file = dist_dir / "국회_기관_자료요구_통합DB.xlsx"
     html_file = dist_dir / "자료요구_통합검색_대시보드.html"
 
     # 1. Clean JSON

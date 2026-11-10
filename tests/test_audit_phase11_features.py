@@ -208,7 +208,8 @@ class TestServerLedgerFeatures(unittest.TestCase):
         self.assertEqual(states, EXPECTED_STATES)
 
     def test_query_ledger_status_and_due_filters(self):
-        ids = lambda rows: sorted(r["ledger_id"] for r in rows)
+        def ids(rows):
+            return sorted(r["ledger_id"] for r in rows)
         self.assertEqual(ids(self.svc.query_ledger(due="overdue", today=TODAY)), ["REQ-2026-001"])
         self.assertEqual(ids(self.svc.query_ledger(due="soon", today=TODAY)), ["REQ-2026-002", "REQ-2026-003"])
         self.assertEqual(ids(self.svc.query_ledger(status="검토중")), ["REQ-2026-003"])

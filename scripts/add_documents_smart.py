@@ -1,11 +1,8 @@
 from typing import Any, cast
 import os
 import sys
-import re
 import time
-import datetime
 import shutil
-import hashlib
 from pathlib import Path
 import json
 
@@ -17,7 +14,6 @@ SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 import system_config
-from write_guard import ensure_writable
 
 # 배포 환경 판정과 루트 판정은 system_config 한 곳에서만 한다. 예전에는 여기서 폴더명의
 # "배포"/"dist"로 따로 판정해 parse_all과 루트가 달라졌고, 투입 문서가 파싱 대상 밖으로
@@ -39,9 +35,8 @@ import parse_all
 import extract_and_build_db
 import generate_excel_db
 import generate_web_dashboard
-import package_distribution
 import sync_distributions
-from ingest.files import (
+from ingest.files import (  # noqa: F401 # re-export (ingest/files + tests import via shim)
     TARGET_EXTS, is_master_ledger_file, determine_target_folder,
     _compute_sha256, _is_in_use, copy_or_move_files,
 )

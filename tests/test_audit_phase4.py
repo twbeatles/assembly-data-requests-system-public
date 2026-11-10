@@ -11,9 +11,7 @@ Verifies:
 7. text_extractor historical date prefix (2018-2023) normalization.
 """
 
-import os
 import sys
-import json
 import sqlite3
 import unittest
 import tempfile

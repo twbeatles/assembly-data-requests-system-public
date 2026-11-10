@@ -6,13 +6,8 @@ data serialization/compression, variable substitution, and safe atomic file writ
 """
 
 import os
-import sys
-import json
-import gzip
-import base64
 import time
 import shutil
-import html
 import re
 from pathlib import Path
 from typing import Dict, Any, Optional

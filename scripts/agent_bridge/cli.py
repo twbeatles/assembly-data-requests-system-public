@@ -96,7 +96,7 @@ def _hoist_global_flags(argv):
         argv = sys.argv[1:]
     flags = {"--json", "--pretty", "--immutable"}
     valued = {"--data-root"}
-    head, tail = [], list(argv)
+    tail = list(argv)
     i = 0
     hoisted = []
     rest = []

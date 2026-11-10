@@ -11,16 +11,13 @@ Verifies:
 """
 
 from typing import Any
-import os
 import sys
 import json
-import sqlite3
 import unittest
 import tempfile
 import shutil
 import time
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 SYSTEM_DIR = SCRIPTS_DIR.parent
@@ -31,8 +28,6 @@ from services.ledger_service import LedgerService
 from services.sync_service import SyncService
 from web_server import RequestLedgerHandler
 from db.database_manager import DatabaseManager
-from extractors import ledger_parser
-import generate_excel_db
 
 
 class TestAuditPhase5(unittest.TestCase):

@@ -1,6 +1,4 @@
-import os
 import sys
-import json
 import sqlite3
 import shutil
 import tempfile
@@ -13,9 +11,6 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import extract_and_build_db
-import web_server
-import parse_all
-import package_distribution
 
 class TestAuditImprovements(unittest.TestCase):
     def test_1_ledger_rendering_and_modals_in_html_script(self):

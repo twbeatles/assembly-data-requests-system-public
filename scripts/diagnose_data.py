@@ -58,7 +58,7 @@ def main(json_path: Optional[Path] = None):
     for d in docs:
         if d['doc_id'] in single_qa:
             q_list = d.get('question_list', '')
-            q_cnt = len([l for l in q_list.split('\n') if l.strip()])
+            q_cnt = len([line for line in q_list.split('\n') if line.strip()])
             if q_cnt > 1:
                 print(f"   * [{d['doc_id']}] {d['title']} -> question_list에는 {q_cnt}개 질문 감지됨!")
                 sample_checked += 1
