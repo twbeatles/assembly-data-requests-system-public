@@ -51,7 +51,7 @@ def fts_table_names():
 def fts_trigger_names():
     """모든 FTS 동기화 트리거 이름. 드롭 순서에 쓴다."""
     names = []
-    for fts_name, (source, _cols) in FTS_SPECS.items():
+    for _fts_name, (source, _cols) in FTS_SPECS.items():
         for suffix in FTS_TRIGGER_SUFFIXES:
             names.append(f"{source}_{suffix}")
     return tuple(names)

@@ -108,7 +108,7 @@ def _run_smart_add_body(input_files=None, status_callback=None):
     for dd in DROP_DIRS:
         if dd.exists():
             drop_files = []
-            for root, dirs, files in os.walk(dd):
+            for root, _dirs, files in os.walk(dd):
                 for f in files:
                     if f.startswith('~$') or f.startswith('.'):
                         continue
@@ -127,7 +127,7 @@ def _run_smart_add_body(input_files=None, status_callback=None):
                 moved = copy_or_move_files(drop_files, move=True, skipped=skipped_inputs)
                 newly_added.extend(moved)
                 # Clean up empty subdirectories left behind inside dd
-                for root, dirs, files in os.walk(dd, topdown=False):
+                for root, dirs, _files in os.walk(dd, topdown=False):
                     for d in dirs:
                         sub_d = Path(root) / d
                         try:

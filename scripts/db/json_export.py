@@ -32,7 +32,7 @@ def _write_rows(fp, cursor) -> int:
     names = [d[0] for d in cursor.description]
     for row in cursor:
         fp.write(",\n" if count else "\n")
-        fp.write(json.dumps(dict(zip(names, row)), ensure_ascii=False, separators=_SEPARATORS))
+        fp.write(json.dumps(dict(zip(names, row, strict=True)), ensure_ascii=False, separators=_SEPARATORS))
         count += 1
     return count
 

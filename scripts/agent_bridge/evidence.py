@@ -89,8 +89,8 @@ def build_pack(facade, question, selected_ids=None, max_sources=None):
         raise DataReqError("invalid_input", "question은 비어 있을 수 없습니다.")
     try:
         count = int(max_sources) if max_sources is not None else policy.MAX_SOURCES
-    except (TypeError, ValueError):
-        raise DataReqError("invalid_input", "max_sources는 정수여야 합니다.")
+    except (TypeError, ValueError) as e:
+        raise DataReqError("invalid_input", "max_sources는 정수여야 합니다.") from e
     count = max(1, min(count, policy.MAX_SOURCES))
     ids = list(selected_ids or [])[:count]
     if not ids:

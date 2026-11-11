@@ -155,15 +155,15 @@ class TestIssue002ReadonlyContract(unittest.TestCase):
                 before = _snapshot_tree(base)
                 failing = []
                 for name, call in [
-                    ("search", lambda: facade.search("딥페이크")),
-                    ("document", lambda: facade.get_document("DOC-2026-001")),
-                    ("qa", lambda: facade.get_qa("QA-2026-001")),
-                    ("ledger_list", lambda: facade.ledger_list()),
-                    ("ledger_get", lambda: facade.ledger_get("REQ-2026-001")),
-                    ("ledger_summary", lambda: facade.ledger_summary()),
-                    ("ledger_history", lambda: facade.ledger_history("REQ-2026-001")),
-                    ("evidence_pack", lambda: facade.evidence_pack("딥페이크 대응")),
-                    ("doctor", lambda: facade.doctor()),
+                    ("search", lambda _facade=facade: _facade.search("딥페이크")),
+                    ("document", lambda _facade=facade: _facade.get_document("DOC-2026-001")),
+                    ("qa", lambda _facade=facade: _facade.get_qa("QA-2026-001")),
+                    ("ledger_list", lambda _facade=facade: _facade.ledger_list()),
+                    ("ledger_get", lambda _facade=facade: _facade.ledger_get("REQ-2026-001")),
+                    ("ledger_summary", lambda _facade=facade: _facade.ledger_summary()),
+                    ("ledger_history", lambda _facade=facade: _facade.ledger_history("REQ-2026-001")),
+                    ("evidence_pack", lambda _facade=facade: _facade.evidence_pack("딥페이크 대응")),
+                    ("doctor", lambda _facade=facade: _facade.doctor()),
                 ]:
                     try:
                         call()
@@ -217,10 +217,10 @@ class TestIssue002ReadonlyContract(unittest.TestCase):
                 before = _snapshot_tree(base)
                 facade = self._facade(base)
                 for name, call in [
-                    ("search", lambda: facade.search("딥페이크")),
-                    ("ledger_get", lambda: facade.ledger_get("REQ-2026-001")),
+                    ("search", lambda _facade=facade: _facade.search("딥페이크")),
+                    ("ledger_get", lambda _facade=facade: _facade.ledger_get("REQ-2026-001")),
                     ("ledger_history",
-                     lambda: facade.ledger_history("REQ-2026-001")),
+                     lambda _facade=facade: _facade.ledger_history("REQ-2026-001")),
                 ]:
                     try:
                         call()

@@ -368,7 +368,7 @@ def prune_orphan_markdowns(
     orphan_targets = []
     total_markdowns = 0
 
-    for dirpath, dirnames, filenames in os.walk(output_dir):
+    for dirpath, _dirnames, filenames in os.walk(output_dir):
         for f in filenames:
             if not f.endswith('.md'):
                 continue

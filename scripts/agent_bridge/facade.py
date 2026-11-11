@@ -74,8 +74,8 @@ class AgentFacade:
             cur = conn.cursor()
             try:
                 version = int(cur.execute("PRAGMA user_version").fetchone()[0])
-            except Exception:
-                raise DataReqError("dataset_unavailable", "SQLite 스키마가 완전하지 않습니다.")
+            except Exception as e:
+                raise DataReqError("dataset_unavailable", "SQLite 스키마가 완전하지 않습니다.") from e
             from db.migrations import SCHEMA_VERSION
             if version > SCHEMA_VERSION:
                 raise DataReqError(
@@ -91,8 +91,8 @@ class AgentFacade:
             try:
                 names = {r[0] for r in cur.execute(
                     "SELECT name FROM sqlite_master WHERE type='table'")}
-            except Exception:
-                raise DataReqError("dataset_unavailable", "SQLite 스키마가 완전하지 않습니다.")
+            except Exception as e:
+                raise DataReqError("dataset_unavailable", "SQLite 스키마가 완전하지 않습니다.") from e
         finally:
             conn.close()
         if not {"documents", "qa_items", "request_ledger"}.issubset(names):
@@ -261,7 +261,7 @@ class AgentFacade:
                 kinds = (["ledger"] * len(result.get("ledger", []))
                          + ["doc"] * len(result.get("documents", []))
                          + ["qa"] * len(result.get("qa_items", [])))
-        items = [self._shape(kind, row, query) for kind, row in zip(kinds, rows)]
+        items = [self._shape(kind, row, query) for kind, row in zip(kinds, rows, strict=True)]
         page, next_cursor = search_adapter.paginate(items, limit, cursor)
         return {
             "schema": "datareq-search/v1",
@@ -318,8 +318,8 @@ class AgentFacade:
                                        policy.MAX_EXCERPT_CHARS)
         try:
             start = max(0, int(offset or 0))
-        except (TypeError, ValueError):
-            raise DataReqError("invalid_input", "offset은 0 이상의 정수여야 합니다.")
+        except (TypeError, ValueError) as e:
+            raise DataReqError("invalid_input", "offset은 0 이상의 정수여야 합니다.") from e
         row = self._single_row("documents", "doc_id", doc_id, "full_markdown")
         if row is None:
             # 테이블·행이 없으면 데이터셋 문제와 ID 문제를 구분한다.
@@ -346,8 +346,8 @@ class AgentFacade:
                                        policy.MAX_EXCERPT_CHARS)
         try:
             start = max(0, int(offset or 0))
-        except (TypeError, ValueError):
-            raise DataReqError("invalid_input", "offset은 0 이상의 정수여야 합니다.")
+        except (TypeError, ValueError) as e:
+            raise DataReqError("invalid_input", "offset은 0 이상의 정수여야 합니다.") from e
         row = self._single_row("qa_items", "qa_id", qa_id, "answer_markdown")
         if row is None:
             # 스키마 검사가 먼저다. 없으면 만들지 않고 실패한다. (감사 ISSUE-002)
@@ -401,8 +401,8 @@ class AgentFacade:
     def ledger_history(self, ledger_id, limit=None):
         try:
             count = max(1, min(int(limit or 20), 100))
-        except (TypeError, ValueError):
-            raise DataReqError("invalid_input", "limit은 정수여야 합니다.")
+        except (TypeError, ValueError) as e:
+            raise DataReqError("invalid_input", "limit은 정수여야 합니다.") from e
         # 스키마 확인이 서비스 호출보다 먼저다. 없으면 만들지 않고 실패한다. (감사 ISSUE-002)
         self._require_schema()
         service = self._service()

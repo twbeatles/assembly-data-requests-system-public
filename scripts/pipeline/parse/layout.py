@@ -118,7 +118,7 @@ def _retire_pair(md_path: Path, output_dir: Path, backup_dir: Optional[Path]):
 
 def _prune_empty_dirs(output_dir: Path, keep: Iterable[str] = ('images',)):
     keep = set(keep)
-    for dirpath, dirnames, filenames in os.walk(output_dir, topdown=False):
+    for dirpath, _dirnames, _filenames in os.walk(output_dir, topdown=False):
         p = Path(dirpath)
         if p == Path(output_dir) or p.name in keep:
             continue

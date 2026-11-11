@@ -159,4 +159,4 @@ def _dict_rows(conn, sql: str):
     cur = conn.execute(sql)
     names = [d[0] for d in cur.description]
     for row in cur:
-        yield dict(zip(names, row))
+        yield dict(zip(names, row, strict=True))

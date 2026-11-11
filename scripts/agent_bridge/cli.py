@@ -127,8 +127,8 @@ def _resolve_base_dir(data_root):
         candidate = Path(data_root).expanduser()
         try:
             resolved = candidate.resolve()
-        except (OSError, ValueError):
-            raise DataReqError("policy_denied", "허용되지 않은 경로입니다.")
+        except (OSError, ValueError) as e:
+            raise DataReqError("policy_denied", "허용되지 않은 경로입니다.") from e
         if not resolved.exists() or not resolved.is_dir():
             raise DataReqError("invalid_input", "데이터 루트가 없습니다.")
         return resolved

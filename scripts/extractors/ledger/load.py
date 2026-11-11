@@ -134,11 +134,11 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
 
         row_seq = 0
         for r in range(2, ws.max_row + 1):
-            def gv(*names):
+            def gv(*names, _header_map=header_map, _ws=ws, _r=r):
                 for name in names:
-                    c = header_map.get(name)
+                    c = _header_map.get(name)
                     if c:
-                        v = ws.cell(r, c).value
+                        v = _ws.cell(_r, c).value
                         if v is not None and str(v).strip():
                             return str(v).strip()
                 return ""

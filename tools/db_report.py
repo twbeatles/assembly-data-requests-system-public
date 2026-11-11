@@ -63,7 +63,7 @@ def storage_report(db_path: Path):
                 print(f"      {col:20} {_mb(total)}")
         print()
         print("FTS 인덱스")
-        for fts_name, (source, cols) in fts_spec.FTS_SPECS.items():
+        for fts_name, (_source, cols) in fts_spec.FTS_SPECS.items():
             try:
                 n = cur.execute(f"SELECT COUNT(*) FROM {fts_name}").fetchone()[0]
                 data = cur.execute(

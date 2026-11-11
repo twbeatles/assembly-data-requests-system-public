@@ -106,7 +106,7 @@ def verify_strict_code_parity(dept_path: Path, univ_path: Path) -> bool:
     univ_scripts = univ_path / "scripts"
 
     src_files = []
-    for root, dirs, files in os.walk(src_scripts):
+    for root, _dirs, files in os.walk(src_scripts):
         if "__pycache__" in root:
             continue
         for f in files:

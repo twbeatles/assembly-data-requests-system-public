@@ -53,8 +53,8 @@ def resolve_allowed_root(target, allowed_roots):
     candidate = Path(target).expanduser()
     try:
         resolved = candidate.resolve()
-    except (OSError, ValueError):
-        raise DataReqError("policy_denied", "허용되지 않은 경로입니다.")
+    except (OSError, ValueError) as e:
+        raise DataReqError("policy_denied", "허용되지 않은 경로입니다.") from e
     for root in allowed_roots or []:
         try:
             base = Path(root).expanduser().resolve()

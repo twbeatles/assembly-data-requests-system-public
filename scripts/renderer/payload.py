@@ -123,7 +123,7 @@ class PayloadMixin:
         try:
             payload = cls.decompress_block(matched.group(1))
         except (ValueError, OSError, UnicodeDecodeError) as error:
-            raise ValueError(f"내장 압축 데이터를 읽을 수 없습니다: {error}")
+            raise ValueError(f"내장 압축 데이터를 읽을 수 없습니다: {error}") from error
         if not isinstance(payload, dict):
             raise ValueError("내장 데이터 구조가 불완전합니다")
         expected = int(payload.pop("body_chunks", 0) or 0)
@@ -137,7 +137,7 @@ class PayloadMixin:
                 try:
                     chunk = cls.decompress_block(b64)
                 except (ValueError, OSError, UnicodeDecodeError) as error:
-                    raise ValueError(f"본문 블록을 읽을 수 없습니다: {error}")
+                    raise ValueError(f"본문 블록을 읽을 수 없습니다: {error}") from error
                 for doc_id, body in (chunk.get("bodies") or {}).items():
                     if doc_id in docs_by_id:
                         docs_by_id[doc_id]["full_markdown"] = body

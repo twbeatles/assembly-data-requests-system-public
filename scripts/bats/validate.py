@@ -37,7 +37,7 @@ def validate_batch_file_rules(content: str, filename: str) -> None:
     try:
         content.encode('cp949')
     except UnicodeEncodeError as e:
-        raise ValueError(f"[{filename}] CP949 encoding failure: {e}")
+        raise ValueError(f"[{filename}] CP949 encoding failure: {e}") from e
 
     # 6. goto targets must exist
     labels = {m.group(1).upper() for m in re.finditer(r'^:([A-Za-z_][\w]*)\s*$', content, re.MULTILINE)}

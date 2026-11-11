@@ -54,7 +54,7 @@ def _install_guard():
             pass
         return original(database, *args, **kwargs)
 
-    setattr(guarded_connect, "_datareq_production_guard", True)
+    setattr(guarded_connect, "_datareq_production_guard", True)  # noqa: B010 -- marker attr on wrapper function; direct assignment trips pyright (standard mode), read via getattr sentinel above
     _sqlite3.connect = guarded_connect
 
 

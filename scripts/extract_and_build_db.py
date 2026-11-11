@@ -197,7 +197,7 @@ def _main_locked():
     print("=" * 60)
 
     md_files = []
-    for dirpath, dirnames, filenames in os.walk(PARSED_DIR):
+    for dirpath, _dirnames, filenames in os.walk(PARSED_DIR):
         for f in filenames:
             if f.endswith('.md'):
                 full = Path(dirpath) / f

@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def safe_copy_file(src: Path, dst: Path, max_retries=5, delay=0.3):
-    for i in range(max_retries):
+    for _i in range(max_retries):
         try:
             shutil.copy2(src, dst)
             return True

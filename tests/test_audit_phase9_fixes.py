@@ -216,7 +216,7 @@ class TestWorkspaceRootDetection(unittest.TestCase):
         """원본 0건 + 기존 마크다운 있음 = 경로 이상. 다음 단계로 넘어가면 안 된다."""
         ws, sys_dir, md_root = self._build_workspace(["2027"])
         mod, _cfg = self._load_parse_all(sys_dir)
-        setattr(mod, "ROOT_DIR", mod.SYSTEM_DIR)  # 경로 오판 상황을 강제한다
+        setattr(mod, "ROOT_DIR", mod.SYSTEM_DIR)  # noqa: B010 -- 경로 오판 상황을 강제한다; dynamically loaded module, ROOT_DIR undeclared (pyright-checked) so direct assignment trips
 
         result = mod.main()
 
