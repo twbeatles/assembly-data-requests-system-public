@@ -4,10 +4,10 @@ Run: python tools/benchmark_dashboard.py --documents 1000 --body-chars 32768
 """
 import argparse
 import json
-from pathlib import Path
 import sys
 import time
 import tracemalloc
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from template_renderer import DashboardRenderer

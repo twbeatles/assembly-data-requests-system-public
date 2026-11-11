@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import os
-import sys
-import re
 import datetime
+import os
+import re
+import sys
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(SCRIPTS_DIR) not in sys.path:
@@ -16,15 +16,16 @@ try:
 except ImportError:
     openpyxl = None
 
+from typing import TYPE_CHECKING
+
+from extractors.ledger.dates import LEDGER_COLUMN_ALIASES
+
 from services.excel_sync.identity import (
     QUARANTINE_CONFLICT,
     ROW_IDENTITY_FIELDS,
     ExcelApplyConflict,
     identity_matches,
 )
-from extractors.ledger.dates import LEDGER_COLUMN_ALIASES
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from services.excel_sync.service import ExcelSyncService

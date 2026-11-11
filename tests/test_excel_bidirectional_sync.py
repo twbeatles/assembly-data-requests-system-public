@@ -8,11 +8,11 @@ Tests both directions:
 """
 
 import os
-import sys
-import time
 import shutil
-import tempfile
 import sqlite3
+import sys
+import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -22,8 +22,8 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 import openpyxl
 from db.database_manager import DatabaseManager
-from services.ledger_service import LedgerService
 from services.excel_sync_service import ExcelSyncService
+from services.ledger_service import LedgerService
 
 
 class TestExcelBidirectionalSync(unittest.TestCase):

@@ -1,9 +1,9 @@
-import os
-import sys
 import json
+import os
 import sqlite3
-import unittest
 import subprocess
+import sys
+import unittest
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
@@ -14,8 +14,8 @@ if str(SCRIPTS_DIR) not in sys.path:
 import extract_and_build_db
 import generate_excel_db
 import generate_web_dashboard
-import write_all_bats
 import parse_all
+import write_all_bats
 from db.database_manager import DatabaseManager
 
 
@@ -357,10 +357,11 @@ class TestAuditFixes(unittest.TestCase):
 
     def test_schema_consistency_across_modules(self):
         """Test that schemas in extract_and_build_db, web_server.init_db, and build_universal_package match 100%."""
-        import tempfile
         import shutil
-        import web_server
+        import tempfile
+
         import build_universal_package
+        import web_server
 
         temp_dir = tempfile.mkdtemp()
         try:
@@ -499,6 +500,7 @@ class TestRepairedLinksJsonRefresh(unittest.TestCase):
     def test_repaired_links_are_reflected_in_json(self):
         import shutil
         import tempfile
+
         from db.database_manager import DatabaseManager
         from services.ledger.autolink import repair_broken_links
         tmp = Path(tempfile.mkdtemp(prefix="r6_03_"))

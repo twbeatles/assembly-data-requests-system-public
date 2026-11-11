@@ -1,8 +1,8 @@
-from typing import Any, Optional, cast
-import sys
 import json
 import shutil
+import sys
 from pathlib import Path
+from typing import Any, Optional, cast
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 
@@ -18,10 +18,11 @@ import system_config
 WORKSPACE_ROOT = system_config.find_workspace_root(SYSTEM_DIR)
 import create_ledger_template
 import write_all_bats
-from universal_pkg.content import HTML_MANUAL_CONTENT_UNIVERSAL, README_TXT_CONTENT_UNIVERSAL
+from universal_pkg.content import (
+    HTML_MANUAL_CONTENT_UNIVERSAL,
+    README_TXT_CONTENT_UNIVERSAL,
+)
 from universal_pkg.database import build_clean_database
-
-
 
 
 def build_universal_package(target_dir: Optional[Path] = None) -> Path:

@@ -10,13 +10,13 @@ Refactored to orchestrate specialized, decoupled modules:
 Maintains full backwards compatibility with all existing callers and unit tests.
 """
 
-from typing import Any, cast
-import os
-import sys
-import json
-import sqlite3
 import datetime
+import json
+import os
+import sqlite3
+import sys
 from pathlib import Path
+from typing import Any, cast
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 
@@ -24,8 +24,8 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
-import system_config
 import file_hash_cache
+import system_config
 from write_guard import ensure_writable
 
 WORKSPACE_ROOT = system_config.find_workspace_root(SYSTEM_DIR)
@@ -36,25 +36,22 @@ JSON_PATH = SYSTEM_DIR / "data_requests.json"
 DIST_MANIFEST = SYSTEM_DIR / ".distribution_manifest.json"
 
 # Import and re-export all functions for 100% backwards compatibility
+from build_db.merge import merge_concurrent_ledger_updates
+from db.database_manager import DatabaseManager
+from extractors.ledger_parser import (  # noqa: F401 # snapshot public surface
+    LedgerParser,
+    load_request_ledger,
+    normalize_ledger_date,
+)
+from extractors.qa_splitter import QASplitter, split_into_qa_items  # noqa: F401 # snapshot public surface
 from extractors.text_extractor import (  # noqa: F401 # snapshot public surface
+    TextExtractor,
     clean_for_excel,
+    extract_content_details,
+    extract_metadata,
     mask_pii,
     parse_date,
-    extract_metadata,
-    extract_content_details,
-    TextExtractor
 )
-from extractors.qa_splitter import (  # noqa: F401 # snapshot public surface
-    split_into_qa_items,
-    QASplitter
-)
-from extractors.ledger_parser import (  # noqa: F401 # snapshot public surface
-    normalize_ledger_date,
-    load_request_ledger,
-    LedgerParser
-)
-from db.database_manager import DatabaseManager
-from build_db.merge import merge_concurrent_ledger_updates
 from pipeline.parse.layout import SOURCE_HEADER_RE, strip_source_header
 
 
@@ -64,17 +61,10 @@ def _mtime(path) -> float:
     except OSError:
         return 0.0
 from build_db.docids import (  # noqa: F401 # re-export (tests import via shim)
-    file_sha256, load_existing_id_map, assign_doc_id,
+    assign_doc_id,
+    file_sha256,
+    load_existing_id_map,
 )
-
-
-
-
-
-
-
-
-
 
 
 def write_json_atomic(path: Path, data: dict):

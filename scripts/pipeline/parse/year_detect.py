@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 from typing import Optional
 
-
 YEAR_DIR_RE = re.compile(r'^20[1-3]\d$')
 YEAR_4DIGIT_RE = re.compile(r'(?:^|[^\d])(20[1-3]\d)(?:[^\d]|$)')
 DATE_6DIGIT_RE = re.compile(r'(?:^|[^\d])([1-3]\d)(?:0[1-9]|1[0-2])(?:[0-3]\d)')

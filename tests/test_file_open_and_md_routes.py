@@ -2,7 +2,6 @@
 """
 탐색기 파일 위치 열기(/api/open) 및 마크다운 파일 서빙(/_parsed_markdown/) 회귀 테스트.
 """
-from typing import Any, Optional
 import io
 import json
 import shutil
@@ -10,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, Optional
 from unittest import mock
 from urllib.parse import quote
 
@@ -20,7 +20,7 @@ for p in (str(SCRIPTS_DIR), str(TESTS_DIR)):
         sys.path.insert(0, p)
 
 import web_server
-from web.downloads import resolve_download_target, open_in_system
+from web.downloads import open_in_system, resolve_download_target
 
 
 class TestFileOpenAndMdRoutes(unittest.TestCase):

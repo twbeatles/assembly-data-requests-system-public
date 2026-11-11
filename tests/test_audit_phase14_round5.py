@@ -5,13 +5,13 @@
 test_zzz_production_isolation이 확인한다.
 """
 
-from typing import Any, cast
 import shutil
 import sqlite3
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, cast
 from unittest import mock
 
 import openpyxl
@@ -21,7 +21,6 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from db.database_manager import DatabaseManager
-
 
 HISTORY_COLS_6 = ("ledger_id", "action", "changed_at", "snapshot",
                   "changed_fields", "actor")

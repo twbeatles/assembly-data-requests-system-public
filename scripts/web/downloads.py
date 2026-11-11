@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """원본 공문서 다운로드 및 탐색기 열기 경로 검증."""
-from pathlib import Path
-from urllib.parse import unquote
 import os
 import subprocess
 import sys
+from pathlib import Path
+from urllib.parse import unquote
 
 
 def resolve_download_target(req_file: str):
@@ -13,8 +13,8 @@ def resolve_download_target(req_file: str):
     BASE_DIR 등은 호출 시점에 web_server 모듈에서 읽는다. 테스트가
     `web_server.BASE_DIR`을 패치해도 복제본이 되지 않게 한다.
     """
-    import web_server as ws
     import system_config
+    import web_server as ws
 
     if not req_file:
         return False, None, "파일 경로가 지정되지 않았습니다."

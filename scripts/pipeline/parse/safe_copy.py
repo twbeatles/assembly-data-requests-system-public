@@ -6,7 +6,6 @@ import shutil
 import tempfile
 from pathlib import Path
 
-
 # 인용해도 cmd.exe를 통과하지 못하는 문자. 실측으로 정한 목록이다.
 #   '&' : 인용 안에서도 명령 구분자로 해석돼 뒤쪽이 별도 명령으로 실행된다.
 #   '^' : 인용 안에서도 이스케이프 문자로 먹혀 경로에서 조용히 사라진다.

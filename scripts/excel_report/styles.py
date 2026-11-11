@@ -2,7 +2,6 @@
 """엑셀 테마 상수·헤더 스타일(SRP: 서식)."""
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-
 NAVY_HEADER = "1F4E79"
 SUB_HEADER = "2F5597"
 ACCENT_BLUE = "D9E1F2"

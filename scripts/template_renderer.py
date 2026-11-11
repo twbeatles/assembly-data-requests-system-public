@@ -6,11 +6,11 @@ data serialization/compression, variable substitution, and safe atomic file writ
 """
 
 import os
-import time
-import shutil
 import re
+import shutil
+import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 DEFAULT_TEMPLATE_PATH = SCRIPTS_DIR / "templates" / "dashboard_template.html"

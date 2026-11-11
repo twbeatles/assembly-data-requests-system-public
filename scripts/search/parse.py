@@ -3,8 +3,14 @@
 import re
 
 from search.lang import (
-    FTS_MIN_TOKEN_LEN, _JAMO_RE, FIELD_ALIASES, _FIELD_TOKEN_RE,
-    _DATE_RANGE_RE, _clean_term, strip_particle, normalize_date,
+    _DATE_RANGE_RE,
+    _FIELD_TOKEN_RE,
+    _JAMO_RE,
+    FIELD_ALIASES,
+    FTS_MIN_TOKEN_LEN,
+    _clean_term,
+    normalize_date,
+    strip_particle,
 )
 
 

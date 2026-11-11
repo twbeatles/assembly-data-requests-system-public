@@ -6,7 +6,8 @@ detecting tables, and extracting question-level summaries.
 """
 
 import re
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 try:
     from .text_extractor import clean_for_excel
 except ImportError:

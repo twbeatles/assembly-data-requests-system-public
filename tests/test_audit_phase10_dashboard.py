@@ -5,7 +5,6 @@
 동작을 보장하지 못한다(AGENTS.md 「테스트 규칙」). Node가 없으면 해당 테스트는 건너뛴다.
 """
 
-from typing import Any
 import json
 import re
 import shutil
@@ -15,6 +14,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:

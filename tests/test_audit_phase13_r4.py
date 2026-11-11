@@ -5,7 +5,6 @@
 test_zzz_production_isolation이 확인한다.
 """
 
-from typing import Any, cast
 import json
 import os
 import shutil
@@ -17,6 +16,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from typing import Any, cast
 from unittest import mock
 
 import openpyxl
@@ -26,10 +26,14 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from db.database_manager import DatabaseManager
-from extractors.ledger.discovery import discover_master_excel
 from extractors.ledger.dates import LEDGER_COLUMN_ALIASES
+from extractors.ledger.discovery import discover_master_excel
 from extractors.ledger_parser import load_request_ledger, stamp_ledger_ids
-from services.excel_sync_service import ExcelSyncService, QUARANTINE_CONFLICT, QUARANTINE_RETRY_LIMIT
+from services.excel_sync_service import (
+    QUARANTINE_CONFLICT,
+    QUARANTINE_RETRY_LIMIT,
+    ExcelSyncService,
+)
 from services.ledger_service import LedgerService
 
 
@@ -259,7 +263,7 @@ class TestStampBackupLocation(Fixture):
 # ---------------------------------------------------------------------------
 class TestServerInstanceLock(Fixture):
     def test_live_holder_blocks_second_server(self):
-        from web.instance_lock import ServerInstanceLock, LOCK_NAME
+        from web.instance_lock import LOCK_NAME, ServerInstanceLock
         holder = sleeper()
         try:
             (self.tmp / LOCK_NAME).write_text(json.dumps({"pid": holder.pid, "port": 8123}), encoding="utf-8")
@@ -272,7 +276,7 @@ class TestServerInstanceLock(Fixture):
             holder.wait()
 
     def test_dead_holder_lock_is_reclaimed_and_released(self):
-        from web.instance_lock import ServerInstanceLock, LOCK_NAME
+        from web.instance_lock import LOCK_NAME, ServerInstanceLock
         dead = sleeper()
         dead.kill()
         dead.wait()
@@ -659,7 +663,8 @@ class TestLedgerHistoryArchive(Fixture):
 # R4-14 정적 게이트: 미정의 이름 (분할 잔재가 NameError로 숨어 있지 않게)
 # ---------------------------------------------------------------------------
 try:
-    from pyflakes import api as _pyflakes_api, messages as _pyflakes_messages
+    from pyflakes import api as _pyflakes_api
+    from pyflakes import messages as _pyflakes_messages
     from pyflakes.reporter import Reporter as _PyflakesReporter
 except ImportError:  # pragma: no cover
     _pyflakes_api = None

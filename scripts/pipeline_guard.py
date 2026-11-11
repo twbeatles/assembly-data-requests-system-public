@@ -2,8 +2,8 @@
 """파이프라인 실행 중 웹 CRUD와의 경합을 막기 위한 파일 락."""
 
 import os
-import time
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 

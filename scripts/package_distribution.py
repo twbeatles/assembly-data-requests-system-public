@@ -1,8 +1,8 @@
-from typing import Any, cast
-import sys
-import shutil
 import json
+import shutil
+import sys
 from pathlib import Path
+from typing import Any, cast
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 

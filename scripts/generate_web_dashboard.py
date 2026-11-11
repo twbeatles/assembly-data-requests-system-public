@@ -6,9 +6,9 @@ Delegates data preparation, template substitution, and atomic persistence to Das
 Preserves HTML_TEMPLATE string in-file for unit test validation (e.g. XSS sanitizer tests).
 """
 
-from typing import Any, cast
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 
@@ -18,7 +18,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import system_config
-from template_renderer import DashboardRenderer, DEFAULT_TEMPLATE_PATH
+from template_renderer import DEFAULT_TEMPLATE_PATH, DashboardRenderer
 
 JSON_PATH = SYSTEM_DIR / "data_requests.json"
 MARKED_PATH = SCRIPTS_DIR / "marked.min.js"

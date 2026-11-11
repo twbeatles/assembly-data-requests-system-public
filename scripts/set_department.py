@@ -1,7 +1,7 @@
-from typing import Any, cast
-import sys
 import re
+import sys
 from pathlib import Path
+from typing import Any, cast
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 

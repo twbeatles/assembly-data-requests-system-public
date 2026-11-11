@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
-from pipeline.parse.year_detect import detect_target_year, YEAR_DIR_RE
+from pipeline.parse.year_detect import YEAR_DIR_RE, detect_target_year
 
 SOURCE_HEADER_RE = re.compile(r'^﻿?<!--\s*source:\s*(.*?)\s*-->')
 UNSORTED_DIR = '미분류'

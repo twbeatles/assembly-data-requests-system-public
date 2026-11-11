@@ -1,8 +1,8 @@
-from typing import Any, cast
+import subprocess
 import sys
 import time
-import subprocess
 from pathlib import Path
+from typing import Any, cast
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 

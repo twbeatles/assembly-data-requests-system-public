@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-from typing import Any, Optional, cast
-import sys
 import json
+import sys
 from collections import Counter
 from pathlib import Path
+from typing import Any, Optional, cast
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 

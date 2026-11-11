@@ -21,8 +21,10 @@ SCRIPTS_DIR = TESTS_DIR.parent / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from db import fts_spec  # noqa: E402
-from db import migrations  # noqa: E402
+from db import (  # noqa: E402
+    fts_spec,
+    migrations,
+)
 from db.database_manager import DatabaseManager  # noqa: E402
 from db.health import check_database  # noqa: E402
 from search_query import (  # noqa: E402

@@ -1,4 +1,5 @@
 from typing import Any, Optional, cast
+
 # -*- coding: utf-8 -*-
 """관리대장 변경 이력(`ledger_history`) 보존 정리 도구 (감사 4회차 4.1-2).
 

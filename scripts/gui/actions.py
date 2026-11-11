@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """GUI 외부 액션 믹스인(SRP: 복사·대시보드/엑셀/폴더 열기·자료 추가)."""
 import os
+import tkinter as tk
 import webbrowser
 from pathlib import Path
-import tkinter as tk
 from tkinter import filedialog, messagebox
-
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """GUI 뷰 빌더 믹스인(SRP: 창·스타일·헤더·검색뷰·상태바 구성)."""
 import tkinter as tk
-from tkinter import ttk, scrolledtext
-
-
+from tkinter import scrolledtext, ttk
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -337,6 +335,7 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
     def refresh_status_details(self, cur, doc_cnt, qa_cnt):
         """상태 표시줄 오른쪽: 스키마 버전·최종 갱신 시각. 가운데: 마감 요약."""
         import datetime
+
         import launcher_gui as lg
         try:
             schema = cur.execute("PRAGMA user_version").fetchone()[0]

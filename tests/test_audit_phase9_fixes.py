@@ -22,8 +22,8 @@ import json
 import shutil
 import sqlite3
 import subprocess
-import sys
 import symtable
+import sys
 import tempfile
 import threading
 import time
@@ -37,10 +37,9 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import openpyxl
-
 import parse_all
 from db.database_manager import DatabaseManager
-from services.excel_sync_service import ExcelSyncService, MAX_PENDING_ATTEMPTS
+from services.excel_sync_service import MAX_PENDING_ATTEMPTS, ExcelSyncService
 from services.ledger_service import LedgerService
 
 HEADERS_WITH_ID = ["대장ID", "연번", "의원", "요구자료", "제출", "요청형태", "비고"]

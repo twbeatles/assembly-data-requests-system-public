@@ -13,7 +13,6 @@ PROJECT_AUDIT.md Phase 1~2 개선에 대한 회귀 테스트.
 - GAP-003/004: 본문 타입·연도 검증, Host/Origin 검증
 """
 
-from typing import Any
 import json
 import os
 import shutil
@@ -24,6 +23,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
@@ -31,7 +31,6 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import openpyxl
-
 import system_config  # noqa: F401  (config 기본값 경로 확인용)
 from db.database_manager import DatabaseManager
 from extractors.ledger_parser import load_request_ledger, stamp_ledger_ids

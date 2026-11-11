@@ -1,5 +1,6 @@
 # 테스트 중 대시보드·브라우저 창이 열리지 않도록 한다.
 import os
+
 os.environ.setdefault("DATAREQ_NO_BROWSER", "1")
 
 # ---------------------------------------------------------------------------
@@ -60,6 +61,7 @@ def _install_guard():
 _install_guard()
 
 import sys as _sys
+
 _scripts_dir = str((_SYSTEM_DIR / "scripts").resolve())
 if _scripts_dir not in _sys.path:
     _sys.path.insert(0, _scripts_dir)

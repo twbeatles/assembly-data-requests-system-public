@@ -1,8 +1,9 @@
-from typing import Any, cast
 import sys
 from pathlib import Path
+from typing import Any, cast
+
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')

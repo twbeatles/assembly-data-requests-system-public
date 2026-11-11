@@ -111,7 +111,10 @@ def ghost_excel_rows() -> list:
     try:
         import openpyxl
         from extractors.ledger_parser import (
-            build_header_map, find_id_column, is_ledger_data_row, year_sheet_names,
+            build_header_map,
+            find_id_column,
+            is_ledger_data_row,
+            year_sheet_names,
         )
         from services.excel_sync_service import ExcelSyncService
     except Exception:

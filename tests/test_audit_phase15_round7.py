@@ -8,7 +8,6 @@
 - ISSUE-005: `<!-- source: … -->` 역추적 주석이 문서 전문에 섞이던 문제
 - 다운로드: 200 헤더 뒤에 파일 열기가 실패하면 오류가 본문에 덧붙던 문제
 """
-from typing import Any
 import contextlib
 import io
 import json
@@ -19,6 +18,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 TESTS_DIR = Path(__file__).resolve().parent
@@ -27,16 +27,19 @@ for p in (str(SCRIPTS_DIR), str(TESTS_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import extract_and_build_db
+import file_hash_cache
 import openpyxl
-
-from test_audit_phase8_fixes import LedgerSyncFixtureMixin, ExcelSyncService, LedgerService
-from test_audit_phase10_dashboard import NODE, TEMPLATE, extract_js
+import parse_all
+import web_server
 from extractors.ledger.dates import coerce_ledger_date, normalize_ledger_date
 from pipeline.parse import layout
-import file_hash_cache
-import parse_all
-import extract_and_build_db
-import web_server
+from test_audit_phase8_fixes import (
+    ExcelSyncService,
+    LedgerService,
+    LedgerSyncFixtureMixin,
+)
+from test_audit_phase10_dashboard import NODE, TEMPLATE, extract_js
 
 EDIT_FIELDS = ("seq_no", "party", "requester", "aide", "department", "title", "details",
                "request_date", "deadline", "submit_date", "status", "request_type", "note")

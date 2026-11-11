@@ -1,10 +1,10 @@
-from typing import Any, cast
+import json
 import os
+import shutil
 import sys
 import time
-import shutil
 from pathlib import Path
-import json
+from typing import Any, cast
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 
@@ -31,20 +31,19 @@ DROP_DIRS = list(dict.fromkeys([
 # `.xlsm` 대장도 투입 폴더에서 받는다(대장 판정 시 시스템 폴더로 옮김). 문서 파싱 대상 확장자는
 # parse_all.TARGET_EXTENSIONS가 따로 정한다.
 
-import parse_all
 import extract_and_build_db
 import generate_excel_db
 import generate_web_dashboard
+import parse_all
 import sync_distributions
 from ingest.files import (  # noqa: F401 # re-export (ingest/files + tests import via shim)
-    TARGET_EXTS, is_master_ledger_file, determine_target_folder,
-    _compute_sha256, _is_in_use, copy_or_move_files,
+    TARGET_EXTS,
+    _compute_sha256,
+    _is_in_use,
+    copy_or_move_files,
+    determine_target_folder,
+    is_master_ledger_file,
 )
-
-
-
-
-
 
 
 def _failure_result(error, elapsed_seconds):

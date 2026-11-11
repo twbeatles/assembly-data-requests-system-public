@@ -1,7 +1,7 @@
 # Ruff S1 baseline: pyflakes + pycodestyle errors only (E4,E7,E9,F).
 # S2 (I) / S3 (B) / S4 (UP) intentionally deferred.
 [lint]
-select = ["E4", "E7", "E9", "F"]
+select = ["E4", "E7", "E9", "F", "I"]
 fixable = []
 
 [lint.per-file-ignores]
@@ -37,7 +37,12 @@ fixable = []
 "scripts/set_department.py" = ["E402"]
 "scripts/sync_distributions.py" = ["E402"]
 "scripts/template_renderer.py" = ["E402"]
-"scripts/web_server.py" = ["E402"]
+# I001 deferred for scripts/web_server.py: its import reorder changes
+# pyright inference in dependent scripts/web/security.py (2 errors in
+# an untouched file; mechanism unisolated, reproduced by file swap).
+# Reverted to S1-verified order. Owner action: isolate the inference
+# coupling, then adopt I001 here.
+"scripts/web_server.py" = ["E402", "I001"]
 "scripts/write_all_bats.py" = ["E402"]
 "tests/__init__.py" = ["E402"]
 "tests/test_audit_confirmed_issues.py" = ["E402"]

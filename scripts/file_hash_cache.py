@@ -104,7 +104,7 @@ class FileHashCache:
                 return False
             entries = {k: list(v) for k, v in self._entries.items() if os.path.exists(k)}
         try:
-            from write_guard import ensure_writable, ProductionWriteBlocked
+            from write_guard import ProductionWriteBlocked, ensure_writable
         except ImportError:  # pragma: no cover - scripts 경로 밖에서 쓰일 때
             ensure_writable, ProductionWriteBlocked = None, RuntimeError
         tmp = self.cache_path.with_name(self.cache_path.name + ".tmp")

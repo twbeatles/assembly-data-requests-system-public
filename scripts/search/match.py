@@ -2,7 +2,12 @@
 """파이썬 대체 검색 평가(SRP: 행 매칭·배점)."""
 import re
 
-from search.lang import EXACT_MATCH_FIELDS, _CHOSEONG_MAX_LEN, strip_particle, get_choseong
+from search.lang import (
+    _CHOSEONG_MAX_LEN,
+    EXACT_MATCH_FIELDS,
+    get_choseong,
+    strip_particle,
+)
 from search.parse import _expand_terms
 
 

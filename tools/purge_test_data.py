@@ -1,4 +1,5 @@
 from typing import Any, cast
+
 # -*- coding: utf-8 -*-
 """운영 대장에 남은 테스트 데이터 정리 도구 (감사 3회차 R3-01 후속).
 
@@ -31,9 +32,9 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 import openpyxl  # noqa: E402
-from extractors.ledger_parser import plan_ledger_ids, connect_readonly  # noqa: E402
-from services.excel_sync_service import ExcelSyncService  # noqa: E402
+from extractors.ledger_parser import connect_readonly, plan_ledger_ids  # noqa: E402
 from pipeline_guard import PipelineGuard  # noqa: E402
+from services.excel_sync_service import ExcelSyncService  # noqa: E402
 
 # 테스트 코드가 등록·수정에 쓰던 (요구자, 제목) 쌍. 운영 데이터와 겹칠 수 없는 조합만 둔다.
 TEST_SIGNATURES = {

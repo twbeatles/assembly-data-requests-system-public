@@ -1,4 +1,5 @@
 from typing import Any, cast
+
 # -*- coding: utf-8 -*-
 """기능 패키지 분할 뒤 남은 미사용 import 정리 도구 (감사 4회차 R4-14).
 
@@ -132,7 +133,11 @@ def main(argv=None) -> int:
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
 
-    from _symbol_inventory import PYTHON_TARGETS, collect_python_target_names, load_snapshot
+    from _symbol_inventory import (
+        PYTHON_TARGETS,
+        collect_python_target_names,
+        load_snapshot,
+    )
 
     corpus = [(p, p.read_text(encoding="utf-8", errors="replace"))
               for root in (SCRIPTS_DIR, TESTS_DIR, SYSTEM_DIR / "tools")

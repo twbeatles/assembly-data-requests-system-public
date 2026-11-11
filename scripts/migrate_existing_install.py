@@ -9,10 +9,10 @@ files are retained under a deterministic ``__migrated_N`` filename.
 import argparse
 import glob
 import hashlib
-import shutil
 import os
-import tempfile
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -42,8 +42,8 @@ def conflict_destination(destination: Path) -> Path:
 
 
 def migrate_markdown(source_system_dir: Path, destination_system_dir: Path = SYSTEM_DIR) -> dict:
-    from pipeline_guard import PipelineGuard
     from db.preflight import check_database_version
+    from pipeline_guard import PipelineGuard
     from write_guard import ensure_writable
     destination_system_dir = Path(destination_system_dir)
     if Path(source_system_dir).resolve() == destination_system_dir.resolve():

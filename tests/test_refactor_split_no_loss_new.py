@@ -5,7 +5,6 @@
 진입점+패키지 합집합을 비교한다. 소스 grep이 아니라 ast 선언 수집이다.
 """
 from __future__ import annotations
-from typing import Any
 
 import builtins
 import json
@@ -16,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 TESTS_DIR = Path(__file__).resolve().parent

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import sys
-import time
 import threading
+import time
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(SCRIPTS_DIR) not in sys.path:
@@ -14,10 +14,10 @@ try:
 except ImportError:
     openpyxl = None
 
-from services.excel_sync.identity import DEFAULT_SYSTEM_DIR
-from services.excel_sync.pending import PendingQueueMixin
 from services.excel_sync.apply import ExcelApplyMixin
 from services.excel_sync.excel_to_db import ExcelToDbMixin
+from services.excel_sync.identity import DEFAULT_SYSTEM_DIR
+from services.excel_sync.pending import PendingQueueMixin
 from services.excel_sync.watcher import ExcelWatcherMixin
 
 

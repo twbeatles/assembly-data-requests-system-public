@@ -1,11 +1,11 @@
-from typing import Any, cast
-import os
-import sys
 import json
+import os
 import shutil
+import sys
 from pathlib import Path
-import openpyxl
+from typing import Any, cast
 
+import openpyxl
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 
@@ -17,12 +17,15 @@ SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 import system_config
-from excel_report.text import _excel_body, sanitize_text  # noqa: F401 # re-export (tests import via shim)
 from excel_report.links import resolve_excel_hyperlink_path  # noqa: F401 # re-export (tests import via shim)
 from excel_report.sheets import (
-    build_dashboard_sheet, build_master_list_sheet, build_qa_detail_sheet,
-    build_statistics_index_sheet, build_ledger_sheet,
+    build_dashboard_sheet,
+    build_ledger_sheet,
+    build_master_list_sheet,
+    build_qa_detail_sheet,
+    build_statistics_index_sheet,
 )
+from excel_report.text import _excel_body, sanitize_text  # noqa: F401 # re-export (tests import via shim)
 
 # 하이퍼링크 기준 폴더는 파싱·DB 구축과 같은 규칙으로 정한다. (배포본은 자기 폴더가 루트)
 WORKSPACE_ROOT = system_config.find_workspace_root(SYSTEM_DIR)

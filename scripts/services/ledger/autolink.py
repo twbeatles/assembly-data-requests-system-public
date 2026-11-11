@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import re
 
-from services.ledger.ids import _seq_token_variants, _has_seq_token
+from services.ledger.ids import _has_seq_token, _seq_token_variants
+
 
 def auto_link_ledger_to_doc(conn, item):
     """Finds a matching document for a ledger item by seq_no or requester+date and links them mutually."""

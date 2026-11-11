@@ -1,10 +1,10 @@
-import sys
-import sqlite3
-from pathlib import Path
-import tkinter as tk
-from tkinter import ttk, messagebox
-import threading
 import queue
+import sqlite3
+import sys
+import threading
+import tkinter as tk
+from pathlib import Path
+from tkinter import messagebox, ttk
 
 try:
     import ctypes
@@ -16,10 +16,17 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from gui.search_text import (get_choseong, is_choseong_only, clean_fts_query,
-                             service_search, target_key, highlight_terms)
-from gui.views import ViewsMixin
 from gui.actions import ActionsMixin
+from gui.search_text import (
+    clean_fts_query,
+    get_choseong,
+    highlight_terms,
+    is_choseong_only,
+    service_search,
+    target_key,
+)
+from gui.views import ViewsMixin
+
 
 def get_base_dir() -> Path:
     if getattr(sys, 'frozen', False):

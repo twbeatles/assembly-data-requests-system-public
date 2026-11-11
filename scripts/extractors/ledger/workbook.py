@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-import os
-import sys
-import shutil
-import sqlite3
 import datetime
 import glob
+import os
+import shutil
+import sqlite3
+import sys
 from pathlib import Path
 from typing import Optional
+
 import openpyxl
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
@@ -15,7 +16,9 @@ DEFAULT_DB_PATH = DEFAULT_SYSTEM_DIR / "data_requests.db"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 from write_guard import ensure_writable
+
 from extractors.ledger.paths import DEFAULT_SYSTEM_DIR
+
 
 def connect_readonly(db_path, immutable: bool = False) -> sqlite3.Connection:
     """SQLite를 읽기 전용으로 연다. 없는 파일을 만들거나 WAL 체크포인트로 파일을 바꾸지 않는다.

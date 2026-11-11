@@ -17,7 +17,8 @@ import sqlite3
 import time
 from pathlib import Path
 
-from . import policy, search as search_adapter
+from . import policy
+from . import search as search_adapter
 from .errors import DataReqError
 
 

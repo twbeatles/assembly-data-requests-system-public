@@ -17,8 +17,8 @@ SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-import write_guard
 import add_documents_smart
+import write_guard
 
 
 class WorkspaceGuardTests(unittest.TestCase):

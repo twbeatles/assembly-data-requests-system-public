@@ -27,11 +27,17 @@ for p in (str(SCRIPTS_DIR), str(TESTS_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import web_server
 from db.database_manager import DatabaseManager
 from services import ledger_service as ls_module
 from services.ledger_service import LedgerService, ledger_due_state
-import web_server
-from test_audit_phase10_dashboard import NODE, TEMPLATE, extract_js, run_node, SEARCH_FUNCS
+from test_audit_phase10_dashboard import (
+    NODE,
+    SEARCH_FUNCS,
+    TEMPLATE,
+    extract_js,
+    run_node,
+)
 
 TODAY = datetime.date(2026, 9, 14)
 LEDGER_FIXTURE = [
@@ -177,8 +183,8 @@ console.log(JSON.stringify({ h1: `${appConfig.department_name} ${cleanTitle}`, s
         self.assertNotIn("전문 & 협업</script>", html, "설정값이 스크립트 블록을 끊으면 안 된다")
 
     def test_universal_builder_uses_shared_root_detection(self):
-        import system_config
         import build_universal_package
+        import system_config
         self.assertEqual(build_universal_package.WORKSPACE_ROOT, system_config.find_workspace_root(build_universal_package.SYSTEM_DIR))
 
 

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """HTTP JSON 바디·응답 믹스인(SRP: 요청 파싱·응답 직렬화)."""
 import json
-
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

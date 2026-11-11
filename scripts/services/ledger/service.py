@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
-import sys
-import re
-import time
-import json
-import sqlite3
-import hashlib
-from db.ledger_outbox import enqueue as enqueue_excel
 import datetime
+import hashlib
+import json
+import re
+import sqlite3
+import sys
 import threading
+import time
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple  # noqa: F401 # snapshot public surface (refactor-split contract)
+from typing import Any, Dict, Optional, Tuple  # noqa: F401 # snapshot public surface (refactor-split contract)
+
+from db.ledger_outbox import enqueue as enqueue_excel
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_BASE_DIR = SCRIPTS_DIR.parent
@@ -18,7 +19,12 @@ DEFAULT_JSON_PATH = DEFAULT_BASE_DIR / "data_requests.json"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 import system_config
+from db import fts_spec
+from extractors.ledger.dates import coerce_ledger_date
+from extractors.text_extractor import mask_pii
+from pipeline_guard import PipelineGuard
 from search_query import (
+    NOSPACE_CODEPOINTS,
     _expand_terms,
     build_fts_match,
     fields_match,
@@ -27,17 +33,19 @@ from search_query import (
     row_matches,
     score_row,
     strip_particle,
-    NOSPACE_CODEPOINTS,
 )
-from db import fts_spec
-from pipeline_guard import PipelineGuard
-from extractors.text_extractor import mask_pii
 from write_guard import ensure_writable
-from services.ledger.due import DUE_FILTERS, ledger_due_state, matches_due_filter
-from services.ledger.ids import LEDGER_TEXT_FIELDS, _clean, next_ledger_id, row_fingerprint
+
 from services.ledger.autolink import auto_link_ledger_to_doc
+from services.ledger.due import DUE_FILTERS, ledger_due_state, matches_due_filter
 from services.ledger.history import build_ledger_timeline
-from extractors.ledger.dates import coerce_ledger_date
+from services.ledger.ids import (
+    LEDGER_TEXT_FIELDS,
+    _clean,
+    next_ledger_id,
+    row_fingerprint,
+)
+
 
 def _history_actor() -> str:
     """이력에 남길 수행자. 이 시스템은 로그인이 없으므로 OS 계정명을 쓴다(제안서 D7).

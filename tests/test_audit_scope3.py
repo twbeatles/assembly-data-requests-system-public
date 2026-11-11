@@ -2,12 +2,12 @@
 """SCOPE3 감사 개선 회귀 테스트."""
 
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import unittest
-import shutil
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
@@ -16,15 +16,15 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import add_documents_smart
-import extract_and_build_db
-from extractors.text_extractor import extract_metadata
-from search_query import build_fts_match
-from pipeline_guard import PipelineGuard
-from services.ledger_service import LedgerService
-from db.database_manager import DatabaseManager
 import build_universal_package
-import write_all_bats
+import extract_and_build_db
 import package_distribution
+import write_all_bats
+from db.database_manager import DatabaseManager
+from extractors.text_extractor import extract_metadata
+from pipeline_guard import PipelineGuard
+from search_query import build_fts_match
+from services.ledger_service import LedgerService
 
 
 class TestAuditScope3(unittest.TestCase):

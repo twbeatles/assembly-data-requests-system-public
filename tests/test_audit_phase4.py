@@ -11,12 +11,12 @@ Verifies:
 7. text_extractor historical date prefix (2018-2023) normalization.
 """
 
-import sys
-import sqlite3
-import unittest
-import tempfile
 import shutil
+import sqlite3
+import sys
+import tempfile
 import threading
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
@@ -25,13 +25,13 @@ SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from db.database_manager import DatabaseManager
+import add_documents_smart
 import generate_excel_db
 import generate_web_dashboard
-from services.ledger_service import LedgerService
+from db.database_manager import DatabaseManager
 from extractors.qa_splitter import split_into_qa_items
-import add_documents_smart
 from extractors.text_extractor import extract_metadata
+from services.ledger_service import LedgerService
 
 
 class TestAuditPhase4(unittest.TestCase):

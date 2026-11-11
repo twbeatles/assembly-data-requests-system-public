@@ -11,7 +11,6 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
-
 from test_audit_phase10_dashboard import run_node
 
 REPO = Path(__file__).resolve().parent.parent

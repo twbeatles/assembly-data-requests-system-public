@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import sys
+import datetime
 import json
 import sqlite3
-import datetime
+import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(SCRIPTS_DIR) not in sys.path:
@@ -50,6 +50,7 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
             self._ensure_ledger_ids(master_excel)
 
             from extractors.ledger_parser import load_request_ledger
+
             from services.ledger_service import LedgerService
 
             # Read documents from DB to support document auto-linking

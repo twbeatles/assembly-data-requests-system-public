@@ -1,10 +1,10 @@
-from typing import Any
-import sys
-import unittest
-import tempfile
 import sqlite3
-from pathlib import Path
+import sys
+import tempfile
+import unittest
 from http.server import ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
 
 TESTS_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = TESTS_DIR.parent
@@ -15,8 +15,9 @@ if str(SCRIPTS_DIR) not in sys.path:
 import add_documents_smart
 import extract_and_build_db
 import parse_all
-import web_server
 import system_config
+import web_server
+
 
 class TestAuditPhase3(unittest.TestCase):
     """

@@ -12,9 +12,9 @@
     python scripts/reorganize_markdown.py --dry-run   # 옮길·정리할 목록만 출력
     python scripts/reorganize_markdown.py             # 실행 (치운 사본은 .maintenance_backup/에 보관)
 """
-from typing import Any, cast
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = SCRIPTS_DIR.parent

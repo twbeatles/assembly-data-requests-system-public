@@ -2,10 +2,7 @@
 """대시보드 조립 믹스인(SRP: 파트→단일 HTML)."""
 import json
 from pathlib import Path
-from typing import Optional
-
-
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from template_renderer import DashboardRenderer

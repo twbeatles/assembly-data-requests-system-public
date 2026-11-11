@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 """HTTP GET 라우팅 믹스인(SRP: 조회 엔드포인트 분기)."""
-from urllib.parse import urlparse, parse_qs, unquote
 import os
 import shutil
+from typing import TYPE_CHECKING
+from urllib.parse import parse_qs, unquote, urlparse
 
 import system_config
+
 from web.pagination import paged_response
-
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from web_server import RequestLedgerHandler

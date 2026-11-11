@@ -1,7 +1,6 @@
 """Regression scenarios use disposable workbooks/DBs and real client functions."""
 import json
 import os
-from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
@@ -9,14 +8,15 @@ import sys
 import threading
 import time
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import pytest
 from db.database_manager import DatabaseManager
-from db.ledger_outbox import read_operations, copy_delivery_state
+from db.ledger_outbox import copy_delivery_state, read_operations
 from db.migrations import SCHEMA_VERSION, SchemaTooNewError
 from db.preflight import snapshot_before_rebuild
-from pipeline_guard import PipelineGuard, STALE_SECONDS
+from pipeline_guard import STALE_SECONDS, PipelineGuard
 from services.excel_sync_service import ExcelSyncService
 from services.ledger_service import LedgerService
 from test_audit_phase8_fixes import LedgerSyncFixtureMixin

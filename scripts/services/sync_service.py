@@ -4,13 +4,13 @@ Pipeline Synchronization Service (SOLID: SRP).
 Handles concurrency locks and asynchronous execution of the incremental data pipeline.
 """
 
-import sys
-import time
 import datetime
 import subprocess
+import sys
 import threading
+import time
 from pathlib import Path
-from typing import Tuple, Dict, Any, Optional
+from typing import Any, Dict, Optional, Tuple
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 

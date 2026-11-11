@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """SCOPE2 감사 개선 회귀 테스트."""
 
-from typing import Any
 import json
+import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
-import shutil
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
@@ -18,17 +18,17 @@ SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from db.database_manager import DatabaseManager
-from services.ledger_service import LedgerService, auto_link_ledger_to_doc
-from services.sync_service import SyncService
-from services.excel_sync_service import ExcelSyncService
-from extractors.ledger_parser import LedgerParser
-from template_renderer import DashboardRenderer
+import create_ledger_template
 import extract_and_build_db
 import parse_all
-import web_server
 import system_config
-import create_ledger_template
+import web_server
+from db.database_manager import DatabaseManager
+from extractors.ledger_parser import LedgerParser
+from services.excel_sync_service import ExcelSyncService
+from services.ledger_service import LedgerService, auto_link_ledger_to_doc
+from services.sync_service import SyncService
+from template_renderer import DashboardRenderer
 
 
 class TestAuditScope2(unittest.TestCase):

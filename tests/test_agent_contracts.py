@@ -15,7 +15,7 @@ def _facade(tmp_path):
 
 def test_result_envelope_fixed_fields(tmp_path):
     _facade(tmp_path)
-    from agent_bridge.cli import build_parser, execute, _hoist_global_flags
+    from agent_bridge.cli import _hoist_global_flags, build_parser, execute
     parser = build_parser()
     args = parser.parse_args(_hoist_global_flags(["search", "딥페이크", "--json"]))
     envelope, code = execute(args, base_dir=str(tmp_path))

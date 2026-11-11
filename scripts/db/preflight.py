@@ -5,7 +5,6 @@ from pathlib import Path
 
 from .migrations import SCHEMA_VERSION, SchemaTooNewError, get_version
 
-
 # 재빌드 직전 백업(`pre_rebuild/`) 보관 상한. 매 재빌드마다 전체 복사본이 하나씩 생기므로
 # 두지 않으면 디스크에 영구 누적된다. (2026-09-28 감사 Gap-1)
 PRE_REBUILD_KEEP = 5
@@ -52,6 +51,7 @@ def snapshot_before_rebuild(path):
     import sqlite3
     import uuid
     from datetime import datetime
+
     from extractors.ledger.workbook import connect_readonly
     from write_guard import ensure_writable
     path = Path(path)

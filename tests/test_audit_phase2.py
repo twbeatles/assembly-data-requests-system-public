@@ -1,9 +1,9 @@
-from typing import Any
-import sys
-import unittest
-import tempfile
 import sqlite3
+import sys
+import tempfile
+import unittest
 from pathlib import Path
+from typing import Any
 
 # Add scripts directory to sys.path
 TESTS_DIR = Path(__file__).resolve().parent
@@ -12,10 +12,11 @@ SCRIPTS_DIR = PROJECT_DIR / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-import parse_all
 import extract_and_build_db
 import generate_excel_db
 import launcher_gui
+import parse_all
+
 
 class TestAuditPhase2(unittest.TestCase):
     """

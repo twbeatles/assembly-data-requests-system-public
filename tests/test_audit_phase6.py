@@ -13,14 +13,14 @@ Tests:
 9. Dashboard template CSV export and strict HTTP error rejection.
 """
 
-from typing import Any
-import sys
 import json
 import shutil
 import sqlite3
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
@@ -28,13 +28,13 @@ ROOT_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from db.database_manager import DatabaseManager
-from services.ledger_service import LedgerService
-from services.excel_sync_service import ExcelSyncService
-from extractors.qa_splitter import QASplitter
-from extractors.text_extractor import extract_content_details
 import generate_excel_db
 import web_server
+from db.database_manager import DatabaseManager
+from extractors.qa_splitter import QASplitter
+from extractors.text_extractor import extract_content_details
+from services.excel_sync_service import ExcelSyncService
+from services.ledger_service import LedgerService
 
 
 class TestAuditPhase6(unittest.TestCase):

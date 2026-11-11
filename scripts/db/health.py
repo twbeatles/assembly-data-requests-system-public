@@ -10,9 +10,9 @@
 이상은 숨기지 않고 `/api/sync`·`/api/db/health`와 00번 배치 끝에서 보이게 한다.
 """
 
-from typing import Any
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 from . import fts_spec
 from .migrations import SCHEMA_VERSION, get_version

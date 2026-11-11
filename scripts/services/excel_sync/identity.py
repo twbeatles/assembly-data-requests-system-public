@@ -3,7 +3,7 @@
 import re
 import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_SYSTEM_DIR = SCRIPTS_DIR.parent

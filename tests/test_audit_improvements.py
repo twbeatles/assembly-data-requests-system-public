@@ -1,6 +1,6 @@
-import sys
-import sqlite3
 import shutil
+import sqlite3
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +11,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import extract_and_build_db
+
 
 class TestAuditImprovements(unittest.TestCase):
     def test_1_ledger_rendering_and_modals_in_html_script(self):

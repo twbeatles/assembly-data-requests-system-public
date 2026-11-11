@@ -10,24 +10,24 @@ Verifies:
 6. Openpyxl workbook closing and handle cleanup.
 """
 
-from typing import Any
-import sys
 import json
-import unittest
-import tempfile
 import shutil
+import sys
+import tempfile
 import time
+import unittest
 from pathlib import Path
+from typing import Any
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
+from db.database_manager import DatabaseManager
 from services.ledger_service import LedgerService
 from services.sync_service import SyncService
 from web_server import RequestLedgerHandler
-from db.database_manager import DatabaseManager
 
 
 class TestAuditPhase5(unittest.TestCase):

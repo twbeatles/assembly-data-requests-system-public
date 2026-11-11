@@ -37,9 +37,10 @@ def test_hostile_document_is_data_only(tmp_path):
 
 
 def test_no_raw_execution_surface(tmp_path):
+    import inspect
+
     import agent_bridge.facade as facade_mod
     import agent_bridge.mcp_server as mcp_mod
-    import inspect
     facade_names = [name for name, _ in inspect.getmembers(facade_mod.AgentFacade,
                                                            predicate=inspect.isfunction)]
     for name in facade_names:

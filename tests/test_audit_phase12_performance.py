@@ -26,8 +26,8 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import file_hash_cache
-from file_hash_cache import FileHashCache
 from extractors.text_extractor import mask_pii
+from file_hash_cache import FileHashCache
 
 
 def legacy_mask_pii(text):
@@ -138,8 +138,8 @@ class FileHashCacheTests(unittest.TestCase):
         self.assertFalse(self.cache_path.with_name(self.cache_path.name + ".tmp").exists())
 
     def test_pipeline_modules_hash_through_cache(self):
-        import parse_all
         import extract_and_build_db
+        import parse_all
         with mock.patch.object(file_hash_cache, "sha256_file", return_value="c" * 64) as spy:
             self.assertEqual(extract_and_build_db.file_sha256(self.src), "c" * 64)
             out_file, hash_file = self.dir / "a.hwp.md", self.dir / "a.hwp.md.sha256"

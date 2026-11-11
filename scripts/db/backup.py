@@ -11,10 +11,10 @@ DB는 대부분 엑셀과 파싱 마크다운에서 다시 만들 수 있지만,
 (파일 복사는 -wal이 남아 있으면 깨진 사본을 만든다).
 """
 
-from typing import Any
 import datetime
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 BACKUP_DIR_NAME = ".db_backup"
 DAILY_SUBDIR = "daily"

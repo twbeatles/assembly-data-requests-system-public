@@ -6,13 +6,13 @@ DDL schema creation, Trigram FTS5 full-text indexing, triggers, composite indexe
 and safe atomic shadow-database swap.
 """
 
-import os
-import sys
-import sqlite3
-import time
 import datetime
+import os
+import sqlite3
+import sys
+import time
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from . import fts_spec
 from .migrations import (
@@ -23,6 +23,7 @@ from .migrations import (
     rebuild_fts,
     set_version,
 )
+
 
 def _readonly_uri(db_path, immutable: bool = False) -> str:
     """읽기 전용 URI. 경로에 공백·쉼표·괄호·한글이 있어도 되도록 퍼센트 인코딩한다.

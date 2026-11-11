@@ -9,7 +9,6 @@ from pathlib import Path
 
 from write_guard import ensure_writable
 
-
 TARGET_EXTS = {'.hwp', '.hwpx', '.xlsx', '.xlsm', '.pdf'}
 def is_master_ledger_file(file_path: Path) -> bool:
     """Check if an excel file is a master ledger rather than an individual answer document."""

@@ -1,4 +1,5 @@
 from typing import Any
+
 # -*- coding: utf-8 -*-
 """
 Phase 7 Comprehensive Audit Fixes Test Suite.
@@ -16,8 +17,8 @@ Verifies all 14 audit issues addressed in PROJECT_AUDIT.md:
 """
 
 import os
-import sys
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -32,11 +33,11 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 import system_config
+from db.database_manager import DatabaseManager
 from pipeline_guard import PipelineGuard
 from search_query import build_fts_match
-from db.database_manager import DatabaseManager
-from services.ledger_service import LedgerService
 from services.excel_sync_service import ExcelSyncService
+from services.ledger_service import LedgerService
 from web_server import RequestLedgerHandler, get_ledger_service
 
 

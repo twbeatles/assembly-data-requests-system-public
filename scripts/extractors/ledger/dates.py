@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
-import sys
 import re
+import sys
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]

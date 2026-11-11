@@ -86,8 +86,8 @@ class TestIssue001ConcurrentReclaim(unittest.TestCase):
     """죽은 락 동시 회수. 서로 다른 살아 있는 프로세스가 둘 다 성공하면 안 된다."""
 
     def _one_round(self, tmp_path, workers=5):
-        from web.instance_lock import LOCK_NAME, ServerInstanceLock
         from pipeline_guard import pid_is_alive
+        from web.instance_lock import LOCK_NAME, ServerInstanceLock
         (tmp_path / LOCK_NAME).write_text(
             json.dumps({"pid": _dead_pid(), "port": 8080}), encoding="utf-8")
         gate = multiprocessing.Event()
@@ -184,7 +184,8 @@ class TestIssue002ReadonlyContract(unittest.TestCase):
 
     def test_empty_root_cli_reports_dataset_unavailable(self):
         import tempfile
-        from agent_bridge.cli import build_parser, execute, _hoist_global_flags
+
+        from agent_bridge.cli import _hoist_global_flags, build_parser, execute
         with tempfile.TemporaryDirectory(prefix="issue002_cli_") as tmp:
             base = Path(tmp)
             before = _snapshot_tree(base)
@@ -366,6 +367,7 @@ class TestIssue004FailureContract(unittest.TestCase):
 
     def test_busy_pipeline_result_has_common_fields(self):
         import tempfile
+
         from pipeline_guard import PipelineGuard
         with tempfile.TemporaryDirectory(prefix="issue004_busy_") as tmp:
             self._patched(tmp)
@@ -406,6 +408,7 @@ class TestResponseBudget(unittest.TestCase):
     def test_cli_main_rejects_oversize_payload(self):
         import contextlib
         import io
+
         from agent_bridge import cli as cli_mod
         old_execute = cli_mod.execute
         big = "x" * (policy.MAX_RESPONSE_BYTES + 1)

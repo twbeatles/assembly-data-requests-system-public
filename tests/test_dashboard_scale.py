@@ -20,12 +20,12 @@ for p in (str(SCRIPTS_DIR), str(TESTS_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from template_renderer import DashboardRenderer
-from db.database_manager import DatabaseManager
 from db import fts_spec
+from db.database_manager import DatabaseManager
 from db.json_export import export_combined_json, write_json_compact
 from services.ledger_service import LedgerService
-from test_audit_phase10_dashboard import NODE, TEMPLATE, extract_js, SEARCH_FUNCS
+from template_renderer import DashboardRenderer
+from test_audit_phase10_dashboard import NODE, SEARCH_FUNCS, TEMPLATE, extract_js
 
 BOOT_JS = SCRIPTS_DIR / "templates" / "dashboard" / "js" / "00_boot.js"
 

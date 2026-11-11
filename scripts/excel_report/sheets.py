@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
 """엑셀 시트 빌더(SRP: 5개 시트 생성)."""
 from collections import Counter
+
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
+from excel_report.links import resolve_excel_hyperlink_path
 from excel_report.styles import (
-    title_font,
-    section_font,
-    regular_font,
-    link_font,
-    sub_header_font,
-    sub_header_fill,
     accent_fill,
-    zebra_fill,
-    cell_border,
     apply_table_header,
+    cell_border,
+    link_font,
+    regular_font,
+    section_font,
+    sub_header_fill,
+    sub_header_font,
+    title_font,
+    zebra_fill,
 )
 from excel_report.text import _excel_body, sanitize_text
-from excel_report.links import resolve_excel_hyperlink_path
 
 
 def build_dashboard_sheet(wb, records, qa_items, ledger_items=None):

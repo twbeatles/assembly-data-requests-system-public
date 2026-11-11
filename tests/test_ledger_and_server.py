@@ -1,11 +1,11 @@
-from typing import Any
 import os
-import sys
-import sqlite3
 import shutil
+import sqlite3
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 SYSTEM_DIR = SCRIPTS_DIR.parent
@@ -15,6 +15,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import extract_and_build_db
 import web_server
 from db.database_manager import DatabaseManager
+
 
 class TestLedgerAndServer(unittest.TestCase):
     @classmethod

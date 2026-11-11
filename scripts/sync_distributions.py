@@ -9,12 +9,12 @@ Ensures all refactored modular packages (db, extractors, services, templates, co
 executables, batch files, and documentation stay 100% in sync with strict SHA256 parity verification.
 """
 
-from typing import Any, cast
+import hashlib
 import os
 import sys
 import time
-import hashlib
 from pathlib import Path
+from typing import Any, cast
 
 cast(Any, sys.stdout).reconfigure(encoding='utf-8')
 
@@ -28,6 +28,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import package_distribution
 import write_all_bats
 from template_renderer import DashboardRenderer
+
 
 def sha256_file(filepath: Path) -> str:
     h = hashlib.sha256()

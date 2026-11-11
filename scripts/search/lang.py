@@ -3,7 +3,6 @@
 import calendar
 import re
 
-
 # FTS5 trigram은 3글자 단위로 색인한다. 이보다 짧은 토큰은 MATCH로 표현할 수 없다.
 FTS_MIN_TOKEN_LEN = 3
 # `_nospace_lower`가 떼는 공백과 SQL 선필터 블롭이 떼는 공백을 한 곳에서 맞춘다. (감사 R6-01)

@@ -68,6 +68,7 @@ def service_search(db_path, base_dir, kw: str, year: str, target: str, limit: in
     호출자(GUI)는 그때 예전 읽기 전용 SQL 경로로 되돌아간다.
     """
     from pathlib import Path
+
     from services.ledger.service import LedgerService
 
     kind, key, id_f, title_f, num_f = GUI_TARGETS[target_key(target)]
@@ -95,8 +96,9 @@ def service_search(db_path, base_dir, kw: str, year: str, target: str, limit: in
 def ledger_due_counts(db_path, today=None) -> dict:
     """{'overdue': n, 'soon': n, 'open': n}. 대시보드 상단 마감 요약과 같은 규칙(불변조건 19)."""
     import sqlite3
-    from services.ledger.due import ledger_due_state
+
     from extractors.ledger.workbook import connect_readonly
+    from services.ledger.due import ledger_due_state
 
     counts = {"overdue": 0, "soon": 0, "open": 0}
     conn = connect_readonly(db_path)

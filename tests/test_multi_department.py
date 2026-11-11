@@ -1,10 +1,10 @@
-from typing import Any
-import unittest
-import sys
 import shutil
-import tempfile
 import sqlite3
+import sys
+import tempfile
+import unittest
 from pathlib import Path
+from typing import Any
 
 TESTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = TESTS_DIR.parent
@@ -13,12 +13,13 @@ SCRIPTS_DIR = SYSTEM_DIR / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-import system_config
-import web_server
-import extract_and_build_db
 import build_universal_package
 import create_ledger_template
+import extract_and_build_db
+import system_config
+import web_server
 from template_renderer import DashboardRenderer
+
 
 class TestMultiDepartmentAndPackaging(unittest.TestCase):
     def setUp(self):

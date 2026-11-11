@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_SYSTEM_DIR = SCRIPTS_DIR.parent
 DEFAULT_DB_PATH = DEFAULT_SYSTEM_DIR / "data_requests.db"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
-from extractors.ledger.paths import DEFAULT_SYSTEM_DIR
 from extractors.ledger.load import load_request_ledger
+from extractors.ledger.paths import DEFAULT_SYSTEM_DIR
+
 
 class LedgerParser:
     """Object-oriented interface for parsing and merging master request ledgers."""

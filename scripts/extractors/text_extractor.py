@@ -5,18 +5,19 @@ Responsible for extracting Korean document metadata (dates, requesters, institut
 document numbers), PII masking, text cleaning, and topic tagging.
 """
 
-import os
-import sys
-import re
 import datetime
+import os
+import re
+import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 import system_config
+
 WORKSPACE_ROOT = system_config.find_workspace_root(SYSTEM_DIR)
 ROOT_DIR = WORKSPACE_ROOT
 

@@ -1,14 +1,14 @@
+import json
 import os
-import sys
-import time
-import subprocess
 import re
+import shutil
+import subprocess
+import sys
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Optional, cast
-import json
-import shutil
 
 KORDOC_CMD = shutil.which('kordoc.cmd') or shutil.which('kordoc') or 'kordoc.cmd'
 # MCP parse_document와 동일한 엔진 옵션: 스캔본 OCR, 표 빈칸·빈 문단 보존
@@ -23,8 +23,8 @@ SYSTEM_DIR = SCRIPTS_DIR.parent
 
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
-import system_config
 import file_hash_cache
+import system_config
 
 # 워크스페이스 루트 판정은 system_config 한 곳에서만 한다. 예전에는 여기서
 # `(SYSTEM_DIR.parent / "2026").exists()`로 연도를 하드코딩했는데, 그 폴더가 없는
@@ -56,15 +56,29 @@ cfg = system_config.get_config(SYSTEM_DIR)
 excel_db_stem = Path(cfg.get("excel_filename", "국회_대외기관_자료요구_통합DB.xlsx")).stem
 EXCLUDE_FILE_PREFIXES = {'~$', excel_db_stem, '국회_대외기관_자료요구_통합DB', '국회_기관_자료요구_통합DB'}
 
-from pipeline.parse.discovery import get_exclude_dirs, is_excluded_dir, find_target_files
+from pipeline.parse.discovery import (
+    find_target_files,
+    get_exclude_dirs,
+    is_excluded_dir,
+)
+from pipeline.parse.images import (
+    _collect_extract_images,
+    _image_to_ocr_png,
+    is_image_only_markdown,
+)
+from pipeline.parse.layout import (
+    consolidate_layout,
+    default_backup_dir,
+    expected_output_path,
+    write_text_atomic,
+)
 from pipeline.parse.safe_copy import (  # noqa: F401 # shim re-export (identity contract)
-    CMD_UNSAFE_CHARS, needs_safe_copy, safe_kordoc_target, kordoc_paths,
+    CMD_UNSAFE_CHARS,
+    kordoc_paths,
+    needs_safe_copy,
+    safe_kordoc_target,
 )
 from pipeline.parse.xlsx_fallback import handle_large_xlsx_fallback
-from pipeline.parse.images import is_image_only_markdown, _collect_extract_images, _image_to_ocr_png
-from pipeline.parse.layout import (
-    expected_output_path, consolidate_layout, default_backup_dir, write_text_atomic,
-)
 
 # 기존 테스트 호환용 별칭
 DEFAULT_EXCLUDE_DIRS = get_exclude_dirs()

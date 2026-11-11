@@ -1,18 +1,19 @@
-from typing import Any
-import sys
-import sqlite3
 import shutil
+import sqlite3
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 SYSTEM_DIR = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from db import fts_spec
 import web_server
+from db import fts_spec
+
 
 class TestDbAndSearchAdvanced(unittest.TestCase):
     @classmethod

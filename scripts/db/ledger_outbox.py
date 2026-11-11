@@ -1,9 +1,9 @@
 """Ledger mutations and their Excel delivery intent share one SQLite commit."""
 import json
-from contextlib import closing
 import sqlite3
 import time
 import uuid
+from contextlib import closing
 from pathlib import Path
 
 

@@ -19,42 +19,30 @@
 
 import re  # noqa: F401 # compat re-export shim
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 from search.lang import (  # noqa: F401 # compat re-export shim
-    FTS_MIN_TOKEN_LEN, KOREAN_PARTICLES, CHOSEONG_LIST, _CHOSEONG_MAX_LEN,
-    _JAMO_RE, _FTS_RESERVED_RE, FIELD_ALIASES, DATE_FIELDS, EXACT_MATCH_FIELDS,
-    _FIELD_TOKEN_RE, _DATE_RANGE_RE, _clean_term, strip_particle, get_choseong,
-    normalize_date, NOSPACE_CODEPOINTS,
+    _CHOSEONG_MAX_LEN,
+    _DATE_RANGE_RE,
+    _FIELD_TOKEN_RE,
+    _FTS_RESERVED_RE,
+    _JAMO_RE,
+    CHOSEONG_LIST,
+    DATE_FIELDS,
+    EXACT_MATCH_FIELDS,
+    FIELD_ALIASES,
+    FTS_MIN_TOKEN_LEN,
+    KOREAN_PARTICLES,
+    NOSPACE_CODEPOINTS,
+    _clean_term,
+    get_choseong,
+    normalize_date,
+    strip_particle,
 )
-from search.parse import _take_field, parse_query, _expand_terms, build_fts_match  # noqa: F401 # compat re-export shim
 from search.match import (  # noqa: F401 # compat re-export shim
-    _nospace_lower, _term_matches, fields_match, row_matches, score_row, plan_is_empty,
+    _nospace_lower,
+    _term_matches,
+    fields_match,
+    plan_is_empty,
+    row_matches,
+    score_row,
 )
+from search.parse import _expand_terms, _take_field, build_fts_match, parse_query  # noqa: F401 # compat re-export shim

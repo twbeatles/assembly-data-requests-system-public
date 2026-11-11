@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*-
+import datetime
+import json
 import os
+import sqlite3
 import sys
 import time
-import json
-import sqlite3
-import datetime
 import uuid
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 from pipeline_guard import PipelineGuard
-from write_guard import ensure_writable, ProductionWriteBlocked
+from write_guard import ProductionWriteBlocked, ensure_writable
 
 try:
     import openpyxl
 except ImportError:
     openpyxl = None
+
+from typing import TYPE_CHECKING
 
 from services.excel_sync.identity import (
     MAX_PENDING_ATTEMPTS,
@@ -26,8 +28,6 @@ from services.excel_sync.identity import (
     QUARANTINE_RETRY_LIMIT,
     ExcelApplyConflict,
 )
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from services.excel_sync.service import ExcelSyncService

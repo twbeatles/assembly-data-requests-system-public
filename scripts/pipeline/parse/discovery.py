@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """파싱 대상 파일 탐색. 경로는 parse_all 모듈 전역을 호출 시점에 읽는다."""
-from typing import Optional
 import os
 from pathlib import Path
+from typing import Optional
 
 
 def get_exclude_dirs():
