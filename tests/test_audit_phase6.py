@@ -51,7 +51,9 @@ class TestAuditPhase6(unittest.TestCase):
         finally:
             conn.close()
 
-        self.service = LedgerService(db_path=self.db_path, json_path=self.json_path, base_dir=self.base_dir)
+        self.service = LedgerService(
+            db_path=self.db_path, json_path=self.json_path, base_dir=self.base_dir
+        )
 
     def tearDown(self):
         LedgerService.wait_last_sync(timeout=2.0)
@@ -67,7 +69,7 @@ class TestAuditPhase6(unittest.TestCase):
             "requester": "홍길동의원",
             "title": "감사 기록 테스트 자료",
             "department": "기획예산팀",
-            "status": "작성중"
+            "status": "작성중",
         }
         res_ins = self.service.insert_ledger_item(insert_data)
         self.assertTrue(res_ins["success"])
@@ -81,7 +83,9 @@ class TestAuditPhase6(unittest.TestCase):
         self.assertEqual(snap_ins["title"], "감사 기록 테스트 자료")
 
         # 2. Update
-        res_upd = self.service.update_ledger_item(ledger_id, {"title": "수정된 감사 자료 제목", "status": "제출완료"})
+        res_upd = self.service.update_ledger_item(
+            ledger_id, {"title": "수정된 감사 자료 제목", "status": "제출완료"}
+        )
         self.assertTrue(res_upd["success"])
 
         hist_upd = self.service.get_ledger_history(ledger_id=ledger_id)
@@ -102,15 +106,15 @@ class TestAuditPhase6(unittest.TestCase):
     def test_2_web_server_ledger_history_endpoint(self):
         """Verify web_server /api/ledger/history route returns JSON history."""
         # Seed record and update to create history
-        ins = self.service.insert_ledger_item({
-            "year": "2026",
-            "requester": "김의원",
-            "title": "API 이력 테스트"
-        })
+        ins = self.service.insert_ledger_item(
+            {"year": "2026", "requester": "김의원", "title": "API 이력 테스트"}
+        )
         lid = ins["item"]["ledger_id"]
         self.service.update_ledger_item(lid, {"title": "API 이력 테스트(수정)"})
 
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         handler.headers = {}
         old_db = web_server.DB_PATH
         old_base = web_server.BASE_DIR
@@ -127,6 +131,7 @@ class TestAuditPhase6(unittest.TestCase):
     def test_3_excel_sync_cleared_cells_and_no_circular_merge(self):
         """Verify sync_excel_to_db reflects cleared cells in SQLite and does not circular merge."""
         import openpyxl
+
         excel_path = self.base_dir / "260904 국회 요구자료 목록(테스트)_스마트검색.xlsx"
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -137,7 +142,9 @@ class TestAuditPhase6(unittest.TestCase):
         wb.save(str(excel_path))
         wb.close()
 
-        sync_svc = ExcelSyncService(base_dir=self.base_dir, db_path=self.db_path, json_path=self.json_path)
+        sync_svc = ExcelSyncService(
+            base_dir=self.base_dir, db_path=self.db_path, json_path=self.json_path
+        )
 
         # Initial sync from Excel to DB
         res1 = sync_svc.sync_excel_to_db()
@@ -152,7 +159,7 @@ class TestAuditPhase6(unittest.TestCase):
         # Clear the '비고' cell in Excel
         wb = openpyxl.load_workbook(str(excel_path))
         ws = wb["2026"]
-        ws.cell(2, 6, value="") # clear note
+        ws.cell(2, 6, value="")  # clear note
         wb.save(str(excel_path))
         wb.close()
 
@@ -168,22 +175,25 @@ class TestAuditPhase6(unittest.TestCase):
     def test_4_build_qa_detail_sheet_relative_hyperlinks(self):
         """Verify build_qa_detail_sheet normalizes hyperlinks using resolve_excel_hyperlink_path."""
         import openpyxl
+
         wb = openpyxl.Workbook()
 
-        qa_items = [{
-            "qa_id": "QA-2026-001-01",
-            "doc_id": "DOC-2026-001",
-            "year": "2026",
-            "institution": "국회",
-            "requester": "박의원",
-            "doc_number": "001",
-            "q_num": 1,
-            "question_title": "질문 제목",
-            "answer_full": "답변 내용",
-            "has_tables": "N",
-            "parsed_md_path": "국회자료요구_스마트시스템(기획예산팀)/_parsed_markdown/2026/test.md",
-            "original_path": "2026/test.hwp"
-        }]
+        qa_items = [
+            {
+                "qa_id": "QA-2026-001-01",
+                "doc_id": "DOC-2026-001",
+                "year": "2026",
+                "institution": "국회",
+                "requester": "박의원",
+                "doc_number": "001",
+                "q_num": 1,
+                "question_title": "질문 제목",
+                "answer_full": "답변 내용",
+                "has_tables": "N",
+                "parsed_md_path": "국회자료요구_스마트시스템(기획예산팀)/_parsed_markdown/2026/test.md",
+                "original_path": "2026/test.hwp",
+            }
+        ]
 
         generate_excel_db.build_qa_detail_sheet(wb, qa_items)
         ws = [s for s in wb.worksheets if "Q&A" in s.title][0]
@@ -200,31 +210,36 @@ class TestAuditPhase6(unittest.TestCase):
 
     def test_5_cors_external_origin_rejection(self):
         """Verify web_server end_headers allows local origins and blocks external origins without wildcard '*'."""
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         headers_sent = {}
+
         def mock_send_header(k, v):
             headers_sent[k] = v
 
         handler.send_header = mock_send_header
-        handler.headers = {'Origin': 'http://localhost:8080'}
-        with patch.object(web_server.SimpleHTTPRequestHandler, 'end_headers'):
+        handler.headers = {"Origin": "http://localhost:8080"}
+        with patch.object(web_server.SimpleHTTPRequestHandler, "end_headers"):
             handler.end_headers()
-            self.assertEqual(headers_sent.get('Access-Control-Allow-Origin'), 'http://localhost:8080')
+            self.assertEqual(
+                headers_sent.get("Access-Control-Allow-Origin"), "http://localhost:8080"
+            )
 
         # External untrusted origin
         headers_sent.clear()
-        handler.headers = {'Origin': 'http://malicious-external-domain.com'}
-        with patch.object(web_server.SimpleHTTPRequestHandler, 'end_headers'):
+        handler.headers = {"Origin": "http://malicious-external-domain.com"}
+        with patch.object(web_server.SimpleHTTPRequestHandler, "end_headers"):
             handler.end_headers()
-            self.assertNotIn('Access-Control-Allow-Origin', headers_sent)
-            self.assertNotEqual(headers_sent.get('Access-Control-Allow-Origin'), '*')
+            self.assertNotIn("Access-Control-Allow-Origin", headers_sent)
+            self.assertNotEqual(headers_sent.get("Access-Control-Allow-Origin"), "*")
 
         # file:// origin must not receive CORS write capability
         headers_sent.clear()
-        handler.headers = {'Origin': 'null'}
-        with patch.object(web_server.SimpleHTTPRequestHandler, 'end_headers'):
+        handler.headers = {"Origin": "null"}
+        with patch.object(web_server.SimpleHTTPRequestHandler, "end_headers"):
             handler.end_headers()
-            self.assertNotIn('Access-Control-Allow-Origin', headers_sent)
+            self.assertNotIn("Access-Control-Allow-Origin", headers_sent)
 
     def test_6_qa_splitter_two_char_title_preservation(self):
         """Verify qa_splitter and text_extractor do not drop valid 2-character titles like '1. 현황' or '2. 예산'."""
@@ -236,10 +251,12 @@ class TestAuditPhase6(unittest.TestCase):
             "현재 정보통신망 심의 및 조치 건수는 전년 대비 증가하였습니다.",
             "",
             "2. 예산",
-            "2026년도 모니터링 예산은 총 15억원으로 편성되었습니다."
+            "2026년도 모니터링 예산은 총 15억원으로 편성되었습니다.",
         ]
         md_text = "\n".join(lines)
-        items = splitter.split("DOC-2026-001", {"year": "2026", "requester": "박의원"}, md_text)
+        items = splitter.split(
+            "DOC-2026-001", {"year": "2026", "requester": "박의원"}, md_text
+        )
         self.assertEqual(len(items), 2)
         self.assertEqual(items[0]["q_num"], 1)
         self.assertIn("현황", items[0]["question_title"])
@@ -273,7 +290,9 @@ class TestAuditPhase6(unittest.TestCase):
 
         # Simulate PermissionError on os.replace (as Windows locks open files)
         with patch("os.replace", side_effect=PermissionError("Locked by open reader")):
-            DatabaseManager.atomic_swap(tmp_db, target_db, max_retries=2, retry_delay=0.01)
+            DatabaseManager.atomic_swap(
+                tmp_db, target_db, max_retries=2, retry_delay=0.01
+            )
 
         # Check target DB now has new data via online backup
         cur = conn_target.cursor()
@@ -300,5 +319,5 @@ class TestAuditPhase6(unittest.TestCase):
         self.assertIn("삭제 실패:", content)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

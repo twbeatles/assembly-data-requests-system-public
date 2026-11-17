@@ -5,6 +5,7 @@
 대시보드 JS는 node --check와 순수 함수 실행 하네스로 확인한다.
 운영 데이터에 쓰지 않는다(읽기만 한다).
 """
+
 import datetime
 import json
 import subprocess
@@ -18,21 +19,48 @@ TEMPLATE = REPO / "scripts" / "templates" / "dashboard_template.html"
 MANIFEST = REPO / "scripts" / "templates" / "dashboard" / "manifest.json"
 
 REQUIRED_IDS = {
-    "conn-status", "due-summary", "due-num-overdue", "due-num-soon", "due-num-open",
-    "tab-count-docs", "tab-count-qa", "tab-count-tables", "tab-count-ledger",
-    "grammar-chips", "topic-chips", "active-filter-chips", "search-spinner",
-    "add-ledger-sub", "add-ledger-title", "edit-ledger-title",
-    "similar-answers", "similar-list", "similar-count",
-    "ledger-history-box", "ledger-history-list", "ledger-history-count", "ledger-history-offline",
-    "ledger-link-select", "btn-save-ledger-link", "btn-clear-ledger-link",
+    "conn-status",
+    "due-summary",
+    "due-num-overdue",
+    "due-num-soon",
+    "due-num-open",
+    "tab-count-docs",
+    "tab-count-qa",
+    "tab-count-tables",
+    "tab-count-ledger",
+    "grammar-chips",
+    "topic-chips",
+    "active-filter-chips",
+    "search-spinner",
+    "add-ledger-sub",
+    "add-ledger-title",
+    "edit-ledger-title",
+    "similar-answers",
+    "similar-list",
+    "similar-count",
+    "ledger-history-box",
+    "ledger-history-list",
+    "ledger-history-count",
+    "ledger-history-offline",
+    "ledger-link-select",
+    "btn-save-ledger-link",
+    "btn-clear-ledger-link",
     "requester-candidates",
-    "add-req-date-preview", "add-deadline-preview", "add-submit-date-preview",
-    "edit-req-date-preview", "edit-deadline-preview", "edit-submit-date-preview",
+    "add-req-date-preview",
+    "add-deadline-preview",
+    "add-submit-date-preview",
+    "edit-req-date-preview",
+    "edit-deadline-preview",
+    "edit-submit-date-preview",
 }
 
 DIALOG_IDS = {
-    "add-ledger-backdrop", "edit-ledger-backdrop", "ledger-modal-backdrop",
-    "modal-backdrop", "compare-backdrop", "quarantine-modal-backdrop",
+    "add-ledger-backdrop",
+    "edit-ledger-backdrop",
+    "ledger-modal-backdrop",
+    "modal-backdrop",
+    "compare-backdrop",
+    "quarantine-modal-backdrop",
     "config-modal-backdrop",
 }
 
@@ -90,9 +118,17 @@ def test_year_not_hardcoded():
 def test_status_options_unified():
     scan = _scan_shell()
     assert scan.select_options["add-status"] == scan.select_options["edit-status"], (
-        f"등록/수정 상태 선택지가 다르다: {scan.select_options}")
+        f"등록/수정 상태 선택지가 다르다: {scan.select_options}"
+    )
     assert set(scan.select_options["add-status"]) >= {
-        "작성중", "검토중", "제출", "완료", "업무설명", "미제출", "해당없음"}
+        "작성중",
+        "검토중",
+        "제출",
+        "완료",
+        "업무설명",
+        "미제출",
+        "해당없음",
+    }
 
 
 def test_dialog_a11y():
@@ -119,9 +155,16 @@ def test_manifest_includes_ux_part():
 
 def test_assembled_template_has_ux_and_no_alert():
     html = TEMPLATE.read_text(encoding="utf-8")
-    for marker in ("closeTopModal", "due-summary", "ledger-history-list",
-                   "requester-candidates", "refreshSearchExtras"):
-        assert marker in html, f"조립 캐시에 {marker} 없음 (write_assembled_template 필요)"
+    for marker in (
+        "closeTopModal",
+        "due-summary",
+        "ledger-history-list",
+        "requester-candidates",
+        "refreshSearchExtras",
+    ):
+        assert marker in html, (
+            f"조립 캐시에 {marker} 없음 (write_assembled_template 필요)"
+        )
     assert "__DASHBOARD_JS__" not in html and "__DASHBOARD_CSS__" not in html
     assert "alert(" not in html
     assert "<script src" not in html and "<link href" not in html
@@ -131,7 +174,11 @@ def test_dashboard_js_syntax():
     for path in sorted(JS_DIR.glob("*.js")):
         res = subprocess.run(
             ["node", "--check", str(path)],
-            stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8")
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
         assert res.returncode == 0, f"{path.name} 구문 오류: {res.stderr[:500]}"
 
 
@@ -151,10 +198,15 @@ def test_ux_pure_functions_run_in_node(tmp_path):
         "};`;\n"
         "(0, eval)(code);\n"
         "console.log(JSON.stringify(globalThis.__results));\n",
-        encoding="utf-8")
+        encoding="utf-8",
+    )
     res = subprocess.run(
         ["node", str(driver), str(JS_DIR / "15_ux.js")],
-        stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8")
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     assert res.returncode == 0, f"UX 하네스 실패: {res.stderr[:500]}"
     out = json.loads(res.stdout)
     year = datetime.date.today().year

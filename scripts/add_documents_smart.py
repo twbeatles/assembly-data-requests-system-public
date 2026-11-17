@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
-cast(Any, sys.stdout).reconfigure(encoding='utf-8')
+cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = SCRIPTS_DIR.parent
@@ -24,9 +24,15 @@ IS_DIST_ENV = system_config.is_distribution_dir(SYSTEM_DIR)
 IS_DATA_DIST_ENV = system_config.is_data_distribution(SYSTEM_DIR)
 WORKSPACE_ROOT = system_config.find_workspace_root(SYSTEM_DIR)
 ROOT_DIR = WORKSPACE_ROOT
-DROP_DIRS = list(dict.fromkeys([
-    WORKSPACE_ROOT / "새자료_투입폴더", SYSTEM_DIR / "새자료_투입폴더", WORKSPACE_ROOT / "새자료_넣는곳"
-]))
+DROP_DIRS = list(
+    dict.fromkeys(
+        [
+            WORKSPACE_ROOT / "새자료_투입폴더",
+            SYSTEM_DIR / "새자료_투입폴더",
+            WORKSPACE_ROOT / "새자료_넣는곳",
+        ]
+    )
+)
 
 # `.xlsm` 대장도 투입 폴더에서 받는다(대장 판정 시 시스템 폴더로 옮김). 문서 파싱 대상 확장자는
 # parse_all.TARGET_EXTENSIONS가 따로 정한다.
@@ -61,6 +67,7 @@ def _failure_result(error, elapsed_seconds):
 
 def run_smart_add(input_files=None, status_callback=None):
     from pipeline_guard import PipelineGuard
+
     t_start = time.time()
     guard = PipelineGuard(SYSTEM_DIR)
     owned_lock = False
@@ -71,6 +78,7 @@ def run_smart_add(input_files=None, status_callback=None):
         return _failure_result(e, time.time() - t_start)
     try:
         from db.preflight import check_database_version
+
         check_database_version(extract_and_build_db.DB_PATH)
         return _run_smart_add_body(input_files, status_callback)
     except Exception as e:
@@ -102,7 +110,9 @@ def _run_smart_add_body(input_files=None, status_callback=None):
     # 1. Process explicit files
     if input_files:
         print(f"지정된 신규 파일 {len(input_files)}개 처리 중...")
-        newly_added = copy_or_move_files(input_files, move=False, skipped=skipped_inputs)
+        newly_added = copy_or_move_files(
+            input_files, move=False, skipped=skipped_inputs
+        )
 
     # 2. Process drop folders (recursively scanning all nested subfolders)
     for dd in DROP_DIRS:
@@ -110,7 +120,7 @@ def _run_smart_add_body(input_files=None, status_callback=None):
             drop_files = []
             for root, _dirs, files in os.walk(dd):
                 for f in files:
-                    if f.startswith('~$') or f.startswith('.'):
+                    if f.startswith("~$") or f.startswith("."):
                         continue
                     fp = Path(root) / f
                     if not fp.is_file():
@@ -123,8 +133,12 @@ def _run_smart_add_body(input_files=None, status_callback=None):
                         if len(ignored_inputs) < 3:
                             ignored_inputs.append(f)
             if drop_files:
-                print(f"📁 전용 투입 폴더({dd.name}) 및 하위 폴더에서 신규 파일 {len(drop_files)}개 발견!")
-                moved = copy_or_move_files(drop_files, move=True, skipped=skipped_inputs)
+                print(
+                    f"📁 전용 투입 폴더({dd.name}) 및 하위 폴더에서 신규 파일 {len(drop_files)}개 발견!"
+                )
+                moved = copy_or_move_files(
+                    drop_files, move=True, skipped=skipped_inputs
+                )
                 newly_added.extend(moved)
                 # Clean up empty subdirectories left behind inside dd
                 for root, dirs, _files in os.walk(dd, topdown=False):
@@ -145,30 +159,48 @@ def _run_smart_add_body(input_files=None, status_callback=None):
     if not IS_DATA_DIST_ENV:
         steps.append(("3. 엑셀 통합 DB(5개 시트) 갱신", 75, generate_excel_db.main))
     else:
-        print("\n💡 [배포용 환경 안내] 데이터 포함 배포본에서는 엑셀 DB 적재를 건너뛰고 웹/SQLite DB에 최적화하여 동기화합니다.")
+        print(
+            "\n💡 [배포용 환경 안내] 데이터 포함 배포본에서는 엑셀 DB 적재를 건너뛰고 웹/SQLite DB에 최적화하여 동기화합니다."
+        )
 
-    steps.append(("4. 웹 실시간 검색 대시보드(HTML) 재생성", 90, generate_web_dashboard.main))
+    steps.append(
+        ("4. 웹 실시간 검색 대시보드(HTML) 재생성", 90, generate_web_dashboard.main)
+    )
 
     # Do not recursively create nested distribution packages inside distribution folders
     if not IS_DIST_ENV:
-        steps.append(("5. 배포용 패키지 폴더 최신화 동기화", 98, sync_distributions.sync_all))
+        steps.append(
+            ("5. 배포용 패키지 폴더 최신화 동기화", 98, sync_distributions.sync_all)
+        )
 
     pipeline_ok = True
     step_error = None
     warnings = []
     if skipped_inputs:
-        names = ", ".join(name for name, _ in skipped_inputs[:3]) + (" 외" if len(skipped_inputs) > 3 else "")
-        warnings.append(f"투입 파일 {len(skipped_inputs)}건을 사용 중이라 옮기지 못했습니다 ({names}). 파일을 닫고 00번을 다시 실행하세요")
+        names = ", ".join(name for name, _ in skipped_inputs[:3]) + (
+            " 외" if len(skipped_inputs) > 3 else ""
+        )
+        warnings.append(
+            f"투입 파일 {len(skipped_inputs)}건을 사용 중이라 옮기지 못했습니다 ({names}). 파일을 닫고 00번을 다시 실행하세요"
+        )
     if ignored_total:
-        names = ", ".join(ignored_inputs) + (" 외" if ignored_total > len(ignored_inputs) else "")
-        warnings.append(f"투입 폴더의 {ignored_total}건은 지원하지 않는 형식이라 건너뛰었습니다 ({names}). HWP·HWPX·PDF·XLSX·XLSM만 투입됩니다")
+        names = ", ".join(ignored_inputs) + (
+            " 외" if ignored_total > len(ignored_inputs) else ""
+        )
+        warnings.append(
+            f"투입 폴더의 {ignored_total}건은 지원하지 않는 형식이라 건너뛰었습니다 ({names}). HWP·HWPX·PDF·XLSX·XLSM만 투입됩니다"
+        )
     for desc, pct, func in steps:
         if status_callback:
             status_callback(desc, pct)
         print(f"\n[실행 중] {desc}...")
         t0 = time.time()
         result = func()
-        step_success = result.get("success", True) if isinstance(result, dict) else result is not False
+        step_success = (
+            result.get("success", True)
+            if isinstance(result, dict)
+            else result is not False
+        )
         if not step_success:
             pipeline_ok = False
             if isinstance(result, dict) and result.get("error"):
@@ -206,6 +238,7 @@ def _run_smart_add_body(input_files=None, status_callback=None):
 
     try:
         import diagnose_data
+
         if json_path.exists():
             print("\n[데이터 진단 요약]")
             diagnose_data.main()
@@ -228,11 +261,12 @@ def _run_smart_add_body(input_files=None, status_callback=None):
         "error": step_error,
     }
 
+
 def main():
     print("=" * 65)
     print("🚀 국회·대외기관 요구자료 신규 문서 스마트 추가 및 DB 동기화")
     print("=" * 65)
-    
+
     input_files = sys.argv[1:] if len(sys.argv) > 1 else None
     res = run_smart_add(input_files)
 
@@ -248,12 +282,16 @@ def main():
         print("=" * 65)
         return 1
     if res.get("warnings"):
-        print(f"⚠️ 일부 문서 처리 실패를 제외하고 갱신을 완료했습니다. (소요시간: {elapsed:.2f}초)")
+        print(
+            f"⚠️ 일부 문서 처리 실패를 제외하고 갱신을 완료했습니다. (소요시간: {elapsed:.2f}초)"
+        )
         for w in res.get("warnings") or []:
             print(f"   - {w}")
         print("=" * 65)
     print(f"🎉 신규 요구자료 추가 및 DB 갱신 성공! (총 소요시간: {elapsed:.2f}초)")
-    print(f"📊 현재 데이터베이스 현황: 총 문서 {res.get('total_docs', 0)}건, 세부 질의(Q&A) {res.get('total_qa', 0):,}건")
+    print(
+        f"📊 현재 데이터베이스 현황: 총 문서 {res.get('total_docs', 0)}건, 세부 질의(Q&A) {res.get('total_qa', 0):,}건"
+    )
     print("=" * 65)
     print("✨ 최신 반영된 산출물:")
     print(" 1. [웹 대시보드] 자료요구_통합검색_대시보드.html")
@@ -265,6 +303,7 @@ def main():
         print(" 2. [SQLite DB]   data_requests.db")
     print("=" * 65)
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-cast(Any, sys.stdout).reconfigure(encoding='utf-8')
+cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = SCRIPTS_DIR.parent
@@ -60,6 +60,8 @@ def _mtime(path) -> float:
         return Path(path).stat().st_mtime
     except OSError:
         return 0.0
+
+
 from build_db.docids import (  # noqa: F401 # re-export (tests import via shim)
     assign_doc_id,
     file_sha256,
@@ -74,6 +76,7 @@ def write_json_atomic(path: Path, data: dict):
     캐시를 들여쓰기만큼 부풀렸다. `json.load`로 읽는 쪽은 형식과 무관하다.
     """
     from db.json_export import write_json_compact
+
     write_json_compact(path, data)
 
 
@@ -88,8 +91,8 @@ def refresh_repaired_links(db_path: Path, combined_data: dict) -> int:
     conn = DatabaseManager.get_connection(db_path)
     try:
         ledger_links = {
-            r[0]: (r[1] or "") for r in conn.execute(
-                "SELECT ledger_id, linked_doc_id FROM request_ledger")
+            r[0]: (r[1] or "")
+            for r in conn.execute("SELECT ledger_id, linked_doc_id FROM request_ledger")
         }
         for rec in combined_data.get("request_ledger", []):
             if not isinstance(rec, dict):
@@ -100,8 +103,8 @@ def refresh_repaired_links(db_path: Path, combined_data: dict) -> int:
                     rec["linked_doc_id"] = ledger_links[lid]
                     patched += 1
         doc_links = {
-            r[0]: (r[1] or "") for r in conn.execute(
-                "SELECT doc_id, linked_ledger_id FROM documents")
+            r[0]: (r[1] or "")
+            for r in conn.execute("SELECT doc_id, linked_ledger_id FROM documents")
         }
         for rec in combined_data.get("documents", []):
             if not isinstance(rec, dict):
@@ -118,7 +121,9 @@ def refresh_repaired_links(db_path: Path, combined_data: dict) -> int:
 
 def is_data_distribution() -> bool:
     try:
-        return bool(json.loads(DIST_MANIFEST.read_text(encoding="utf-8")).get("data_included"))
+        return bool(
+            json.loads(DIST_MANIFEST.read_text(encoding="utf-8")).get("data_included")
+        )
     except (OSError, ValueError, TypeError):
         return False
 
@@ -130,13 +135,20 @@ def existing_document_count(db_path: Path) -> int:
     conn = None
     try:
         conn = sqlite3.connect(str(db_path))
-        exists = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'").fetchone()
-        return int(conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]) if exists else 0
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'"
+        ).fetchone()
+        return (
+            int(conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0])
+            if exists
+            else 0
+        )
     except sqlite3.Error:
         return 0
     finally:
         if conn:
             conn.close()
+
 
 def prepare_ledger_for_rebuild() -> set:
     """재빌드 전에 관리대장의 세 저장소를 맞추고, DB 값을 유지할 대장 ID를 돌려준다.
@@ -147,7 +159,10 @@ def prepare_ledger_for_rebuild() -> set:
     """
     try:
         from services.excel_sync_service import ExcelSyncService
-        excel_sync = ExcelSyncService(base_dir=SYSTEM_DIR, db_path=DB_PATH, json_path=JSON_PATH)
+
+        excel_sync = ExcelSyncService(
+            base_dir=SYSTEM_DIR, db_path=DB_PATH, json_path=JSON_PATH
+        )
         master = excel_sync.find_master_excel()
         if master is not None and DB_PATH.exists():
             excel_sync.flush_pending_queue()
@@ -173,6 +188,7 @@ def main():
     실행하면 그사이의 웹 등록이 DB 교체로 사라질 수 있었다. (감사 R4-08)
     """
     from pipeline_guard import PipelineGuard
+
     guard = PipelineGuard(Path(DB_PATH).parent)
     ensure_writable(guard.path, "파이프라인 락")
     try:
@@ -182,6 +198,7 @@ def main():
         return {"success": False, "error": str(e)}
     try:
         from db.preflight import check_database_version
+
         check_database_version(DB_PATH)
         return _main_locked()
     except Exception as e:
@@ -199,27 +216,29 @@ def _main_locked():
     md_files = []
     for dirpath, _dirnames, filenames in os.walk(PARSED_DIR):
         for f in filenames:
-            if f.endswith('.md'):
+            if f.endswith(".md"):
                 full = Path(dirpath) / f
                 rel = full.relative_to(PARSED_DIR)
                 md_files.append((rel, full))
-    
+
     print(f"발견된 파싱 마크다운 파일: {len(md_files)}개")
 
-    existing_id_map, max_id_per_year = load_existing_id_map(JSON_PATH, DB_PATH, ROOT_DIR)
+    existing_id_map, max_id_per_year = load_existing_id_map(
+        JSON_PATH, DB_PATH, ROOT_DIR
+    )
 
     records = []
     all_qa_items = []
     assigned_ids = set()
-    seen_sources = {}       # 원문 상대경로 -> (records 인덱스, 우선순위)
+    seen_sources = {}  # 원문 상대경로 -> (records 인덱스, 우선순위)
     duplicate_sources = []
 
     for rel_path, full_path in sorted(md_files, key=lambda x: str(x[0])):
         filename = full_path.name
         rel_str = str(rel_path)
-        
+
         try:
-            with open(full_path, 'r', encoding='utf-8', errors='replace') as fp:
+            with open(full_path, "r", encoding="utf-8", errors="replace") as fp:
                 md_content = mask_pii(fp.read())
         except Exception as e:
             print(f"파일 읽기 오류: {rel_str} ({e})")
@@ -234,35 +253,41 @@ def _main_locked():
                 orig_candidate = src_cand
 
         # 2. 동일 상대 경로 또는 부모 폴더 기준 원본 탐색
-        if not orig_candidate and rel_str.endswith('.md'):
+        if not orig_candidate and rel_str.endswith(".md"):
             cand = ROOT_DIR / rel_str[:-3]
             if cand.exists():
                 orig_candidate = cand
             else:
                 stem = full_path.stem
                 orig_parent = ROOT_DIR / rel_path.parent
-                for ext in ['.hwp', '.hwpx', '.xlsx', '.pdf']:
+                for ext in [".hwp", ".hwpx", ".xlsx", ".pdf"]:
                     cand_ext = orig_parent / f"{stem}{ext}"
                     if cand_ext.exists():
                         orig_candidate = cand_ext
                         break
-        
+
         # 3. 루트 직하 원본 매칭 (마크다운이 연도 폴더로 모인 경우)
         if not orig_candidate:
             stem = full_path.stem
-            orig_name = rel_path.name[:-3] if rel_path.name.endswith('.md') else rel_path.name
+            orig_name = (
+                rel_path.name[:-3] if rel_path.name.endswith(".md") else rel_path.name
+            )
             if (ROOT_DIR / orig_name).exists():
                 orig_candidate = ROOT_DIR / orig_name
             else:
-                for ext in ['.hwp', '.hwpx', '.xlsx', '.pdf']:
+                for ext in [".hwp", ".hwpx", ".xlsx", ".pdf"]:
                     cand_ext = ROOT_DIR / f"{stem}{ext}"
                     if cand_ext.exists():
                         orig_candidate = cand_ext
                         break
-        
-        orig_rel_str = str(orig_candidate.relative_to(ROOT_DIR)) if orig_candidate and orig_candidate.exists() else (rel_str[:-3] if rel_str.endswith('.md') else rel_str)
-        parsed_md_rel = f"_parsed_markdown/{rel_str}".replace('\\', '/')
-        orig_rel_norm = orig_rel_str.replace('\\', '/')
+
+        orig_rel_str = (
+            str(orig_candidate.relative_to(ROOT_DIR))
+            if orig_candidate and orig_candidate.exists()
+            else (rel_str[:-3] if rel_str.endswith(".md") else rel_str)
+        )
+        parsed_md_rel = f"_parsed_markdown/{rel_str}".replace("\\", "/")
+        orig_rel_norm = orig_rel_str.replace("\\", "/")
 
         # 같은 원문의 마크다운이 두 자리에 있으면(연도별 배치 전환 전 사본 등) 문서가 두 건이 된다.
         # 파서의 배치 정리(consolidate_layout)가 1차로 막고, 여기서는 실제 원문이 확인된 경우에만
@@ -282,7 +307,9 @@ def _main_locked():
         # 역추적 주석은 파이프라인 메타데이터라 문서 전문에 넣지 않는다. 넣으면 카드 미리보기에
         # `<!-- source: … -->`가 글자 그대로 보이고 폴더명이 본문 검색에 걸린다. (감사 7회차 ISSUE-005)
         md_clean_body = strip_source_header(md_content)
-        meta = extract_metadata(rel_str, filename, md_clean_body, orig_candidate or full_path)
+        meta = extract_metadata(
+            rel_str, filename, md_clean_body, orig_candidate or full_path
+        )
         content_info = extract_content_details(md_clean_body)
 
         if replace_idx is not None:
@@ -290,10 +317,13 @@ def _main_locked():
             all_qa_items = [q for q in all_qa_items if q.get("doc_id") != doc_id]
         else:
             doc_id = assign_doc_id(
-                existing_id_map, max_id_per_year,
-                parsed_md_rel, orig_rel_norm,
-                orig_candidate, meta.get("year") or "",
-                assigned_ids=assigned_ids
+                existing_id_map,
+                max_id_per_year,
+                parsed_md_rel,
+                orig_rel_norm,
+                orig_candidate,
+                meta.get("year") or "",
+                assigned_ids=assigned_ids,
             )
 
         # 엑셀 셀 한도(3만 자)용. 웹 대시보드·검색 전문은 아래 full_markdown을 쓴다.
@@ -326,18 +356,25 @@ def _main_locked():
         else:
             records.append(record)
             if dup_key is not None:
-                seen_sources[dup_key] = (len(records) - 1, (bool(m_src), _mtime(full_path)))
+                seen_sources[dup_key] = (
+                    len(records) - 1,
+                    (bool(m_src), _mtime(full_path)),
+                )
         if replace_idx is not None and dup_key is not None:
             seen_sources[dup_key] = (replace_idx, (bool(m_src), _mtime(full_path)))
 
         # Extract 1:N Q&A items
-        qa_list = split_into_qa_items(doc_id, meta, md_clean_body, parsed_md_rel, orig_rel_norm)
+        qa_list = split_into_qa_items(
+            doc_id, meta, md_clean_body, parsed_md_rel, orig_rel_norm
+        )
         all_qa_items.extend(qa_list)
 
     if duplicate_sources:
-        print(f"⚠️ 같은 원문의 파싱 마크다운 {len(duplicate_sources)}건이 중복되어 한 건씩만 적재했습니다. "
-              f"(예: {duplicate_sources[0]}) — 다음 00번 실행의 배치 정리 또는 "
-              f"`python scripts/reorganize_markdown.py`로 정리됩니다.")
+        print(
+            f"⚠️ 같은 원문의 파싱 마크다운 {len(duplicate_sources)}건이 중복되어 한 건씩만 적재했습니다. "
+            f"(예: {duplicate_sources[0]}) — 다음 00번 실행의 배치 정리 또는 "
+            f"`python scripts/reorganize_markdown.py`로 정리됩니다."
+        )
 
     file_hash_cache.default_cache().save()
     print(f"구조화된 문서 레코드: {len(records)}건")
@@ -379,6 +416,7 @@ def _main_locked():
     ensure_writable(JSON_PATH, "JSON 캐시")
 
     from db.preflight import snapshot_before_rebuild
+
     snapshot_before_rebuild(DB_PATH)
 
     # Load and link Request Ledger (마스터 요구자료 대장)
@@ -387,11 +425,19 @@ def _main_locked():
     pipeline_started = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # 웹 반영·사전 동기화와 같은 규칙(discovery)으로 고른 대장을 파싱한다. (감사 R4-03)
     from extractors.ledger.discovery import discover_master_excel
+
     master_excel, _candidates, _pinned = discover_master_excel(SYSTEM_DIR, ROOT_DIR)
-    ledger_records = load_request_ledger(ROOT_DIR, records, protected_ids=protected_ids,
-                                         db_path=DB_PATH, system_dir=SYSTEM_DIR,
-                                         excel_path=master_excel)
-    ledger_records = merge_concurrent_ledger_updates(ledger_records, DB_PATH, pipeline_started)
+    ledger_records = load_request_ledger(
+        ROOT_DIR,
+        records,
+        protected_ids=protected_ids,
+        db_path=DB_PATH,
+        system_dir=SYSTEM_DIR,
+        excel_path=master_excel,
+    )
+    ledger_records = merge_concurrent_ledger_updates(
+        ledger_records, DB_PATH, pipeline_started
+    )
 
     # 파생 산출물(JSON 캐시 → 대시보드 HTML → 통합 XLSX)에는 `[삭제]` tombstone을
     # 담지 않는다. SQLite에는 그대로 남겨야 stale Excel 행이 항목을 되살리지 못하지만,
@@ -402,12 +448,14 @@ def _main_locked():
     ]
     tombstone_count = len(ledger_records) - len(active_ledger_records)
     if tombstone_count:
-        print(f"ℹ️ 삭제 처리된 대장 {tombstone_count}건은 DB에만 남기고 검색 산출물에서 제외합니다.")
+        print(
+            f"ℹ️ 삭제 처리된 대장 {tombstone_count}건은 DB에만 남기고 검색 산출물에서 제외합니다."
+        )
 
     combined_data = {
         "documents": records,
         "qa_items": all_qa_items,
-        "request_ledger": active_ledger_records
+        "request_ledger": active_ledger_records,
     }
 
     # Save SQLite DB via DatabaseManager using shadow build and atomic swap
@@ -423,6 +471,7 @@ def _main_locked():
         DatabaseManager.init_schema(conn)
         DatabaseManager.insert_records(conn, records, all_qa_items, ledger_records)
         from db.ledger_outbox import copy_delivery_state
+
         copy_delivery_state(DB_PATH, conn)
         hist_n = DatabaseManager.copy_ledger_history(DB_PATH, conn)
         if hist_n:
@@ -436,20 +485,25 @@ def _main_locked():
 
     # JSON은 DB 스왑 성공 후에만 원자적으로 기록한다
     write_json_atomic(JSON_PATH, combined_data)
-    print(f"JSON 데이터베이스 저장 완료: {JSON_PATH.name} (문서 {len(records)}건, Q&A {len(all_qa_items)}건, 관리대장 {len(active_ledger_records)}건)")
+    print(
+        f"JSON 데이터베이스 저장 완료: {JSON_PATH.name} (문서 {len(records)}건, Q&A {len(all_qa_items)}건, 관리대장 {len(active_ledger_records)}건)"
+    )
 
     # 끊어진 문서 연결 복구 (제안서 D3). linked_doc_id는 파생값이라, 가리키던 문서가
     # 재빌드에서 사라지면 아무 뜻이 없는 값이 남는다. 다시 잇거나 비운다.
     try:
         from services.ledger.autolink import repair_broken_links
+
         _conn = DatabaseManager.get_connection(DB_PATH)
         try:
             link_fix = repair_broken_links(_conn)
         finally:
             _conn.close()
         if link_fix.get("checked"):
-            print(f"✓ 끊어진 문서 연결 {link_fix['checked']}건 정리 "
-                  f"(재연결 {link_fix['relinked']}건, 해제 {link_fix['cleared']}건)")
+            print(
+                f"✓ 끊어진 문서 연결 {link_fix['checked']}건 정리 "
+                f"(재연결 {link_fix['relinked']}건, 해제 {link_fix['cleared']}건)"
+            )
             if link_fix.get("relinked") or link_fix.get("cleared"):
                 # 복구로 바뀐 연결을 JSON 캐시에도 반영한다. 복구 전에 쓴 JSON을
                 # 그대로 두면 같은 00번 산출물의 연결 표시가 한 사이클 늦는다. (감사 R6-03)
@@ -464,6 +518,7 @@ def _main_locked():
     health = {}
     try:
         from db.health import check_database
+
         health = check_database(DB_PATH)
         for w in health.get("warnings", []):
             print(f"  [DB 경고] {w}")
@@ -478,11 +533,14 @@ def _main_locked():
     backup = {}
     try:
         from db import backup as db_backup
+
         backup = db_backup.run_all(DB_PATH, SYSTEM_DIR)
-        snap = (backup.get("database") or {})
+        snap = backup.get("database") or {}
         if snap.get("success"):
-            print(f"✓ DB 스냅숏 저장: {Path(snap['path']).name} ({snap.get('size_bytes', 0) / 1048576:.0f} MB)")
-        hist = (backup.get("history") or {})
+            print(
+                f"✓ DB 스냅숏 저장: {Path(snap['path']).name} ({snap.get('size_bytes', 0) / 1048576:.0f} MB)"
+            )
+        hist = backup.get("history") or {}
         if hist.get("success"):
             print(f"✓ 대장 이력 덤프: {hist.get('rows', 0)}건")
     except Exception as e:
@@ -509,6 +567,7 @@ def _main_locked():
         "health": health,
         "backup": backup,
     }
+
 
 if __name__ == "__main__":
     result = main()

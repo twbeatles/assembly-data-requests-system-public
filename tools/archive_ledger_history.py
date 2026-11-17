@@ -48,7 +48,9 @@ def parse_changed_at(value):
     text = str(value or "").strip()
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
-            return datetime.datetime.strptime(text[:19] if "H" in fmt else text[:10], fmt)
+            return datetime.datetime.strptime(
+                text[:19] if "H" in fmt else text[:10], fmt
+            )
         except ValueError:
             continue
     return None
@@ -89,7 +91,9 @@ def plan_history_archive(rows, cutoff: datetime.datetime):
 def preconditions(system_dir: Path) -> list:
     problems = []
     if PipelineGuard(system_dir).is_locked():
-        problems.append("파이프라인 락(.pipeline.lock)이 있습니다. 00번 파이프라인이 끝난 뒤 실행하세요.")
+        problems.append(
+            "파이프라인 락(.pipeline.lock)이 있습니다. 00번 파이프라인이 끝난 뒤 실행하세요."
+        )
     web_lock = system_dir / ".web_server.lock"
     if web_lock.exists():
         try:
@@ -97,12 +101,19 @@ def preconditions(system_dir: Path) -> list:
         except (OSError, ValueError, TypeError, AttributeError):
             pid = 0
         if pid and pid != os.getpid() and pid_is_alive(pid):
-            problems.append("02번 웹관리서버가 실행 중입니다. 서버 창을 닫은 뒤 실행하세요.")
+            problems.append(
+                "02번 웹관리서버가 실행 중입니다. 서버 창을 닫은 뒤 실행하세요."
+            )
     return problems
 
 
-def archive_history(db_path: Path, backup_root: Path, days: int = 365, apply: bool = False,
-                    now: Optional[datetime.datetime] = None) -> dict:
+def archive_history(
+    db_path: Path,
+    backup_root: Path,
+    days: int = 365,
+    apply: bool = False,
+    now: Optional[datetime.datetime] = None,
+) -> dict:
     db_path = Path(db_path)
     if not db_path.exists():
         return {"success": False, "error": f"DB가 없습니다: {db_path}"}
@@ -112,12 +123,21 @@ def archive_history(db_path: Path, backup_root: Path, days: int = 365, apply: bo
     conn = sqlite3.connect(str(db_path), timeout=10)
     conn.row_factory = sqlite3.Row
     try:
-        rows = [dict(r) for r in conn.execute(
-            "SELECT history_id, ledger_id, action, changed_at, snapshot FROM ledger_history ORDER BY history_id"
-        )]
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT history_id, ledger_id, action, changed_at, snapshot FROM ledger_history ORDER BY history_id"
+            )
+        ]
         archive_ids, keep = plan_history_archive(rows, cutoff)
-        result = {"success": True, "total": len(rows), "archive": len(archive_ids), "keep": len(keep),
-                  "cutoff": cutoff.strftime("%Y-%m-%d %H:%M:%S"), "applied": False}
+        result = {
+            "success": True,
+            "total": len(rows),
+            "archive": len(archive_ids),
+            "keep": len(keep),
+            "cutoff": cutoff.strftime("%Y-%m-%d %H:%M:%S"),
+            "applied": False,
+        }
         if not apply or not archive_ids:
             return result
 
@@ -138,17 +158,32 @@ def archive_history(db_path: Path, backup_root: Path, days: int = 365, apply: bo
         with open(archive_file, "r", encoding="utf-8") as fp:
             written = {json.loads(line)["history_id"] for line in fp if line.strip()}
         if written != wanted:
-            raise RuntimeError("보관 파일 검증 실패: 기록한 이력과 삭제 대상이 다릅니다. DB는 바꾸지 않았습니다.")
-        (dest / "MANIFEST.json").write_text(json.dumps({
-            "created_at": now.strftime("%Y-%m-%d %H:%M:%S"), "db": str(db_path), "days": days,
-            "cutoff": result["cutoff"], "archived": len(archive_ids),
-        }, ensure_ascii=False, indent=2), encoding="utf-8")
+            raise RuntimeError(
+                "보관 파일 검증 실패: 기록한 이력과 삭제 대상이 다릅니다. DB는 바꾸지 않았습니다."
+            )
+        (dest / "MANIFEST.json").write_text(
+            json.dumps(
+                {
+                    "created_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+                    "db": str(db_path),
+                    "days": days,
+                    "cutoff": result["cutoff"],
+                    "archived": len(archive_ids),
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
         conn.execute("BEGIN IMMEDIATE")
         try:
             for start in range(0, len(archive_ids), DELETE_CHUNK):
-                chunk = archive_ids[start:start + DELETE_CHUNK]
-                conn.execute(f"DELETE FROM ledger_history WHERE history_id IN ({','.join('?' * len(chunk))})", chunk)
+                chunk = archive_ids[start : start + DELETE_CHUNK]
+                conn.execute(
+                    f"DELETE FROM ledger_history WHERE history_id IN ({','.join('?' * len(chunk))})",
+                    chunk,
+                )
             conn.commit()
         except Exception:
             conn.rollback()
@@ -161,8 +196,15 @@ def archive_history(db_path: Path, backup_root: Path, days: int = 365, apply: bo
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="관리대장 변경 이력 보존 정리")
-    parser.add_argument("--days", type=int, default=365, help="보존 기간(일). 이보다 오래된 이력을 보관 대상으로 본다.")
-    parser.add_argument("--apply", action="store_true", help="보관 파일을 쓰고 DB에서 삭제한다.")
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=365,
+        help="보존 기간(일). 이보다 오래된 이력을 보관 대상으로 본다.",
+    )
+    parser.add_argument(
+        "--apply", action="store_true", help="보관 파일을 쓰고 DB에서 삭제한다."
+    )
     parser.add_argument("--db", default=str(SYSTEM_DIR / "data_requests.db"))
     args = parser.parse_args(argv)
     if args.days < 30:
@@ -175,11 +217,18 @@ def main(argv=None) -> int:
             for p in problems:
                 print(f"   - {p}")
             return 1
-    res = archive_history(Path(args.db), SYSTEM_DIR / ".maintenance_backup", days=args.days, apply=args.apply)
+    res = archive_history(
+        Path(args.db),
+        SYSTEM_DIR / ".maintenance_backup",
+        days=args.days,
+        apply=args.apply,
+    )
     if not res.get("success"):
         print(f"✗ {res.get('error')}")
         return 1
-    print(f"전체 이력 {res['total']}건 / 보관 대상 {res['archive']}건 / 유지 {res['keep']}건 (기준: {res['cutoff']} 이전)")
+    print(
+        f"전체 이력 {res['total']}건 / 보관 대상 {res['archive']}건 / 유지 {res['keep']}건 (기준: {res['cutoff']} 이전)"
+    )
     if res["applied"]:
         print(f"✓ 보관 후 삭제 완료: {res['archive_file']}")
     elif args.apply:

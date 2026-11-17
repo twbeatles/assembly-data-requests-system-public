@@ -60,10 +60,17 @@ class TestAuditPhase4(unittest.TestCase):
         with open(tmp_db, "w", encoding="utf-8") as f:
             f.write("test_content_v2")
 
-        with patch("os.replace", side_effect=PermissionError("File locked by another process")):
-            with patch("shutil.copy2", side_effect=PermissionError("File locked by another process")):
+        with patch(
+            "os.replace", side_effect=PermissionError("File locked by another process")
+        ):
+            with patch(
+                "shutil.copy2",
+                side_effect=PermissionError("File locked by another process"),
+            ):
                 with self.assertRaises(PermissionError):
-                    DatabaseManager.atomic_swap(tmp_db, target_db, max_retries=2, retry_delay=0.01)
+                    DatabaseManager.atomic_swap(
+                        tmp_db, target_db, max_retries=2, retry_delay=0.01
+                    )
                 # Ensure tmp_db is NOT lost or deleted!
                 self.assertTrue(tmp_db.exists())
                 self.assertEqual(tmp_db.read_text(encoding="utf-8"), "test_content_v2")
@@ -97,11 +104,15 @@ class TestAuditPhase4(unittest.TestCase):
         blocker = sqlite3.connect(str(target_db))
         blocker.execute("BEGIN EXCLUSIVE")
         out = {}
-        worker = threading.Thread(target=lambda: out.update(self._try_swap(tmp_db, target_db)), daemon=True)
+        worker = threading.Thread(
+            target=lambda: out.update(self._try_swap(tmp_db, target_db)), daemon=True
+        )
         worker.start()
         worker.join(timeout=60)
         try:
-            self.assertFalse(worker.is_alive(), "atomic_swap이 잠긴 대상에서 무한 대기한다")
+            self.assertFalse(
+                worker.is_alive(), "atomic_swap이 잠긴 대상에서 무한 대기한다"
+            )
             self.assertIn("locked", out)
         finally:
             blocker.execute("ROLLBACK")
@@ -117,7 +128,9 @@ class TestAuditPhase4(unittest.TestCase):
     @staticmethod
     def _try_swap(tmp_db, target_db):
         try:
-            DatabaseManager.atomic_swap(tmp_db, target_db, max_retries=1, retry_delay=0.01)
+            DatabaseManager.atomic_swap(
+                tmp_db, target_db, max_retries=1, retry_delay=0.01
+            )
             return {"locked": "returned"}
         except PermissionError as e:
             return {"locked": str(e)}
@@ -159,19 +172,23 @@ class TestAuditPhase4(unittest.TestCase):
     def test_excel_hyperlink_relative_path(self):
         """Test resolve_excel_hyperlink_path returns correct relative formula paths."""
         # Test path in 2026 directory
-        rel_2026 = generate_excel_db.resolve_excel_hyperlink_path("2026/260901_홍길동_질의서.hwp")
+        rel_2026 = generate_excel_db.resolve_excel_hyperlink_path(
+            "2026/260901_홍길동_질의서.hwp"
+        )
         self.assertIn("2026", rel_2026)
         self.assertTrue("홍길동" in rel_2026)
 
         # Test path inside system folder
-        rel_sys = generate_excel_db.resolve_excel_hyperlink_path("국회자료요구_스마트시스템(기획예산팀)/새자료_투입폴더/test.xlsx")
+        rel_sys = generate_excel_db.resolve_excel_hyperlink_path(
+            "국회자료요구_스마트시스템(기획예산팀)/새자료_투입폴더/test.xlsx"
+        )
         self.assertIn("test.xlsx", rel_sys)
 
     def test_ledger_service_year_update_allowed(self):
         """Test ledger_service allows updating the 'year' field."""
         db_file = self.temp_path / "test_ledger.db"
         json_file = self.temp_path / "test_data.json"
-        
+
         # Setup schema
         mgr = DatabaseManager(db_file)
         conn = mgr.get_conn()
@@ -182,23 +199,29 @@ class TestAuditPhase4(unittest.TestCase):
 
         service = LedgerService(db_file, json_file)
         # Add item
-        add_res = service.insert_ledger_item({
-            "year": "2025",
-            "seq_no": "001",
-            "requester": "테스트의원",
-            "title": "테스트 제목"
-        })
+        add_res = service.insert_ledger_item(
+            {
+                "year": "2025",
+                "seq_no": "001",
+                "requester": "테스트의원",
+                "title": "테스트 제목",
+            }
+        )
         self.assertTrue(add_res["success"])
         item_id = add_res["item"]["ledger_id"]
 
         # Update year to 2026
-        upd_res = service.update_ledger_item(item_id, {"year": "2026", "title": "수정 제목"})
+        upd_res = service.update_ledger_item(
+            item_id, {"year": "2026", "title": "수정 제목"}
+        )
         self.assertTrue(upd_res["success"])
 
         # Verify DB directly
         conn = sqlite3.connect(db_file)
         try:
-            row = conn.execute("SELECT year, title FROM request_ledger WHERE ledger_id = ?", (item_id,)).fetchone()
+            row = conn.execute(
+                "SELECT year, title FROM request_ledger WHERE ledger_id = ?", (item_id,)
+            ).fetchone()
             self.assertEqual(row[0], "2026")
             self.assertEqual(row[1], "수정 제목")
         finally:
@@ -254,7 +277,9 @@ class TestAuditPhase4(unittest.TestCase):
 
         try:
             # When move=False, identical file must not create a timestamped duplicate
-            processed = add_documents_smart.copy_or_move_files([str(src_file)], move=False)
+            processed = add_documents_smart.copy_or_move_files(
+                [str(src_file)], move=False
+            )
             self.assertEqual(len(processed), 1)
             self.assertEqual(processed[0].name, "test_audit_phase4_dup.hwp")
 

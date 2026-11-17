@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """검색 어휘 자원(SRP: 상수·정규화·초성·날짜)."""
+
 import calendar
 import re
 
@@ -10,15 +11,66 @@ FTS_MIN_TOKEN_LEN = 3
 # 기억이 아니라 실측으로 확정했다. SQL 쪽은 `CHAR(n)`으로 같은 집합을 뗀다
 # (`services/ledger/service.py._norm_expr`). 한쪽만 고치면 선필터가 결과를 깎는다.
 NOSPACE_CODEPOINTS = (
-    9, 10, 11, 12, 13, 28, 29, 30, 31, 32, 133, 160, 5760,
-    8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202,
-    8232, 8233, 8239, 8287, 12288,
+    9,
+    10,
+    11,
+    12,
+    13,
+    28,
+    29,
+    30,
+    31,
+    32,
+    133,
+    160,
+    5760,
+    8192,
+    8193,
+    8194,
+    8195,
+    8196,
+    8197,
+    8198,
+    8199,
+    8200,
+    8201,
+    8202,
+    8232,
+    8233,
+    8239,
+    8287,
+    12288,
 )
 KOREAN_PARTICLES = (
-    "에서는", "에게는", "으로는", "에서도",
-    "에서", "으로", "에게", "까지", "부터", "보다", "처럼", "에는", "에도", "로는", "이나",
-    "을", "를", "이", "가", "은", "는", "의", "에", "로",
-    "과", "와", "도", "만", "나",
+    "에서는",
+    "에게는",
+    "으로는",
+    "에서도",
+    "에서",
+    "으로",
+    "에게",
+    "까지",
+    "부터",
+    "보다",
+    "처럼",
+    "에는",
+    "에도",
+    "로는",
+    "이나",
+    "을",
+    "를",
+    "이",
+    "가",
+    "은",
+    "는",
+    "의",
+    "에",
+    "로",
+    "과",
+    "와",
+    "도",
+    "만",
+    "나",
 )
 # 긴 조사부터 본다. 예전에는 "나"를 "이나"보다 먼저 봐서 "예산이나"가 "예산이"로 잘렸다.
 # 대시보드 `01_search.js`의 KOREAN_PARTICLES_LONGEST_FIRST와 같은 규칙이다.
@@ -33,23 +85,41 @@ _FTS_RESERVED_RE = re.compile(r'["\'*^(){}\[\]:~\-\\/]')
 # `필드:값` 한정자. **여기 있는 이름만** 한정자로 본다. 모르는 접두사(`테스트:질의`)는
 # 평범한 검색어로 두고 `:`를 떼어낸다. 그러지 않으면 콜론이 든 검색어가 조용히 사라진다.
 FIELD_ALIASES = {
-    "요구자": "requester", "의원": "requester", "requester": "requester",
-    "상태": "status", "진행상태": "status", "status": "status",
-    "연도": "year", "년도": "year", "year": "year",
-    "문서번호": "doc_number", "docno": "doc_number",
-    "연번": "seq_no", "seq": "seq_no",
-    "정당": "party", "party": "party",
-    "부서": "department", "담당부서": "department", "department": "department",
-    "기관": "institution", "institution": "institution",
-    "기간": "date", "일자": "date", "date": "date",
+    "요구자": "requester",
+    "의원": "requester",
+    "requester": "requester",
+    "상태": "status",
+    "진행상태": "status",
+    "status": "status",
+    "연도": "year",
+    "년도": "year",
+    "year": "year",
+    "문서번호": "doc_number",
+    "docno": "doc_number",
+    "연번": "seq_no",
+    "seq": "seq_no",
+    "정당": "party",
+    "party": "party",
+    "부서": "department",
+    "담당부서": "department",
+    "department": "department",
+    "기관": "institution",
+    "institution": "institution",
+    "기간": "date",
+    "일자": "date",
+    "date": "date",
 }
 DATE_FIELDS = ("date",)
 # 값 전체가 같아야 하는 필드. 부분일치로 두면 `상태:제출`이 `미제출`에도 걸린다.
 EXACT_MATCH_FIELDS = ("status", "year", "seq_no", "doc_number")
 _FIELD_TOKEN_RE = re.compile(r"^([0-9A-Za-z가-힣]+):(.*)$")
 _DATE_RANGE_RE = re.compile(r"^(?P<a>[0-9][0-9\-.]*)?\.\.(?P<b>[0-9][0-9\-.]*)?$")
+
+
 def _clean_term(term: str) -> str:
     return re.sub(r"[^\w가-힣ㄱ-ㅎ]", "", _FTS_RESERVED_RE.sub(" ", term)).strip()
+
+
 def strip_particle(word: str) -> str:
     if not word or len(word) <= 2:
         return word
@@ -57,6 +127,8 @@ def strip_particle(word: str) -> str:
         if len(word) > len(p) + 1 and word.endswith(p):
             return word[: -len(p)]
     return word
+
+
 def get_choseong(text: str) -> str:
     out = []
     for ch in str(text or ""):
@@ -66,6 +138,8 @@ def get_choseong(text: str) -> str:
         elif not ch.isspace():
             out.append(ch)
     return "".join(out)
+
+
 def normalize_date(value: str, end_of_range: bool = False) -> str:
     """`2026`, `2026-03`, `2026-03-01`을 비교 가능한 `YYYY-MM-DD`로 편다.
 
@@ -87,9 +161,19 @@ def normalize_date(value: str, end_of_range: bool = False) -> str:
                 last = f"{calendar.monthrange(int(year), int(month))[1]:02d}"
             except (ValueError, OverflowError):
                 # 월·연도가 달력 범위 밖이면 예전 고정 표로 떨어진다. (감사 R6-05)
-                last = {"01": "31", "03": "31", "05": "31", "07": "31", "08": "31",
-                        "10": "31", "12": "31", "04": "30", "06": "30", "09": "30",
-                        "11": "30"}.get(month, "28")
+                last = {
+                    "01": "31",
+                    "03": "31",
+                    "05": "31",
+                    "07": "31",
+                    "08": "31",
+                    "10": "31",
+                    "12": "31",
+                    "04": "30",
+                    "06": "30",
+                    "09": "30",
+                    "11": "30",
+                }.get(month, "28")
             return f"{year}-{month}-{last}"
         return f"{year}-{month}-01"
     return f"{year}-{month}-{parts[2].zfill(2)}"

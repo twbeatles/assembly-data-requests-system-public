@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """호환 진입점. 구현은 services.excel_sync."""
+
 try:
     import openpyxl
 except ImportError:

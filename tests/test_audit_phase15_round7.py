@@ -8,6 +8,7 @@
 - ISSUE-005: `<!-- source: … -->` 역추적 주석이 문서 전문에 섞이던 문제
 - 다운로드: 200 헤더 뒤에 파일 열기가 실패하면 오류가 본문에 덧붙던 문제
 """
+
 import contextlib
 import io
 import json
@@ -41,8 +42,21 @@ from test_audit_phase8_fixes import (
 )
 from test_audit_phase10_dashboard import NODE, TEMPLATE, extract_js
 
-EDIT_FIELDS = ("seq_no", "party", "requester", "aide", "department", "title", "details",
-               "request_date", "deadline", "submit_date", "status", "request_type", "note")
+EDIT_FIELDS = (
+    "seq_no",
+    "party",
+    "requester",
+    "aide",
+    "department",
+    "title",
+    "details",
+    "request_date",
+    "deadline",
+    "submit_date",
+    "status",
+    "request_type",
+    "note",
+)
 
 
 def dashboard_payload(item, **changes):
@@ -57,8 +71,13 @@ def history_rows(db_path, lid):
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     try:
-        return [dict(r) for r in conn.execute(
-            "SELECT action, changed_fields FROM ledger_history WHERE ledger_id = ? ORDER BY rowid", (lid,))]
+        return [
+            dict(r)
+            for r in conn.execute(
+                "SELECT action, changed_fields FROM ledger_history WHERE ledger_id = ? ORDER BY rowid",
+                (lid,),
+            )
+        ]
     finally:
         conn.close()
 
@@ -72,13 +91,19 @@ class TestFullPayloadEdits(LedgerSyncFixtureMixin, unittest.TestCase):
         return excel, self.db_rows()[row[0]]
 
     def test_queued_edit_does_not_revert_manual_excel_edit(self):
-        excel, item = self.seed(["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", "원래 비고"])
+        excel, item = self.seed(
+            ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", "원래 비고"]
+        )
         ledger = self.ledger_service()
         with mock.patch.object(ExcelSyncService, "is_file_locked", return_value=True):
-            res = ledger.update_ledger_item("REQ-2026-001", dashboard_payload(item, status="제출"))
+            res = ledger.update_ledger_item(
+                "REQ-2026-001", dashboard_payload(item, status="제출")
+            )
         LedgerService.wait_last_sync(3)
         self.assertTrue(res["success"], res)
-        self.assertEqual(self.sync_service().protected_field_map()["REQ-2026-001"], {"status"})
+        self.assertEqual(
+            self.sync_service().protected_field_map()["REQ-2026-001"], {"status"}
+        )
 
         wb = openpyxl.load_workbook(excel)
         wb["2026"].cell(2, 7, "사용자 수기 비고")
@@ -90,21 +115,43 @@ class TestFullPayloadEdits(LedgerSyncFixtureMixin, unittest.TestCase):
         self.assertEqual(row["비고"], "사용자 수기 비고")
 
     def test_untouched_masked_cell_is_not_rewritten(self):
-        excel, item = self.seed(["REQ-2026-001", "1", "김의원", "자료A", "작성중", "메일", "보좌관 연락처 010-1234-5678"])
-        res = self.ledger_service().update_ledger_item("REQ-2026-001", dashboard_payload(item, status="제출"))
+        excel, item = self.seed(
+            [
+                "REQ-2026-001",
+                "1",
+                "김의원",
+                "자료A",
+                "작성중",
+                "메일",
+                "보좌관 연락처 010-1234-5678",
+            ]
+        )
+        res = self.ledger_service().update_ledger_item(
+            "REQ-2026-001", dashboard_payload(item, status="제출")
+        )
         LedgerService.wait_last_sync(3)
         self.assertTrue(res["success"], res)
-        self.assertEqual(self.excel_rows(excel)[0]["비고"], "보좌관 연락처 010-1234-5678")
-        updates = [h for h in history_rows(self.db_path, "REQ-2026-001") if h["action"] == "UPDATE"]
+        self.assertEqual(
+            self.excel_rows(excel)[0]["비고"], "보좌관 연락처 010-1234-5678"
+        )
+        updates = [
+            h
+            for h in history_rows(self.db_path, "REQ-2026-001")
+            if h["action"] == "UPDATE"
+        ]
         self.assertEqual(updates[-1]["changed_fields"], "status,updated_at")
         self.assertEqual(res["changes"], {"status": "제출"})
 
     def test_identical_payload_is_a_no_op(self):
-        excel, item = self.seed(["REQ-2026-001", "1", "김의원", "자료A", "작성중", "메일", ""])
+        excel, item = self.seed(
+            ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "메일", ""]
+        )
         before_mtime = excel.stat().st_mtime_ns
         before_hist = len(history_rows(self.db_path, "REQ-2026-001"))
         time.sleep(0.05)
-        res = self.ledger_service().update_ledger_item("REQ-2026-001", dashboard_payload(item))
+        res = self.ledger_service().update_ledger_item(
+            "REQ-2026-001", dashboard_payload(item)
+        )
         LedgerService.wait_last_sync(3)
         self.assertTrue(res["success"], res)
         self.assertTrue(res.get("unchanged"))
@@ -113,10 +160,14 @@ class TestFullPayloadEdits(LedgerSyncFixtureMixin, unittest.TestCase):
         self.assertEqual(len(history_rows(self.db_path, "REQ-2026-001")), before_hist)
 
     def test_status_outside_dropdown_survives_other_edit(self):
-        excel, item = self.seed(["REQ-2026-001", "1", "김의원", "자료A", "업무설명", "메일", ""])
+        excel, item = self.seed(
+            ["REQ-2026-001", "1", "김의원", "자료A", "업무설명", "메일", ""]
+        )
         # 새 대시보드는 달라진 필드만 보낸다.
         res = self.ledger_service().update_ledger_item(
-            "REQ-2026-001", {"note": "메모만 수정", "expected_updated_at": item["updated_at"]})
+            "REQ-2026-001",
+            {"note": "메모만 수정", "expected_updated_at": item["updated_at"]},
+        )
         LedgerService.wait_last_sync(3)
         self.assertTrue(res["success"], res)
         self.assertEqual(self.excel_rows(excel)[0]["제출"], "업무설명")
@@ -126,9 +177,12 @@ class TestFullPayloadEdits(LedgerSyncFixtureMixin, unittest.TestCase):
         self.assertEqual(self.db_rows()["REQ-2026-001"]["status"], "업무설명")
 
     def test_blank_status_from_old_client_is_rejected(self):
-        excel, item = self.seed(["REQ-2026-001", "1", "김의원", "자료A", "업무설명", "메일", ""])
+        excel, item = self.seed(
+            ["REQ-2026-001", "1", "김의원", "자료A", "업무설명", "메일", ""]
+        )
         res = self.ledger_service().update_ledger_item(
-            "REQ-2026-001", dashboard_payload(item, note="메모", status=""))
+            "REQ-2026-001", dashboard_payload(item, note="메모", status="")
+        )
         self.assertFalse(res["success"])
         self.assertIn("진행상태", res["error"])
         self.assertEqual(self.excel_rows(excel)[0]["제출"], "업무설명")
@@ -137,19 +191,25 @@ class TestFullPayloadEdits(LedgerSyncFixtureMixin, unittest.TestCase):
     def test_excel_text_date_does_not_block_unrelated_edit(self):
         self.seed(["REQ-2026-001", "1", "김의원", "자료A", "작성중", "메일", ""])
         conn = sqlite3.connect(str(self.db_path))
-        conn.execute("UPDATE request_ledger SET deadline = '9월 중' WHERE ledger_id = 'REQ-2026-001'")
+        conn.execute(
+            "UPDATE request_ledger SET deadline = '9월 중' WHERE ledger_id = 'REQ-2026-001'"
+        )
         conn.commit()
         conn.close()
         item = self.db_rows()["REQ-2026-001"]
         ledger = self.ledger_service()
         with mock.patch.object(ExcelSyncService, "is_file_locked", return_value=True):
-            ok = ledger.update_ledger_item("REQ-2026-001", dashboard_payload(item, status="제출"))
+            ok = ledger.update_ledger_item(
+                "REQ-2026-001", dashboard_payload(item, status="제출")
+            )
         self.assertTrue(ok["success"], ok)
         self.assertEqual(self.db_rows()["REQ-2026-001"]["deadline"], "9월 중")
         item = self.db_rows()["REQ-2026-001"]
         with mock.patch.object(ExcelSyncService, "is_file_locked", return_value=True):
             bad = ledger.update_ledger_item("REQ-2026-001", {"deadline": "2026-13-40"})
-            norm = ledger.update_ledger_item("REQ-2026-001", {"deadline": "2026. 10. 1."})
+            norm = ledger.update_ledger_item(
+                "REQ-2026-001", {"deadline": "2026. 10. 1."}
+            )
         self.assertFalse(bad["success"])
         self.assertTrue(norm["success"], norm)
         self.assertEqual(self.db_rows()["REQ-2026-001"]["deadline"], "2026-10-01")
@@ -158,7 +218,14 @@ class TestFullPayloadEdits(LedgerSyncFixtureMixin, unittest.TestCase):
 
 class TestLedgerDateNormalization(unittest.TestCase):
     def test_korean_official_formats(self):
-        for text in ("2026.9.10", "2026. 9. 10.", "2026년 9월 10일", "2026/9/10(수)", "26.9.10", "9/10(수)"):
+        for text in (
+            "2026.9.10",
+            "2026. 9. 10.",
+            "2026년 9월 10일",
+            "2026/9/10(수)",
+            "26.9.10",
+            "9/10(수)",
+        ):
             self.assertEqual(normalize_ledger_date(text, "2026"), "2026-09-10", text)
             self.assertEqual(coerce_ledger_date(text, "2026"), "2026-09-10", text)
 
@@ -177,6 +244,7 @@ class TestEditModalPayload(unittest.TestCase):
 
     def run_js(self, names, body):
         import subprocess
+
         src = TEMPLATE.read_text(encoding="utf-8")
         prelude = r"""
 function makeSelect(values) {
@@ -193,38 +261,52 @@ function makeSelect(values) {
 const document = { createElement: () => ({ attrs: {}, setAttribute(k, x) { this.attrs[k] = x; }, getAttribute(k) { return this.attrs[k]; }, remove() {} }) };
 """
         code = prelude + "\n".join(extract_js(src, n) for n in names) + "\n" + body
-        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fp:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".js", delete=False, encoding="utf-8"
+        ) as fp:
             fp.write(code)
             path = fp.name
         try:
             assert NODE is not None
             assert NODE is not None
-            proc = subprocess.run([NODE, path], capture_output=True, text=True, encoding="utf-8",
-                                  timeout=60, stdin=subprocess.DEVNULL)
+            proc = subprocess.run(
+                [NODE, path],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=60,
+                stdin=subprocess.DEVNULL,
+            )
         finally:
             Path(path).unlink(missing_ok=True)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         return json.loads(proc.stdout.strip().splitlines()[-1])
 
     def test_select_keeps_value_missing_from_options(self):
-        out = self.run_js(["setSelectPreservingValue"], """
+        out = self.run_js(
+            ["setSelectPreservingValue"],
+            """
 const sel = makeSelect(['작성중', '제출', '미제출']);
 const res = {};
 for (const v of ['업무설명', '완료', '제출']) { setSelectPreservingValue(sel, v); res[v] = sel.value; }
 res.preserved = sel.options.filter(o => o.attrs['data-preserved'] === '1').map(o => o.value);
 console.log(JSON.stringify(res));
-""")
+""",
+        )
         self.assertEqual(out["업무설명"], "업무설명")
         self.assertEqual(out["완료"], "완료")
         self.assertEqual(out["제출"], "제출")
         self.assertEqual(out["preserved"], [], "임시 선택지는 다음 값을 넣을 때 치운다")
 
     def test_dirty_fields_only(self):
-        out = self.run_js(["ledgerDirtyFields"], """
+        out = self.run_js(
+            ["ledgerDirtyFields"],
+            """
 const before = { title: 'A', status: '업무설명', note: '', deadline: '2026.9.10' };
 const after = { title: 'A', status: '업무설명', note: '메모', deadline: '2026.9.10' };
 console.log(JSON.stringify([ledgerDirtyFields(before, after), ledgerDirtyFields(after, after)]));
-""")
+""",
+        )
         self.assertEqual(out, [{"note": "메모"}, {}])
 
     def test_submit_sends_preserved_values_and_dirty_fields_only(self):
@@ -234,8 +316,14 @@ console.log(JSON.stringify([ledgerDirtyFields(before, after), ledgerDirtyFields(
         폼 값은 보존되고 fetch 본문에는 바뀐 비고와 `expected_updated_at`만 담긴다.
         """
         out = self.run_js(
-            ["setSelectPreservingValue", "readEditLedgerForm", "ledgerDirtyFields",
-             "openEditLedgerModal", "closeEditLedgerModal", "submitEditLedgerItemNow"],
+            [
+                "setSelectPreservingValue",
+                "readEditLedgerForm",
+                "ledgerDirtyFields",
+                "openEditLedgerModal",
+                "closeEditLedgerModal",
+                "submitEditLedgerItemNow",
+            ],
             """
 const EDIT_LEDGER_FIELDS = [
   ['seq_no', 'edit-seq-no'], ['party', 'edit-party'], ['requester', 'edit-requester'],
@@ -290,20 +378,25 @@ async function main() {
     mapStatus: LEDGER_MAP['REQ-2026-001'].status }));
 }
 main();
-""")
+""",
+        )
         self.assertEqual(out["formCheck"], {"status": "완료", "reqType": "국정감사"})
         self.assertEqual(len(out["calls"]), 1)
         call = out["calls"][0]
         self.assertTrue(call["url"].endswith("/api/ledger/REQ-2026-001"), call["url"])
-        self.assertEqual(call["body"],
-                         {"note": "새비고", "expected_updated_at": "2026-09-24 00:00:00"})
+        self.assertEqual(
+            call["body"],
+            {"note": "새비고", "expected_updated_at": "2026-09-24 00:00:00"},
+        )
         self.assertEqual(out["mapNote"], "새비고")
         self.assertEqual(out["mapStatus"], "완료")
 
     def test_edit_status_dropdown_lists_done_statuses(self):
-        shell = (SCRIPTS_DIR / "templates" / "dashboard" / "shell.html").read_text(encoding="utf-8")
-        block = shell[shell.index('id="edit-status"'):]
-        block = block[:block.index("</select>")]
+        shell = (SCRIPTS_DIR / "templates" / "dashboard" / "shell.html").read_text(
+            encoding="utf-8"
+        )
+        block = shell[shell.index('id="edit-status"') :]
+        block = block[: block.index("</select>")]
         for value in ("완료", "업무설명", "제출", "미제출"):
             self.assertIn(f'value="{value}"', block)
 
@@ -351,21 +444,30 @@ class TestMarkdownLayout(LayoutFixture):
 
     def test_legacy_copy_is_moved_with_hash_and_counts_as_cached(self):
         src = self.source("홍길동 519/260901 요구자료.hwp")
-        legacy = self.md("홍길동 519/260901 요구자료.hwp.md", "# 본문\n", self.cache.sha256(src))
+        legacy = self.md(
+            "홍길동 519/260901 요구자료.hwp.md", "# 본문\n", self.cache.sha256(src)
+        )
         self.assertFalse(parse_all.is_parse_cache_fresh(src, self.out))
         res = parse_all.consolidate_markdown_layout([src])
         expected, expected_hash = parse_all.parse_output_paths(src, self.out)
         self.assertEqual(len(res["moved"]), 1)
         self.assertFalse(legacy.exists())
         self.assertTrue(expected.exists() and expected_hash.exists())
-        self.assertTrue(parse_all.is_parse_cache_fresh(src, self.out), "KorDoc 없이도 캐시로 인정돼야 한다")
+        self.assertTrue(
+            parse_all.is_parse_cache_fresh(src, self.out),
+            "KorDoc 없이도 캐시로 인정돼야 한다",
+        )
 
     def test_duplicate_is_retired_to_backup_not_deleted(self):
         src = self.source("260831 입법조사관 요청자료.hwp")
         h = self.cache.sha256(src)
         legacy = self.md("260831 입법조사관 요청자료.hwp.md", "옛 본문", h)
-        current = self.md("2026/260831 입법조사관 요청자료.hwp.md", "새 본문", h,
-                          header="260831 입법조사관 요청자료.hwp")
+        current = self.md(
+            "2026/260831 입법조사관 요청자료.hwp.md",
+            "새 본문",
+            h,
+            header="260831 입법조사관 요청자료.hwp",
+        )
         res = parse_all.consolidate_markdown_layout([src])
         self.assertEqual(res["moved"], [])
         self.assertEqual(res["removed"], ["260831 입법조사관 요청자료.hwp.md"])
@@ -377,7 +479,12 @@ class TestMarkdownLayout(LayoutFixture):
     def test_flattened_copy_from_old_reorganize_tool_is_consolidated(self):
         """이전 재배치 도구가 '미분류' 하위 경로를 평탄화한 사본도 주석으로 원문을 찾아 모은다."""
         src = self.source("미분류/하위/260902 자료.hwp")
-        stray = self.md("2026/260902 자료.hwp.md", "본문", self.cache.sha256(src), header="미분류/하위/260902 자료.hwp")
+        stray = self.md(
+            "2026/260902 자료.hwp.md",
+            "본문",
+            self.cache.sha256(src),
+            header="미분류/하위/260902 자료.hwp",
+        )
         parse_all.consolidate_markdown_layout([src])
         expected, _ = parse_all.parse_output_paths(src, self.out)
         self.assertEqual(expected, self.out / "미분류" / "하위" / "260902 자료.hwp.md")
@@ -395,8 +502,16 @@ class TestMarkdownLayout(LayoutFixture):
         md = self.md("2026/x.hwp.md", "# 본문\n")
         with mock.patch.object(layout.os, "replace", side_effect=OSError("disk")):
             parse_all._ensure_source_header(md, Path("2026/x.hwp"))
-        self.assertEqual(md.read_text(encoding="utf-8"), "# 본문\n", "실패해도 원본 본문이 그대로여야 한다")
-        self.assertEqual([p.name for p in md.parent.iterdir()], ["x.hwp.md"], "임시 파일을 남기지 않는다")
+        self.assertEqual(
+            md.read_text(encoding="utf-8"),
+            "# 본문\n",
+            "실패해도 원본 본문이 그대로여야 한다",
+        )
+        self.assertEqual(
+            [p.name for p in md.parent.iterdir()],
+            ["x.hwp.md"],
+            "임시 파일을 남기지 않는다",
+        )
 
 
 class TestBuilderDedupAndHeader(LayoutFixture):
@@ -407,11 +522,23 @@ class TestBuilderDedupAndHeader(LayoutFixture):
             mock.patch.object(extract_and_build_db, "ROOT_DIR", self.root),
             mock.patch.object(extract_and_build_db, "SYSTEM_DIR", self.sysd),
             mock.patch.object(extract_and_build_db, "PARSED_DIR", self.out),
-            mock.patch.object(extract_and_build_db, "DB_PATH", self.sysd / "data_requests.db"),
-            mock.patch.object(extract_and_build_db, "JSON_PATH", self.sysd / "data_requests.json"),
-            mock.patch.object(extract_and_build_db, "DIST_MANIFEST", self.sysd / ".distribution_manifest.json"),
-            mock.patch.object(extract_and_build_db, "prepare_ledger_for_rebuild", return_value=set()),
-            mock.patch.object(extract_and_build_db, "load_request_ledger", return_value=[]),
+            mock.patch.object(
+                extract_and_build_db, "DB_PATH", self.sysd / "data_requests.db"
+            ),
+            mock.patch.object(
+                extract_and_build_db, "JSON_PATH", self.sysd / "data_requests.json"
+            ),
+            mock.patch.object(
+                extract_and_build_db,
+                "DIST_MANIFEST",
+                self.sysd / ".distribution_manifest.json",
+            ),
+            mock.patch.object(
+                extract_and_build_db, "prepare_ledger_for_rebuild", return_value=set()
+            ),
+            mock.patch.object(
+                extract_and_build_db, "load_request_ledger", return_value=[]
+            ),
         ]
         with contextlib.ExitStack() as stack:
             for p in patches:
@@ -420,8 +547,12 @@ class TestBuilderDedupAndHeader(LayoutFixture):
             res = extract_and_build_db.main()
         conn = sqlite3.connect(str(self.sysd / "data_requests.db"))
         try:
-            rows = conn.execute("SELECT doc_id, original_path, parsed_md_path, full_markdown FROM documents").fetchall()
-            qas = conn.execute("SELECT qa_id, doc_id, answer_markdown FROM qa_items").fetchall()
+            rows = conn.execute(
+                "SELECT doc_id, original_path, parsed_md_path, full_markdown FROM documents"
+            ).fetchall()
+            qas = conn.execute(
+                "SELECT qa_id, doc_id, answer_markdown FROM qa_items"
+            ).fetchall()
         finally:
             conn.close()
         return res, rows, qas
@@ -431,18 +562,31 @@ class TestBuilderDedupAndHeader(LayoutFixture):
         self.source("2026/260902 이의원 요구자료.hwp")
         body = "# 요구자료\n\n1. 질의 내용입니다?\n\n○ 답변 내용이 여기에 있습니다 충분히 긴 문장.\n"
         self.md("홍길동 519/260901 홍길동의원 요구자료.hwp.md", body)
-        newer = self.md("2026/홍길동 519/260901 홍길동의원 요구자료.hwp.md", body,
-                        header="홍길동 519/260901 홍길동의원 요구자료.hwp")
+        newer = self.md(
+            "2026/홍길동 519/260901 홍길동의원 요구자료.hwp.md",
+            body,
+            header="홍길동 519/260901 홍길동의원 요구자료.hwp",
+        )
         self.md("2026/260902 이의원 요구자료.hwp.md", body)
         res, rows, qas = self.build()
         self.assertTrue(res["success"], res)
         self.assertEqual(res["documents"], 2)
         originals = sorted(r[1] for r in rows)
-        self.assertEqual(originals, ["2026/260902 이의원 요구자료.hwp", "홍길동 519/260901 홍길동의원 요구자료.hwp"])
+        self.assertEqual(
+            originals,
+            [
+                "2026/260902 이의원 요구자료.hwp",
+                "홍길동 519/260901 홍길동의원 요구자료.hwp",
+            ],
+        )
         kept = [r for r in rows if r[1].startswith("홍길동")][0]
-        self.assertEqual(kept[2], "_parsed_markdown/" + newer.relative_to(self.out).as_posix())
+        self.assertEqual(
+            kept[2], "_parsed_markdown/" + newer.relative_to(self.out).as_posix()
+        )
         doc_ids = {r[0] for r in rows}
-        self.assertTrue(all(q[1] in doc_ids for q in qas), "버린 사본의 Q&A가 남으면 안 된다")
+        self.assertTrue(
+            all(q[1] in doc_ids for q in qas), "버린 사본의 Q&A가 남으면 안 된다"
+        )
 
     def test_source_header_is_not_part_of_full_text(self):
         self.source("2026/a.hwp")
@@ -459,7 +603,9 @@ class TestDownloadOpenFailure(unittest.TestCase):
             doc_dir = base / "2026"
             doc_dir.mkdir(parents=True)
             (doc_dir / "잠긴_파일.md").write_text("x", encoding="utf-8")
-            handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+            handler: Any = web_server.RequestLedgerHandler.__new__(
+                web_server.RequestLedgerHandler
+            )
             sent = []
             handler.send_response = lambda code: sent.append(("status", code))
             handler.send_header = lambda k, v: sent.append((k, v))
@@ -468,9 +614,16 @@ class TestDownloadOpenFailure(unittest.TestCase):
             handler.wfile = io.BytesIO()
             handler.headers = {}
             from urllib.parse import quote
+
             handler.path = "/api/download?path=" + quote("2026/잠긴_파일.md")
-            with mock.patch.object(web_server, "BASE_DIR", base), \
-                 mock.patch("web.routes_get.open", side_effect=PermissionError("locked"), create=True):
+            with (
+                mock.patch.object(web_server, "BASE_DIR", base),
+                mock.patch(
+                    "web.routes_get.open",
+                    side_effect=PermissionError("locked"),
+                    create=True,
+                ),
+            ):
                 handler.do_GET()
             self.assertEqual(sent, [("error", 500)])
         finally:

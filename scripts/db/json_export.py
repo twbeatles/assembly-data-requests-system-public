@@ -10,6 +10,7 @@ JSON 캐시는 문서 전문을 담아 DB가 커지면 수백 MB가 된다. 예�
   `json.load`로 그대로 읽힌다.
 - 교체: 임시 파일에 다 쓴 뒤 원자 교체한다. 실패하면 기존 파일이 그대로 남는다.
 """
+
 import json
 import os
 import shutil
@@ -17,11 +18,20 @@ import time
 from pathlib import Path
 
 EXPORT_QUERIES = (
-    ("documents", "SELECT * FROM documents ORDER BY year DESC, request_date DESC, doc_id ASC"),
-    ("qa_items", "SELECT * FROM qa_items ORDER BY year DESC, request_date DESC, qa_id ASC"),
+    (
+        "documents",
+        "SELECT * FROM documents ORDER BY year DESC, request_date DESC, doc_id ASC",
+    ),
+    (
+        "qa_items",
+        "SELECT * FROM qa_items ORDER BY year DESC, request_date DESC, qa_id ASC",
+    ),
     # 삭제 tombstone은 파생 산출물에 넣지 않는다(불변조건 11).
-    ("request_ledger", "SELECT * FROM request_ledger WHERE COALESCE(status, '') != '[삭제]' "
-                       "ORDER BY year DESC, request_date DESC, seq_no DESC"),
+    (
+        "request_ledger",
+        "SELECT * FROM request_ledger WHERE COALESCE(status, '') != '[삭제]' "
+        "ORDER BY year DESC, request_date DESC, seq_no DESC",
+    ),
 )
 
 _SEPARATORS = (",", ":")
@@ -32,7 +42,13 @@ def _write_rows(fp, cursor) -> int:
     names = [d[0] for d in cursor.description]
     for row in cursor:
         fp.write(",\n" if count else "\n")
-        fp.write(json.dumps(dict(zip(names, row, strict=True)), ensure_ascii=False, separators=_SEPARATORS))
+        fp.write(
+            json.dumps(
+                dict(zip(names, row, strict=True)),
+                ensure_ascii=False,
+                separators=_SEPARATORS,
+            )
+        )
         count += 1
     return count
 
@@ -85,10 +101,14 @@ def write_json_compact(path, data: dict):
                     fp.write("[")
                     for i, row in enumerate(value):
                         fp.write(",\n" if i else "\n")
-                        fp.write(json.dumps(row, ensure_ascii=False, separators=_SEPARATORS))
+                        fp.write(
+                            json.dumps(row, ensure_ascii=False, separators=_SEPARATORS)
+                        )
                     fp.write("\n]")
                 else:
-                    fp.write(json.dumps(value, ensure_ascii=False, separators=_SEPARATORS))
+                    fp.write(
+                        json.dumps(value, ensure_ascii=False, separators=_SEPARATORS)
+                    )
             fp.write("\n}\n")
         replace_with_retry(tmp, path)
     finally:

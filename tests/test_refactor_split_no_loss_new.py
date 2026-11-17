@@ -4,6 +4,7 @@
 분할 전 스냅샷(tests/_expected_symbols_new.json)과
 진입점+패키지 합집합을 비교한다. 소스 grep이 아니라 ast 선언 수집이다.
 """
+
 from __future__ import annotations
 
 import builtins
@@ -47,13 +48,33 @@ NEW_KEYS = (
 IDENTITY_PAIRS = (
     ("web_server", "paged_response", "web.pagination", "paged_response"),
     ("parse_all", "needs_safe_copy", "pipeline.parse.safe_copy", "needs_safe_copy"),
-    ("parse_all", "handle_large_xlsx_fallback", "pipeline.parse.xlsx_fallback", "handle_large_xlsx_fallback"),
+    (
+        "parse_all",
+        "handle_large_xlsx_fallback",
+        "pipeline.parse.xlsx_fallback",
+        "handle_large_xlsx_fallback",
+    ),
     ("search_query", "parse_query", "search.parse", "parse_query"),
     ("search_query", "row_matches", "search.match", "row_matches"),
-    ("generate_excel_db", "build_ledger_sheet", "excel_report.sheets", "build_ledger_sheet"),
+    (
+        "generate_excel_db",
+        "build_ledger_sheet",
+        "excel_report.sheets",
+        "build_ledger_sheet",
+    ),
     ("extract_and_build_db", "assign_doc_id", "build_db.docids", "assign_doc_id"),
-    ("write_all_bats", "validate_batch_file_rules", "bats.validate", "validate_batch_file_rules"),
-    ("build_universal_package", "build_clean_database", "universal_pkg.database", "build_clean_database"),
+    (
+        "write_all_bats",
+        "validate_batch_file_rules",
+        "bats.validate",
+        "validate_batch_file_rules",
+    ),
+    (
+        "build_universal_package",
+        "build_clean_database",
+        "universal_pkg.database",
+        "build_clean_database",
+    ),
     ("add_documents_smart", "copy_or_move_files", "ingest.files", "copy_or_move_files"),
 )
 
@@ -64,7 +85,9 @@ class TestRefactorSplitNoLossNew(unittest.TestCase):
         cls.snapshot = json.loads(NEW_SNAPSHOT_PATH.read_text(encoding="utf-8"))
 
     def test_new_snapshot_file_exists(self):
-        self.assertTrue(NEW_SNAPSHOT_PATH.exists(), f"심볼 스냅샷이 없습니다: {NEW_SNAPSHOT_PATH}")
+        self.assertTrue(
+            NEW_SNAPSHOT_PATH.exists(), f"심볼 스냅샷이 없습니다: {NEW_SNAPSHOT_PATH}"
+        )
 
     def test_new_targets_registered_in_inventory(self):
         for key in NEW_KEYS:
@@ -79,7 +102,11 @@ class TestRefactorSplitNoLossNew(unittest.TestCase):
             lost = [name for name in expected if name not in actual]
             if lost:
                 missing[key] = lost
-        self.assertEqual(missing, {}, f"분할 후 사라진 Python 심볼: {json.dumps(missing, ensure_ascii=False)}")
+        self.assertEqual(
+            missing,
+            {},
+            f"분할 후 사라진 Python 심볼: {json.dumps(missing, ensure_ascii=False)}",
+        )
 
     def test_new_shim_modules_export_same_objects(self):
         for shim_mod, attr, pkg_mod, pkg_attr in IDENTITY_PAIRS:
@@ -95,16 +122,27 @@ class TestRefactorSplitNoLossNew(unittest.TestCase):
     def test_new_target_files_still_exist_as_entrypoints(self):
         for key in NEW_KEYS:
             path = SCRIPTS_DIR / PYTHON_TARGETS[key]
-            self.assertTrue(path.exists(), f"호환 진입점 파일이 없습니다: {PYTHON_TARGETS[key]}")
+            self.assertTrue(
+                path.exists(), f"호환 진입점 파일이 없습니다: {PYTHON_TARGETS[key]}"
+            )
 
 
 # 분할 때 import가 빠져나간 이름은 NameError로 터진다. 심볼 재수출 검사가
 # 통과해도 호출자 쪽 import가 빠지면 못 잡으므로, 이름 해결까지 본다. (R6-06~08)
-_PROVIDED_NAMES = frozenset({
-    "__file__", "__name__", "__doc__", "__package__", "__loader__",
-    "__spec__", "__cached__", "__builtins__",
-    "__annotate__", "__classdict__",  # 변수 어노테이션용 컴파일러 생성 이름
-})
+_PROVIDED_NAMES = frozenset(
+    {
+        "__file__",
+        "__name__",
+        "__doc__",
+        "__package__",
+        "__loader__",
+        "__spec__",
+        "__cached__",
+        "__builtins__",
+        "__annotate__",
+        "__classdict__",  # 변수 어노테이션용 컴파일러 생성 이름
+    }
+)
 _BUILTIN_NAMES = frozenset(dir(builtins))
 
 
@@ -124,8 +162,13 @@ def _undefined_names(path: Path) -> list:
                 sym = table.lookup(ident)
             except KeyError:
                 continue
-            if (sym.is_assigned() or sym.is_imported() or sym.is_parameter()
-                    or sym.is_namespace() or sym.is_declared_global()):
+            if (
+                sym.is_assigned()
+                or sym.is_imported()
+                or sym.is_parameter()
+                or sym.is_namespace()
+                or sym.is_declared_global()
+            ):
                 names.add(ident)
         return names
 
@@ -172,6 +215,7 @@ class TestSplitImportsResolve(unittest.TestCase):
         import web_server
         from db.database_manager import DatabaseManager
         from web_server import RequestLedgerHandler
+
         tmp = Path(tempfile.mkdtemp(prefix="split_route_"))
         try:
             db = tmp / "data_requests.db"
@@ -181,32 +225,36 @@ class TestSplitImportsResolve(unittest.TestCase):
                 conn.execute(
                     "INSERT INTO request_ledger (ledger_id, year, title, requester, status)"
                     " VALUES (?, ?, ?, ?, ?)",
-                    ("REQ-2026-001", "2026", "분할 테스트", "의원", "작성중"))
+                    ("REQ-2026-001", "2026", "분할 테스트", "의원", "작성중"),
+                )
                 conn.commit()
             finally:
                 conn.close()
             handler: Any = RequestLedgerHandler.__new__(RequestLedgerHandler)
             handler.headers = {"Origin": "http://localhost:8000"}
             sent = []
-            handler.send_json_response = (
-                lambda data, status_code=200: sent.append((status_code, data)))
-            handler.send_error_response = (
-                lambda code, msg: sent.append((code, {"success": False, "error": msg})))
+            handler.send_json_response = lambda data, status_code=200: sent.append(
+                (status_code, data)
+            )
+            handler.send_error_response = lambda code, msg: sent.append(
+                (code, {"success": False, "error": msg})
+            )
             handler.path = "/api/ledger"
-            with mock.patch.object(web_server, "BASE_DIR", tmp), \
-                    mock.patch.object(web_server, "DB_PATH", db), \
-                    mock.patch.object(web_server, "JSON_PATH",
-                                        tmp / "data_requests.json"):
+            with (
+                mock.patch.object(web_server, "BASE_DIR", tmp),
+                mock.patch.object(web_server, "DB_PATH", db),
+                mock.patch.object(web_server, "JSON_PATH", tmp / "data_requests.json"),
+            ):
                 handler.do_GET()
             self.assertEqual(len(sent), 1, sent)
             code, body = sent[0]
             self.assertEqual(code, 200, body)
             self.assertTrue(body["success"])
             self.assertGreaterEqual(body["total"], 1)
-            self.assertTrue(any(r["ledger_id"] == "REQ-2026-001"
-                                for r in body["data"]))
+            self.assertTrue(any(r["ledger_id"] == "REQ-2026-001" for r in body["data"]))
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

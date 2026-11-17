@@ -5,6 +5,7 @@
     python scripts/datareq_mcp.py
 환경 변수: DATAREQ_DATA_ROOT (미지정 시 시스템 폴더), DATAREQ_PROFILE (reader 고정)
 """
+
 import sys
 from pathlib import Path
 

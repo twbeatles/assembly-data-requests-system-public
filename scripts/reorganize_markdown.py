@@ -12,6 +12,7 @@
     python scripts/reorganize_markdown.py --dry-run   # 옮길·정리할 목록만 출력
     python scripts/reorganize_markdown.py             # 실행 (치운 사본은 .maintenance_backup/에 보관)
 """
+
 import sys
 from pathlib import Path
 from typing import Any, cast
@@ -22,7 +23,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 try:
-    cast(Any, sys.stdout).reconfigure(encoding='utf-8')
+    cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 except Exception:
     pass
 
@@ -60,7 +61,9 @@ def reorganize_parsed_markdown(dry_run: bool = False) -> dict:
     try:
         files = parse_all.find_target_files(ROOT_DIR)
         if not files:
-            print("✗ 원문 문서를 한 건도 찾지 못해 정리하지 않습니다. 기준 경로를 확인하세요.")
+            print(
+                "✗ 원문 문서를 한 건도 찾지 못해 정리하지 않습니다. 기준 경로를 확인하세요."
+            )
             return {"success": False, "moved": 0, "removed": 0}
         result = parse_all.consolidate_markdown_layout(files, dry_run=dry_run)
     finally:
@@ -73,11 +76,19 @@ def reorganize_parsed_markdown(dry_run: bool = False) -> dict:
         print(f"  중복 정리: {line}")
     print("=" * 60)
     verb = "예정" if dry_run else "완료"
-    print(f"✓ 정리 {verb}: 이동 {len(result['moved'])}건, 중복 정리 {len(result['removed'])}건")
+    print(
+        f"✓ 정리 {verb}: 이동 {len(result['moved'])}건, 중복 정리 {len(result['removed'])}건"
+    )
     if not dry_run and result["removed"]:
-        print("  치운 사본은 .maintenance_backup/markdown_layout_<시각>/ 에 보관했습니다.")
+        print(
+            "  치운 사본은 .maintenance_backup/markdown_layout_<시각>/ 에 보관했습니다."
+        )
     print("=" * 60)
-    return {"success": True, "moved": len(result["moved"]), "removed": len(result["removed"])}
+    return {
+        "success": True,
+        "moved": len(result["moved"]),
+        "removed": len(result["removed"]),
+    }
 
 
 if __name__ == "__main__":

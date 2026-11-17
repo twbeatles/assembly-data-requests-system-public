@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """cmd.exe 위험 문자 경로의 안전 복사(SRP: kordoc 호출 경로 안전화)."""
+
 import contextlib
 import hashlib
 import shutil
@@ -14,10 +15,14 @@ from pathlib import Path
 #   '"' : 인용 자체를 깨뜨린다. Windows 파일명에는 올 수 없지만 방어적으로 둔다.
 # 반면 ( ) ! ; , ' ` ~ # $ { } [ ] + @ 공백 은 전체 인용만으로 안전하다(실측 확인).
 CMD_UNSAFE_CHARS = '&^%"'
+
+
 def needs_safe_copy(path: Path) -> bool:
     """인용으로 막을 수 없는 문자가 경로에 있으면 True."""
     text = str(path)
     return any(ch in text for ch in CMD_UNSAFE_CHARS)
+
+
 @contextlib.contextmanager
 def safe_kordoc_target(path: Path):
     """cmd.exe가 해석하는 문자가 든 경로는 안전한 임시 이름으로 복사해 넘긴다.
@@ -37,6 +42,8 @@ def safe_kordoc_target(path: Path):
         yield safe_path
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 @contextlib.contextmanager
 def kordoc_paths(src: Path, out_file: Path):
     """kordoc에 넘길 입력·출력 경로를 cmd.exe가 해석하지 못하는 형태로 바꿔 준다.

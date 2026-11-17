@@ -4,10 +4,11 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
-cast(Any, sys.stdout).reconfigure(encoding='utf-8')
+cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 ROOT_DIR = SCRIPTS_DIR.parent
+
 
 def run_step(step_num, title, script_name):
     print("\n" + "=" * 70)
@@ -15,7 +16,12 @@ def run_step(step_num, title, script_name):
     print("=" * 70)
     t0 = time.time()
     script_path = SCRIPTS_DIR / script_name
-    res = subprocess.run([sys.executable, "-u", str(script_path)], text=True, encoding='utf-8', errors='replace')
+    res = subprocess.run(
+        [sys.executable, "-u", str(script_path)],
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     elapsed = time.time() - t0
     if res.returncode != 0:
         print(f"경고: {script_name} 실행 중 오류 발생 (종료 코드 {res.returncode})")
@@ -23,6 +29,7 @@ def run_step(step_num, title, script_name):
     else:
         print(f"단계 {step_num} 완료 ({elapsed:.2f}초 소요)")
         return True
+
 
 def main():
     print("*" * 70)
@@ -33,11 +40,19 @@ def main():
     # Step 0: Ingest drop folder documents if any
     try:
         import add_documents_smart
+
         for dd in add_documents_smart.DROP_DIRS:
             if dd.exists():
-                drops = [f for f in dd.iterdir() if f.is_file() and f.suffix.lower() in add_documents_smart.TARGET_EXTS]
+                drops = [
+                    f
+                    for f in dd.iterdir()
+                    if f.is_file()
+                    and f.suffix.lower() in add_documents_smart.TARGET_EXTS
+                ]
                 if drops:
-                    print(f"\n[사전 단계] 투입 폴더({dd.name}) 신규 문서 {len(drops)}개 감지 및 연도별 자동 분류 배치...")
+                    print(
+                        f"\n[사전 단계] 투입 폴더({dd.name}) 신규 문서 {len(drops)}개 감지 및 연도별 자동 분류 배치..."
+                    )
                     add_documents_smart.copy_or_move_files(drops, move=True)
     except Exception as ex:
         print(f"사전 투입 문서 처리 알림: {ex}")
@@ -60,7 +75,9 @@ def main():
     print("*" * 70)
     print("생성된 주요 산출물 (상위 루트 폴더 위치):")
     print(" 1. 전담팀 배포 패키지: 배포용_자료요구_통합검색시스템/ (기존 데이터 포함)")
-    print(" 2. 타 부서 전용 클린 패키지: 국회자료요구_스마트시스템_범용배포용/ (타 부서 자체 DB 적재용)")
+    print(
+        " 2. 타 부서 전용 클린 패키지: 국회자료요구_스마트시스템_범용배포용/ (타 부서 자체 DB 적재용)"
+    )
     print(" 3. 엑셀 통합 데이터베이스: 국회_대외기관_자료요구_통합DB.xlsx")
     print(" 4. 웹 실시간 검색 대시보드: 자료요구_통합검색_대시보드.html")
     print(" 5. SQLite 표준 데이터베이스: data_requests.db")
@@ -69,6 +86,7 @@ def main():
     print(" 8. 파이프라인 스크립트 모음: scripts/")
     print("*" * 70)
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -208,7 +208,9 @@ class TestDbAndSearchAdvanced(unittest.TestCase):
 
     def test_web_server_query_ledger_fts_and_fallback(self):
         """Test query_ledger uses FTS5 trigram + BM25 and falls back to LIKE for short terms."""
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
 
         # FTS5 Trigram query (>= 3 chars)
         res1 = handler.query_ledger(kw="플랫폼별")
@@ -222,7 +224,9 @@ class TestDbAndSearchAdvanced(unittest.TestCase):
 
     def test_web_server_search_all_integrated_endpoint(self):
         """Test search_all returns unified counts and results across ledger, documents, and QA."""
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
 
         res = handler.search_all(kw="딥페이크")
         self.assertTrue(res["success"])
@@ -233,14 +237,16 @@ class TestDbAndSearchAdvanced(unittest.TestCase):
 
     def test_auto_link_ledger_to_doc_on_insert(self):
         """Test that insert_ledger_item automatically finds matching doc by seq_no and creates bilateral links."""
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
 
         new_item_payload = {
             "year": "2026",
             "seq_no": "0517",  # matches DOC-2026-001
             "requester": "홍길동 의원",
             "title": "추가 자동 연계 테스트 자료",
-            "details": "세부 내용"
+            "details": "세부 내용",
         }
         res = handler.insert_ledger_item(new_item_payload)
         self.assertTrue(res["success"])
@@ -252,9 +258,12 @@ class TestDbAndSearchAdvanced(unittest.TestCase):
         # Check documents table has linked_ledger_id set
         conn = web_server.get_db_conn()
         cur = conn.cursor()
-        doc_row = cur.execute("SELECT linked_ledger_id FROM documents WHERE doc_id = 'DOC-2026-001'").fetchone()
+        doc_row = cur.execute(
+            "SELECT linked_ledger_id FROM documents WHERE doc_id = 'DOC-2026-001'"
+        ).fetchone()
         self.assertEqual(doc_row["linked_ledger_id"], created["ledger_id"])
         conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

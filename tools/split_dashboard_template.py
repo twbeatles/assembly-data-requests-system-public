@@ -4,6 +4,7 @@
 줄 단위로 잘라 옮기므로 함수 본문을 재작성하지 않는다.
 한 번 나눈 뒤에는 파트가 정본이고, dashboard_template.html은 조립 캐시다.
 """
+
 from __future__ import annotations
 
 import json
@@ -55,17 +56,24 @@ def main() -> int:
     if idx < 0:
         print("COMPRESSED_DATA 블록 없음", file=sys.stderr)
         return 1
-    after_data = rest[idx + len(marker):]
+    after_data = rest[idx + len(marker) :]
     app_open = after_data.find("<script>")
     app_close = after_data.rfind("</script>")
     if app_open < 0 or app_close < 0:
         print("앱 스크립트 블록 없음", file=sys.stderr)
         return 1
-    js = after_data[app_open + len("<script>"):app_close]
+    js = after_data[app_open + len("<script>") : app_close]
     head_body = rest[: idx + len(marker)]
     prefix_ws = after_data[:app_open]
-    tail = after_data[app_close + len("</script>"):]
-    shell = pre + "<!-- __DASHBOARD_CSS__ -->" + head_body + prefix_ws + "<!-- __DASHBOARD_JS__ -->" + tail
+    tail = after_data[app_close + len("</script>") :]
+    shell = (
+        pre
+        + "<!-- __DASHBOARD_CSS__ -->"
+        + head_body
+        + prefix_ws
+        + "<!-- __DASHBOARD_JS__ -->"
+        + tail
+    )
 
     (OUT / "js").mkdir(parents=True, exist_ok=True)
     (OUT / "shell.html").write_text(shell, encoding="utf-8")
@@ -73,12 +81,12 @@ def main() -> int:
 
     js_manifest = []
     for rel, start, end in JS_PARTS:
-        chunk = "".join(lines[start - 1:end])
+        chunk = "".join(lines[start - 1 : end])
         path = OUT / rel
         path.write_text(chunk, encoding="utf-8")
         js_manifest.append(rel.replace("\\", "/"))
 
-    joined_js = "".join("".join(lines[s - 1:e]) for _, s, e in JS_PARTS)
+    joined_js = "".join("".join(lines[s - 1 : e]) for _, s, e in JS_PARTS)
     if joined_js != "".join(lines[1621:4745]):
         print("JS 파트 연결이 원본 1622-4745줄과 다릅니다", file=sys.stderr)
         return 1
@@ -93,7 +101,9 @@ def main() -> int:
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     print(f"wrote {OUT}")
-    print(f"  css {len(css)} chars, js parts {len(js_manifest)}, shell {len(shell)} chars")
+    print(
+        f"  css {len(css)} chars, js parts {len(js_manifest)}, shell {len(shell)} chars"
+    )
     return 0
 
 

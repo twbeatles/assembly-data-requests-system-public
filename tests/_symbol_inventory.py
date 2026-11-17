@@ -4,6 +4,7 @@
 원본 파일을 패키지로 나눈 뒤에도 같은 이름이 남아 있는지 확인한다.
 소스 문자열 grep이 아니라 ast / 정규식으로 선언을 뽑는다.
 """
+
 from __future__ import annotations
 
 import ast
@@ -144,7 +145,9 @@ def build_snapshot(dashboard_source: str) -> dict:
 
 
 def save_snapshot(data: dict, path: Path = SNAPSHOT_PATH) -> None:
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def load_snapshot(path: Path = SNAPSHOT_PATH) -> dict:

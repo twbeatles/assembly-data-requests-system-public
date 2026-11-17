@@ -8,19 +8,36 @@ import os
 
 import agent_fixtures
 
-EXPECTED_TOOLS = {"datareq_status", "datareq_search", "datareq_get_document",
-                  "datareq_get_qa", "datareq_ledger_list", "datareq_ledger_get",
-                  "datareq_ledger_history", "datareq_evidence_pack"}
+EXPECTED_TOOLS = {
+    "datareq_status",
+    "datareq_search",
+    "datareq_get_document",
+    "datareq_get_qa",
+    "datareq_ledger_list",
+    "datareq_ledger_get",
+    "datareq_ledger_history",
+    "datareq_evidence_pack",
+}
 
-FORBIDDEN_FRAGMENTS = ("delete", "restore", "quarantine", "open_file",
-                       "run_shell", "run_pipeline", "execute_sql",
-                       "send_email", "export_all", "overwrite")
+FORBIDDEN_FRAGMENTS = (
+    "delete",
+    "restore",
+    "quarantine",
+    "open_file",
+    "run_shell",
+    "run_pipeline",
+    "execute_sql",
+    "send_email",
+    "export_all",
+    "overwrite",
+)
 
 
 def _make_server(tmp_path):
     os.environ["DATAREQ_DATA_ROOT"] = str(tmp_path)
     os.environ["DATAREQ_PROFILE"] = "reader"
     from agent_bridge.mcp_server import create_server
+
     return create_server()
 
 
@@ -55,24 +72,29 @@ def test_tools_return_json_and_search_works(tmp_path):
     found = _call(server, "datareq_search", {"query": "딥페이크"})
     assert found["ok"] is True
     assert found["data"]["items"], "synthetic match expected"
-    doc = _call(server, "datareq_get_document",
-                {"doc_id": "DOC-2026-001", "max_chars": 20})
+    doc = _call(
+        server, "datareq_get_document", {"doc_id": "DOC-2026-001", "max_chars": 20}
+    )
     assert doc["ok"] is True
     assert doc["data"]["truncated"] is True
     assert len(doc["data"]["excerpt"]) <= 21
     assert doc["data"]["next_offset"] == 20
     assert doc["data"]["content_sha256"].startswith("sha256:")
-    history = _call(server, "datareq_ledger_history",
-                    {"ledger_id": "REQ-2026-001"})
+    history = _call(server, "datareq_ledger_history", {"ledger_id": "REQ-2026-001"})
     assert history["ok"] is True
     assert "010-1234-5678" not in json.dumps(history, ensure_ascii=False)
 
 
 def _fingerprints(base_dir):
     from pathlib import Path
+
     marks = {}
-    for name in ("data_requests.db", "data_requests.db-wal",
-                 "data_requests.db-shm", "data_requests.json"):
+    for name in (
+        "data_requests.db",
+        "data_requests.db-wal",
+        "data_requests.db-shm",
+        "data_requests.json",
+    ):
         path = Path(base_dir) / name
         if path.exists():
             digest = hashlib.sha256()
@@ -117,6 +139,7 @@ def test_stdio_protocol_roundtrip_with_sdk_client(tmp_path):
     import asyncio
     import sys
     from pathlib import Path
+
     agent_fixtures.build_synthetic_db(tmp_path)
     from mcp.client.session import ClientSession
     from mcp.client.stdio import StdioServerParameters, stdio_client
@@ -129,7 +152,8 @@ def test_stdio_protocol_roundtrip_with_sdk_client(tmp_path):
         params = StdioServerParameters(
             command=sys.executable,
             args=[str(repo_root / "scripts" / "datareq_mcp.py")],
-            env={"DATAREQ_DATA_ROOT": str(tmp_path)})
+            env={"DATAREQ_DATA_ROOT": str(tmp_path)},
+        )
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
@@ -137,7 +161,8 @@ def test_stdio_protocol_roundtrip_with_sdk_client(tmp_path):
                 names = {tool.name for tool in tools.tools}
                 assert EXPECTED_TOOLS <= names
                 result = await session.call_tool(
-                    "datareq_search", {"query": "딥페이크"})
+                    "datareq_search", {"query": "딥페이크"}
+                )
                 texts = [getattr(block, "text", "") for block in result.content]
                 payload = json.loads("\n".join(texts))
                 assert payload["ok"] is True

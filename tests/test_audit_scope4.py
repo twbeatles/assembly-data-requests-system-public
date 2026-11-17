@@ -42,7 +42,12 @@ class TestAuditScope4(unittest.TestCase):
         moved.parent.mkdir()
         shutil.copy2(src, moved)
         did = extract_and_build_db.assign_doc_id(
-            existing, {}, "_parsed_markdown/미분류/orig.hwp.md", "미분류/orig.hwp", moved, "2023"
+            existing,
+            {},
+            "_parsed_markdown/미분류/orig.hwp.md",
+            "미분류/orig.hwp",
+            moved,
+            "2023",
         )
         self.assertEqual(did, "DOC-2023-007")
 
@@ -52,19 +57,33 @@ class TestAuditScope4(unittest.TestCase):
         src1.write_bytes(b"duplicate-content-payload")
         src2 = self.base / "file2.hwp"
         src2.write_bytes(b"duplicate-content-payload")
-        
+
         assigned = set()
         existing_map = {}
         max_ids = {}
 
         did1 = extract_and_build_db.assign_doc_id(
-            existing_map, max_ids, "_parsed/f1.md", "2024/f1.hwp", src1, "2024", assigned_ids=assigned
+            existing_map,
+            max_ids,
+            "_parsed/f1.md",
+            "2024/f1.hwp",
+            src1,
+            "2024",
+            assigned_ids=assigned,
         )
         did2 = extract_and_build_db.assign_doc_id(
-            existing_map, max_ids, "_parsed/f2.md", "2024/f2.hwp", src2, "2024", assigned_ids=assigned
+            existing_map,
+            max_ids,
+            "_parsed/f2.md",
+            "2024/f2.hwp",
+            src2,
+            "2024",
+            assigned_ids=assigned,
         )
 
-        self.assertNotEqual(did1, did2, "동일한 내용의 파일이라도 고유한 doc_id를 가져야 합니다.")
+        self.assertNotEqual(
+            did1, did2, "동일한 내용의 파일이라도 고유한 doc_id를 가져야 합니다."
+        )
         self.assertEqual(len(assigned), 2)
         self.assertIn(did1, assigned)
         self.assertIn(did2, assigned)
@@ -75,7 +94,13 @@ class TestAuditScope4(unittest.TestCase):
         assigned = {"DOC-2024-001"}
         max_ids = {"2024": 1}
         did = extract_and_build_db.assign_doc_id(
-            existing, max_ids, "_parsed/new.md", "2024/new.hwp", None, "2024", assigned_ids=assigned
+            existing,
+            max_ids,
+            "_parsed/new.md",
+            "2024/new.hwp",
+            None,
+            "2024",
+            assigned_ids=assigned,
         )
         self.assertNotEqual(did, "DOC-2024-001")
         self.assertEqual(did, "DOC-2024-002")
@@ -92,8 +117,29 @@ class TestAuditScope4(unittest.TestCase):
                     has_tables, table_count, table_summary, topic_tags, parsed_md_path, original_path,
                     full_markdown, linked_ledger_id
                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                ("DOC-2022-003", "2022", "", "국회", "의원", "", "v1", "제목",
-                 "", "", "", "", "", "N", 0, "", "", "p.md", "2022/a.hwp", "", "")
+                (
+                    "DOC-2022-003",
+                    "2022",
+                    "",
+                    "국회",
+                    "의원",
+                    "",
+                    "v1",
+                    "제목",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "N",
+                    0,
+                    "",
+                    "",
+                    "p.md",
+                    "2022/a.hwp",
+                    "",
+                    "",
+                ),
             )
             conn.commit()
         finally:
@@ -114,12 +160,14 @@ class TestAuditScope4(unittest.TestCase):
         meta = extract_metadata(
             "붙임1_심의 관련 부서별 담당 정보.hwp",
             filename="붙임1_심의 관련 부서별 담당 정보.hwp",
-            md_text=""
+            md_text="",
         )
         self.assertNotEqual(meta["requester"], "대외위원회")
 
     def test_requester_calculation_filename_not_internal_stats(self):
-        meta = extract_metadata("예산 계산 참고.xlsx", filename="예산 계산 참고.xlsx", md_text="")
+        meta = extract_metadata(
+            "예산 계산 참고.xlsx", filename="예산 계산 참고.xlsx", md_text=""
+        )
         self.assertNotEqual(meta["requester"], "전담팀 자체통계")
 
     def test_copy_collision_unique_names(self):
@@ -153,7 +201,9 @@ class TestAuditScope4(unittest.TestCase):
         self.assertEqual(validate_label("기획예산팀", "부서명"), "기획예산팀")
 
     def test_dashboard_has_hashchange_listener(self):
-        tmpl = (SCRIPTS_DIR / "templates" / "dashboard_template.html").read_text(encoding="utf-8")
+        tmpl = (SCRIPTS_DIR / "templates" / "dashboard_template.html").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("hashchange", tmpl)
         self.assertIn("applyDeepLink", tmpl)
         self.assertIn("decodeURIComponent", tmpl)

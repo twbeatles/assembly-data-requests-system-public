@@ -67,12 +67,16 @@ class ServerInstanceLock:
             try:
                 if os.name == "nt":
                     import msvcrt
+
                     msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
                 else:
                     import fcntl
+
                     fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError as exc:
-                raise RuntimeError("웹 서버 락 확인 중입니다. 잠시 후 다시 시도하세요.") from exc
+                raise RuntimeError(
+                    "웹 서버 락 확인 중입니다. 잠시 후 다시 시도하세요."
+                ) from exc
             try:
                 yield
             finally:
@@ -123,7 +127,9 @@ class ServerInstanceLock:
                         except OSError:
                             return False, info
                         try:
-                            self._write({"pid": os.getpid(), "port": None}, exclusive=True)
+                            self._write(
+                                {"pid": os.getpid(), "port": None}, exclusive=True
+                            )
                         except FileExistsError:
                             continue
                     self._owned = True

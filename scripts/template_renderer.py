@@ -29,13 +29,12 @@ class DashboardRenderer(AssembleMixin, PayloadMixin):  # pyright: ignore[reportG
     ALWAYS_EMBED_FULL_TEXT = True
 
     def __init__(self, template_path: Optional[Path] = None):
-        self.template_path = Path(template_path) if template_path else DEFAULT_TEMPLATE_PATH
-
+        self.template_path = (
+            Path(template_path) if template_path else DEFAULT_TEMPLATE_PATH
+        )
 
     @staticmethod
-
     @staticmethod
-
     @staticmethod
     def verify_offline_dashboard_html(html_content: str):
         """Decode the actual embedded payload and confirm an HTML-only handoff works."""
@@ -49,14 +48,18 @@ class DashboardRenderer(AssembleMixin, PayloadMixin):  # pyright: ignore[reportG
         except ValueError as error:
             return False, str(error)
         expected_keys = ("documents", "qa_items", "request_ledger")
-        if not isinstance(payload, dict) or not all(key in payload for key in expected_keys):
+        if not isinstance(payload, dict) or not all(
+            key in payload for key in expected_keys
+        ):
             return False, "내장 데이터 구조가 불완전합니다"
         if not all("full_markdown" in doc for doc in payload["documents"]):
             return False, "문서 전문(full_markdown)이 HTML에 모두 포함되지 않았습니다"
         # Q&A 전문은 부모 본문 안의 위치 참조로 실릴 수 있다. 참조를 되살린 뒤 검사한다.
         # 키가 있는지만 보는 것보다 강한 검사다 — 실제로 복원되는지까지 확인한다.
         restored = DashboardRenderer.rehydrate_qa_bodies(payload)
-        if not all(item.get("answer_markdown") is not None for item in restored["qa_items"]):
+        if not all(
+            item.get("answer_markdown") is not None for item in restored["qa_items"]
+        ):
             return False, "Q&A 전문(answer_markdown)이 HTML에서 복원되지 않았습니다"
         return True, ""
 
@@ -67,7 +70,10 @@ class DashboardRenderer(AssembleMixin, PayloadMixin):  # pyright: ignore[reportG
         대시보드의 `00_boot.js`가 브라우저에서 하는 일과 **같은 규칙**이다. 두 구현이
         갈라지면 화면과 검증이 다른 것을 보게 되므로, 규칙을 바꿀 때는 양쪽을 같이 고친다.
         """
-        docs_by_id = {d.get("doc_id"): (d.get("full_markdown") or "") for d in payload.get("documents", [])}
+        docs_by_id = {
+            d.get("doc_id"): (d.get("full_markdown") or "")
+            for d in payload.get("documents", [])
+        }
         out_qas = []
         for q in payload.get("qa_items", []):
             item = dict(q)
@@ -76,16 +82,17 @@ class DashboardRenderer(AssembleMixin, PayloadMixin):  # pyright: ignore[reportG
                 body = docs_by_id.get(item.get("doc_id"), "")
                 try:
                     start, length = int(ref[0]), int(ref[1])
-                    item["answer_markdown"] = body[start:start + length]
+                    item["answer_markdown"] = body[start : start + length]
                 except (TypeError, ValueError, IndexError):
                     item["answer_markdown"] = ""
             item.setdefault("answer_markdown", "")
             out_qas.append(item)
         return {**payload, "qa_items": out_qas}
 
-
     @staticmethod
-    def save_atomic(out_path: Path, content: str, max_retries: int = 5, retry_delay: float = 0.4) -> bool:
+    def save_atomic(
+        out_path: Path, content: str, max_retries: int = 5, retry_delay: float = 0.4
+    ) -> bool:
         """Saves content to file with atomic write and retry mechanism."""
         out_path = Path(out_path)
         tmp_out = out_path.with_suffix(".tmp.html")

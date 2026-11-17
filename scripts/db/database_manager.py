@@ -32,6 +32,7 @@ def _readonly_uri(db_path, immutable: bool = False) -> str:
     `immutable=1`은 `-wal`/`-shm` 사이드카까지 건드리지 않는다(감사 R4-01).
     """
     from urllib.parse import quote
+
     uri = "file:" + quote(Path(db_path).resolve().as_posix(), safe="/:") + "?mode=ro"
     if immutable:
         uri += "&immutable=1"
@@ -53,7 +54,7 @@ class DatabaseManager:
         row_factory: bool = True,
         busy_timeout: int = 5000,
         cache_size: int = -32000,
-        readonly: bool = False
+        readonly: bool = False,
     ) -> sqlite3.Connection:
         """Factory method returning an optimized SQLite connection.
 
@@ -61,7 +62,9 @@ class DatabaseManager:
         구조적으로 막는다(제안서 D9). WAL 읽기는 읽기 전용 연결에서도 정상 동작한다.
         """
         if readonly:
-            conn = sqlite3.connect(_readonly_uri(db_path), uri=True, check_same_thread=False)
+            conn = sqlite3.connect(
+                _readonly_uri(db_path), uri=True, check_same_thread=False
+            )
         else:
             conn = sqlite3.connect(str(db_path), check_same_thread=False)
         if row_factory:
@@ -76,9 +79,13 @@ class DatabaseManager:
             conn.execute("PRAGMA query_only = ON;")
         return conn
 
-    def get_conn(self, row_factory: bool = True, readonly: bool = False) -> sqlite3.Connection:
+    def get_conn(
+        self, row_factory: bool = True, readonly: bool = False
+    ) -> sqlite3.Connection:
         """Returns connection to self.db_path."""
-        return self.get_connection(self.db_path, row_factory=row_factory, readonly=readonly)
+        return self.get_connection(
+            self.db_path, row_factory=row_factory, readonly=readonly
+        )
 
     @staticmethod
     def ensure_schema(conn: sqlite3.Connection):
@@ -86,13 +93,17 @@ class DatabaseManager:
         if get_version(conn) > SCHEMA_VERSION:
             raise SchemaTooNewError("지원하지 않는 최신 DB 버전입니다.")
         from .ledger_outbox import ensure_tables
+
         ensure_tables(conn)
         cur = conn.cursor()
         # 테이블을 만들기 **전에** 새 DB인지 본다. 만든 뒤에 보면 새 DB도 '기존 DB'가 되어
         # 빌드할 때마다 빈 테이블에 마이그레이션이 돌고 로그가 지저분해진다.
-        was_fresh = cur.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'"
-        ).fetchone() is None
+        was_fresh = (
+            cur.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='documents'"
+            ).fetchone()
+            is None
+        )
         cur.execute("PRAGMA page_size = 4096;")
         cur.execute("PRAGMA journal_mode = WAL;")
         cur.execute("PRAGMA synchronous = NORMAL;")
@@ -187,7 +198,9 @@ class DatabaseManager:
                 actor TEXT
             )
         """)
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_history_ledger_id ON ledger_history(ledger_id)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_history_ledger_id ON ledger_history(ledger_id)"
+        )
 
         # 5. Search Log (제안서 S9) — 어떤 질의가 0건으로 끝났는지 알아야 사전을 고칠 수 있다.
         cur.execute("""
@@ -201,8 +214,12 @@ class DatabaseManager:
                 searched_at TEXT
             )
         """)
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_search_log_at ON search_log(searched_at DESC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_search_log_zero ON search_log(result_count, searched_at DESC)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_log_at ON search_log(searched_at DESC)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_log_zero ON search_log(result_count, searched_at DESC)"
+        )
 
         # FTS5 External Content Virtual Tables & Triggers (정의는 fts_spec 한 곳)
         try:
@@ -224,26 +241,56 @@ class DatabaseManager:
     @staticmethod
     def _create_indexes(cur):
         """복합·커버링 인덱스. 예전에는 같은 목록이 세 곳에 복사돼 있었다."""
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_doc_year_date ON documents(year, request_date DESC, doc_id ASC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_doc_date_order ON documents(request_date DESC, doc_id ASC)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_doc_year_date ON documents(year, request_date DESC, doc_id ASC)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_doc_date_order ON documents(request_date DESC, doc_id ASC)"
+        )
         cur.execute("CREATE INDEX IF NOT EXISTS idx_doc_year ON documents(year)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_doc_requester ON documents(requester)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_doc_institution ON documents(institution)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_doc_requester ON documents(requester)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_doc_institution ON documents(institution)"
+        )
 
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_qa_year_date ON qa_items(year, request_date DESC, qa_id ASC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_qa_date_order ON qa_items(request_date DESC, qa_id ASC)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_qa_year_date ON qa_items(year, request_date DESC, qa_id ASC)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_qa_date_order ON qa_items(request_date DESC, qa_id ASC)"
+        )
         cur.execute("CREATE INDEX IF NOT EXISTS idx_qa_doc_id ON qa_items(doc_id)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_qa_requester ON qa_items(requester)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_qa_doc_qnum ON qa_items(doc_id, q_num)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_qa_requester ON qa_items(requester)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_qa_doc_qnum ON qa_items(doc_id, q_num)"
+        )
 
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_year_date ON request_ledger(year, request_date DESC, ledger_id ASC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_date_order ON request_ledger(request_date DESC, ledger_id ASC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_requester ON request_ledger(requester)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_status ON request_ledger(status)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_linked ON request_ledger(linked_doc_id)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ledger_year_date ON request_ledger(year, request_date DESC, ledger_id ASC)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ledger_date_order ON request_ledger(request_date DESC, ledger_id ASC)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ledger_requester ON request_ledger(requester)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ledger_status ON request_ledger(status)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ledger_linked ON request_ledger(linked_doc_id)"
+        )
         # 마감 임박·경과 조회가 전 행을 훑던 자리 (제안서 D4)
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_deadline ON request_ledger(deadline)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_submit_date ON request_ledger(submit_date)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ledger_deadline ON request_ledger(deadline)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ledger_submit_date ON request_ledger(submit_date)"
+        )
 
     @staticmethod
     def init_schema(conn: sqlite3.Connection, drop_existing: bool = False):
@@ -269,43 +316,95 @@ class DatabaseManager:
         conn: sqlite3.Connection,
         records: List[Dict[str, Any]],
         all_qa_items: List[Dict[str, Any]],
-        ledger_records: List[Dict[str, Any]]
+        ledger_records: List[Dict[str, Any]],
     ):
         """Bulk-inserts documents, qa_items, and request_ledger."""
         cur = conn.cursor()
 
         doc_tuples = [
             (
-                r["doc_id"], r["year"], r["request_date"], r["institution"], r["requester"], r["doc_number"],
-                r["version"], r["title"], r["department"], r["contact_person"], r["question_list"],
-                r["answer_summary"], r["answer_full_text"], r["has_tables"], r["table_count"], r["table_summary"],
-                r["topic_tags"], r["parsed_md_path"], r["original_path"], r["full_markdown"],
-                r.get("linked_ledger_id", "")
+                r["doc_id"],
+                r["year"],
+                r["request_date"],
+                r["institution"],
+                r["requester"],
+                r["doc_number"],
+                r["version"],
+                r["title"],
+                r["department"],
+                r["contact_person"],
+                r["question_list"],
+                r["answer_summary"],
+                r["answer_full_text"],
+                r["has_tables"],
+                r["table_count"],
+                r["table_summary"],
+                r["topic_tags"],
+                r["parsed_md_path"],
+                r["original_path"],
+                r["full_markdown"],
+                r.get("linked_ledger_id", ""),
             )
             for r in records
         ]
-        cur.executemany("INSERT OR REPLACE INTO documents VALUES (" + ",".join(["?"] * 21) + ")", doc_tuples)
+        cur.executemany(
+            "INSERT OR REPLACE INTO documents VALUES (" + ",".join(["?"] * 21) + ")",
+            doc_tuples,
+        )
 
         qa_tuples = [
             (
-                q["qa_id"], q["doc_id"], q["year"], q["request_date"], q["institution"], q["requester"],
-                q["doc_number"], q["q_num"], q["question_title"], q["answer_full"], q["answer_markdown"],
-                q["has_tables"], q["parsed_md_path"], q["original_path"]
+                q["qa_id"],
+                q["doc_id"],
+                q["year"],
+                q["request_date"],
+                q["institution"],
+                q["requester"],
+                q["doc_number"],
+                q["q_num"],
+                q["question_title"],
+                q["answer_full"],
+                q["answer_markdown"],
+                q["has_tables"],
+                q["parsed_md_path"],
+                q["original_path"],
             )
             for q in all_qa_items
         ]
-        cur.executemany("INSERT OR REPLACE INTO qa_items VALUES (" + ",".join(["?"] * 14) + ")", qa_tuples)
+        cur.executemany(
+            "INSERT OR REPLACE INTO qa_items VALUES (" + ",".join(["?"] * 14) + ")",
+            qa_tuples,
+        )
 
         ledger_tuples = [
             (
-                lr["ledger_id"], lr["year"], lr["seq_no"], lr["party"], lr["requester"], lr["aide"],
-                lr["title"], lr["details"], lr["request_date"], lr["deadline"], lr["submit_date"],
-                lr["department"], lr["status"], lr["note"], lr["request_type"], lr["linked_doc_id"],
-                lr["created_at"], lr["updated_at"]
+                lr["ledger_id"],
+                lr["year"],
+                lr["seq_no"],
+                lr["party"],
+                lr["requester"],
+                lr["aide"],
+                lr["title"],
+                lr["details"],
+                lr["request_date"],
+                lr["deadline"],
+                lr["submit_date"],
+                lr["department"],
+                lr["status"],
+                lr["note"],
+                lr["request_type"],
+                lr["linked_doc_id"],
+                lr["created_at"],
+                lr["updated_at"],
             )
             for lr in ledger_records
         ]
-        cur.executemany("INSERT OR REPLACE INTO request_ledger VALUES (" + ",".join(["?"] * 18) + ")", ledger_tuples)
+        cur.executemany(
+            "INSERT OR REPLACE INTO request_ledger VALUES ("
+            + ",".join(["?"] * 18)
+            + ")",
+            ledger_tuples,
+        )
         conn.commit()
 
     @staticmethod
@@ -322,7 +421,10 @@ class DatabaseManager:
             ).fetchone()
             if not exists:
                 return 0
-            src_cols = {row[1] for row in src.execute("PRAGMA table_info(ledger_history)").fetchall()}
+            src_cols = {
+                row[1]
+                for row in src.execute("PRAGMA table_info(ledger_history)").fetchall()
+            }
             if {"changed_fields", "actor"} <= src_cols:
                 cols = "ledger_id, action, changed_at, snapshot, changed_fields, actor"
             else:
@@ -333,8 +435,7 @@ class DatabaseManager:
                 return 0
             placeholders = ",".join(["?"] * len(cols.split(",")))
             dest_conn.executemany(
-                f"INSERT INTO ledger_history ({cols}) VALUES ({placeholders})",
-                rows
+                f"INSERT INTO ledger_history ({cols}) VALUES ({placeholders})", rows
             )
             dest_conn.commit()
             return len(rows)
@@ -350,8 +451,11 @@ class DatabaseManager:
                     pass
 
     @staticmethod
-    def prune_search_log(conn: sqlite3.Connection, retention_days: int = 90,
-                         keep_zero_result: bool = True) -> int:
+    def prune_search_log(
+        conn: sqlite3.Connection,
+        retention_days: int = 90,
+        keep_zero_result: bool = True,
+    ) -> int:
         """오래된 검색 로그를 rolling 삭제한다. (감사 R6-04)
 
         `search_log`는 검색할 때마다 1행씩 쌓이고 지우는 코드가 없어 영원히
@@ -362,15 +466,15 @@ class DatabaseManager:
         retention_days = int(retention_days)
         if retention_days < 0:
             raise ValueError(f"retention_days는 0 이상이어야 합니다: {retention_days}")
-        cutoff = (datetime.datetime.now()
-                  - datetime.timedelta(days=retention_days)).isoformat(timespec="seconds")
+        cutoff = (
+            datetime.datetime.now() - datetime.timedelta(days=retention_days)
+        ).isoformat(timespec="seconds")
         sql = "DELETE FROM search_log WHERE searched_at IS NOT NULL AND searched_at < ?"
         if keep_zero_result:
             sql += " AND COALESCE(result_count, 0) != 0"
         cur = conn.execute(sql, (cutoff,))
         conn.commit()
         return cur.rowcount or 0
-
 
     @staticmethod
     def build_fts_and_indexes(conn: sqlite3.Connection):
@@ -393,7 +497,9 @@ class DatabaseManager:
         DatabaseManager.optimize_for_search(conn, fts=fts_ok, vacuum=True)
 
     @staticmethod
-    def optimize_for_search(conn: sqlite3.Connection, fts: bool = True, vacuum: bool = False) -> list:
+    def optimize_for_search(
+        conn: sqlite3.Connection, fts: bool = True, vacuum: bool = False
+    ) -> list:
         """검색용 DB를 정리한다. 실패해도 검색 결과는 같다(속도·크기만 영향). 반환: 수행한 단계.
 
         - FTS5 `optimize`: 한 번에 채운 인덱스도 세그먼트 b-tree가 여러 개로 남는다. 하나로
@@ -406,7 +512,12 @@ class DatabaseManager:
         steps = []
         if fts:
             for name in fts_spec.fts_table_names():
-                steps.append((f"FTS optimize: {name}", f"INSERT INTO {name}({name}) VALUES('optimize')"))
+                steps.append(
+                    (
+                        f"FTS optimize: {name}",
+                        f"INSERT INTO {name}({name}) VALUES('optimize')",
+                    )
+                )
         steps.append(("ANALYZE", "ANALYZE"))
         steps.append(("PRAGMA optimize", "PRAGMA optimize"))
         for label, sql in steps:
@@ -417,7 +528,10 @@ class DatabaseManager:
             except sqlite3.Error as e:
                 print(f"DB 최적화 알림({label}): {e}")
         if vacuum:
-            for label, sql in (("VACUUM", "VACUUM"), ("WAL checkpoint", "PRAGMA wal_checkpoint(TRUNCATE)")):
+            for label, sql in (
+                ("VACUUM", "VACUUM"),
+                ("WAL checkpoint", "PRAGMA wal_checkpoint(TRUNCATE)"),
+            ):
                 try:
                     conn.execute(sql)
                     done.append(label)
@@ -453,7 +567,7 @@ class DatabaseManager:
         tmp_db_path: Path,
         target_db_path: Path,
         max_retries: int = 5,
-        retry_delay: float = 0.5
+        retry_delay: float = 0.5,
     ):
         """Replaces target production DB with tmp DB atomically, cleaning up WAL/SHM files,
         with Windows file-lock retry handling to avoid PermissionError during server runtime."""
@@ -497,7 +611,9 @@ class DatabaseManager:
                         except Exception:
                             pass
             else:
-                print("[DB 스왑 알림] checkpoint 미완료: -wal/-shm을 남기고 교체합니다.")
+                print(
+                    "[DB 스왑 알림] checkpoint 미완료: -wal/-shm을 남기고 교체합니다."
+                )
 
         # 2. 재시도 루프 (os.replace → SQLite online backup)
         # 열려 있는 DB 파일 위에 파일 바이트를 복사(shutil.copy2)하지 않는다. 지우지 못한 이전

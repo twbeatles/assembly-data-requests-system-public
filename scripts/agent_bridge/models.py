@@ -10,9 +10,17 @@ SEARCH_SCHEMA = "datareq-search/v1"
 EVIDENCE_SCHEMA = "datareq-evidence-pack/v1"
 
 
-def result_envelope(operation, data=None, warnings=None, error=None,
-                    source="local_sqlite", dataset_version="",
-                    returned=0, elapsed_ms=0, request_id=None):
+def result_envelope(
+    operation,
+    data=None,
+    warnings=None,
+    error=None,
+    source="local_sqlite",
+    dataset_version="",
+    returned=0,
+    elapsed_ms=0,
+    request_id=None,
+):
     """표준 결과 봉투를 만든다. `--json` 출력은 이 dict 하나만 stdout에 낸다."""
     return {
         "schema": RESULT_SCHEMA,
@@ -31,8 +39,9 @@ def result_envelope(operation, data=None, warnings=None, error=None,
     }
 
 
-def error_envelope(operation, code, message, dataset_version="",
-                   warnings=None, request_id=None):
+def error_envelope(
+    operation, code, message, dataset_version="", warnings=None, request_id=None
+):
     """실패 봉투. `error`는 {code, message} 형태다."""
     return result_envelope(
         operation,

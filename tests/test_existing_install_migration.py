@@ -37,7 +37,9 @@ class ExistingInstallMigrationTests(unittest.TestCase):
         self.assertEqual(result["copied"], 1)
         self.assertEqual(old_path.read_text(encoding="utf-8"), "이전 답변 전문")
         self.assertEqual(
-            (self.new / "_parsed_markdown" / "2025" / "answer.md").read_text(encoding="utf-8"),
+            (self.new / "_parsed_markdown" / "2025" / "answer.md").read_text(
+                encoding="utf-8"
+            ),
             "이전 답변 전문",
         )
 
@@ -49,13 +51,19 @@ class ExistingInstallMigrationTests(unittest.TestCase):
 
         result = migrate_existing_install.migrate_markdown(self.old, self.new)
 
-        self.assertEqual((result["copied"], result["skipped"], result["renamed"]), (1, 1, 1))
         self.assertEqual(
-            (self.new / "_parsed_markdown" / "2026" / "conflict.md").read_text(encoding="utf-8"),
+            (result["copied"], result["skipped"], result["renamed"]), (1, 1, 1)
+        )
+        self.assertEqual(
+            (self.new / "_parsed_markdown" / "2026" / "conflict.md").read_text(
+                encoding="utf-8"
+            ),
             "현재 내용",
         )
         self.assertEqual(
-            (self.new / "_parsed_markdown" / "2026" / "conflict__migrated_1.md").read_text(encoding="utf-8"),
+            (
+                self.new / "_parsed_markdown" / "2026" / "conflict__migrated_1.md"
+            ).read_text(encoding="utf-8"),
             "이전 내용",
         )
 
@@ -81,5 +89,7 @@ class ExistingInstallMigrationTests(unittest.TestCase):
             self.assertFalse(migrate_existing_install.rebuild_outputs())
 
     def test_cancelled_folder_picker_changes_nothing(self):
-        with mock.patch.object(migrate_existing_install, "choose_previous_folder", return_value=None):
+        with mock.patch.object(
+            migrate_existing_install, "choose_previous_folder", return_value=None
+        ):
             self.assertEqual(migrate_existing_install.main([]), 2)

@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional, Tuple
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 
+
 class SyncService:
     """Manages background pipeline synchronization runs with concurrency prevention and status tracking."""
 
@@ -32,7 +33,10 @@ class SyncService:
         """Triggers pipeline in background if not already running. Returns (started, message)."""
         with self.sync_lock:
             if self.is_syncing:
-                return False, "동기화 파이프라인이 이미 실행 중입니다. 잠시 후 다시 시도해주세요."
+                return (
+                    False,
+                    "동기화 파이프라인이 이미 실행 중입니다. 잠시 후 다시 시도해주세요.",
+                )
             self.is_syncing = True
             self.last_start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.last_finish_time = None
@@ -56,7 +60,7 @@ class SyncService:
                         encoding="utf-8",
                         errors="replace",
                         timeout=self.timeout_seconds,
-                        cwd=str(self.scripts_dir.parent)
+                        cwd=str(self.scripts_dir.parent),
                     )
                     if res.returncode == 0:
                         success = True
@@ -65,20 +69,27 @@ class SyncService:
                 else:
                     err = "파이프라인 실행 스크립트를 찾을 수 없습니다."
             except subprocess.TimeoutExpired:
-                err = f"파이프라인이 {self.timeout_seconds}초를 초과하여 중단되었습니다."
+                err = (
+                    f"파이프라인이 {self.timeout_seconds}초를 초과하여 중단되었습니다."
+                )
             except Exception as e:
                 err = str(e)
             finally:
                 elapsed = time.time() - t0
                 with self.sync_lock:
                     self.is_syncing = False
-                    self.last_finish_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    self.last_finish_time = datetime.datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
                     self.last_success = success
                     self.last_error = err
                     self.last_elapsed = round(elapsed, 2)
 
         threading.Thread(target=_worker, daemon=True).start()
-        return True, "신규 문서 파싱 및 전체 DB 동기화 작업이 백그라운드에서 시작되었습니다."
+        return (
+            True,
+            "신규 문서 파싱 및 전체 DB 동기화 작업이 백그라운드에서 시작되었습니다.",
+        )
 
     def get_status(self) -> Dict[str, Any]:
         """Returns current synchronization status and last run metrics."""
@@ -90,5 +101,5 @@ class SyncService:
                 "last_finish_time": self.last_finish_time,
                 "last_success": self.last_success,
                 "last_error": self.last_error,
-                "last_elapsed": self.last_elapsed
+                "last_elapsed": self.last_elapsed,
             }

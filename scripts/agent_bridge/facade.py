@@ -23,34 +23,43 @@ from .errors import DataReqError
 
 
 def _utcnow_iso():
-    return (datetime.datetime.now(datetime.timezone.utc)
-            .astimezone().isoformat(timespec="seconds"))
+    return (
+        datetime.datetime.now(datetime.timezone.utc)
+        .astimezone()
+        .isoformat(timespec="seconds")
+    )
 
 
 class AgentFacade:
-    def __init__(self, base_dir, allowed_roots=None, profile="reader",
-                 immutable=False):
+    def __init__(self, base_dir, allowed_roots=None, profile="reader", immutable=False):
         self.base_dir = Path(base_dir)
         if profile not in policy.PROFILES:
             raise DataReqError("invalid_input", "알 수 없는 권한 프로파일입니다.")
         self.profile = profile
         self.immutable = bool(immutable)
-        self.allowed_roots = ([Path(p) for p in allowed_roots]
-                              if allowed_roots
-                              else policy.default_allowed_roots(self.base_dir))
+        self.allowed_roots = (
+            [Path(p) for p in allowed_roots]
+            if allowed_roots
+            else policy.default_allowed_roots(self.base_dir)
+        )
 
     # -- 내부 도우미 ------------------------------------------------------
 
     def _service(self):
         from services.ledger_service import LedgerService
+
         db_path = self.base_dir / "data_requests.db"
         json_path = self.base_dir / "data_requests.json"
         # 조회 전용 서비스로만 실행한다. 스키마 준비·마이그레이션·검색 로그 쓰기를
         # 하지 않으며, 없는 DB를 만들지도 않는다. immutable 선택도 그대로 전달한다.
         # (감사 ISSUE-002)
-        return LedgerService(db_path=db_path, json_path=json_path,
-                             base_dir=self.base_dir, read_only=True,
-                             immutable=self.immutable)
+        return LedgerService(
+            db_path=db_path,
+            json_path=json_path,
+            base_dir=self.base_dir,
+            read_only=True,
+            immutable=self.immutable,
+        )
 
     def _db_path(self):
         return self.base_dir / "data_requests.db"
@@ -75,28 +84,41 @@ class AgentFacade:
             try:
                 version = int(cur.execute("PRAGMA user_version").fetchone()[0])
             except Exception as e:
-                raise DataReqError("dataset_unavailable", "SQLite 스키마가 완전하지 않습니다.") from e
+                raise DataReqError(
+                    "dataset_unavailable", "SQLite 스키마가 완전하지 않습니다."
+                ) from e
             from db.migrations import SCHEMA_VERSION
+
             if version > SCHEMA_VERSION:
                 raise DataReqError(
                     "dataset_unavailable",
                     "DB 버전 %s은 지원 버전 %s보다 높습니다. 최신 프로그램으로 실행하세요."
-                    % (version, SCHEMA_VERSION))
+                    % (version, SCHEMA_VERSION),
+                )
             if version < SCHEMA_VERSION:
                 raise DataReqError(
                     "dataset_unavailable",
                     "DB 스키마가 오래되었습니다 (버전 %s, 지원 %s). "
                     "00번 파이프라인으로 DB를 구축한 뒤 다시 시도하세요."
-                    % (version, SCHEMA_VERSION))
+                    % (version, SCHEMA_VERSION),
+                )
             try:
-                names = {r[0] for r in cur.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'")}
+                names = {
+                    r[0]
+                    for r in cur.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    )
+                }
             except Exception as e:
-                raise DataReqError("dataset_unavailable", "SQLite 스키마가 완전하지 않습니다.") from e
+                raise DataReqError(
+                    "dataset_unavailable", "SQLite 스키마가 완전하지 않습니다."
+                ) from e
         finally:
             conn.close()
         if not {"documents", "qa_items", "request_ledger"}.issubset(names):
-            raise DataReqError("dataset_unavailable", "SQLite 스키마가 완전하지 않습니다.")
+            raise DataReqError(
+                "dataset_unavailable", "SQLite 스키마가 완전하지 않습니다."
+            )
 
     @contextlib.contextmanager
     def _no_search_logging(self, service):
@@ -113,6 +135,7 @@ class AgentFacade:
 
     def _readonly_conn(self):
         from extractors.ledger.workbook import connect_readonly
+
         db_path = self._require_db()
         conn = connect_readonly(db_path, immutable=self._effective_immutable())
         conn.row_factory = sqlite3.Row
@@ -138,19 +161,23 @@ class AgentFacade:
                 qa = cur.execute("SELECT COUNT(*) FROM qa_items").fetchone()[0]
                 ledger = cur.execute(
                     "SELECT COUNT(*) FROM request_ledger "
-                    "WHERE COALESCE(status, '') != '[삭제]'").fetchone()[0]
+                    "WHERE COALESCE(status, '') != '[삭제]'"
+                ).fetchone()[0]
                 tombstones = cur.execute(
-                    "SELECT COUNT(*) FROM request_ledger "
-                    "WHERE status = '[삭제]'").fetchone()[0]
+                    "SELECT COUNT(*) FROM request_ledger WHERE status = '[삭제]'"
+                ).fetchone()[0]
                 docs_seq = cur.execute("SELECT MAX(rowid) FROM documents").fetchone()[0]
                 qa_seq = cur.execute("SELECT MAX(rowid) FROM qa_items").fetchone()[0]
                 ledger_seq = cur.execute(
-                    "SELECT MAX(rowid) FROM request_ledger").fetchone()[0]
+                    "SELECT MAX(rowid) FROM request_ledger"
+                ).fetchone()[0]
                 ledger_updated = cur.execute(
-                    "SELECT MAX(updated_at) FROM request_ledger").fetchone()[0]
+                    "SELECT MAX(updated_at) FROM request_ledger"
+                ).fetchone()[0]
                 try:
                     hist_seq = cur.execute(
-                        "SELECT MAX(history_id) FROM ledger_history").fetchone()[0]
+                        "SELECT MAX(history_id) FROM ledger_history"
+                    ).fetchone()[0]
                 except Exception:
                     hist_seq = None
                 ledger_hash = self._ledger_content_hash(cur)
@@ -159,13 +186,33 @@ class AgentFacade:
             # 파일 식별자는 inode·장치만 쓴다. 크기·mtime은 checkpoint만으로 바뀌어
             # 내용 불변에도 지문이 흔들리고, 재빌드(os.replace)는 inode가 바뀌어 구분된다.
             stat = db_path.stat()
-            canonical = "|".join(str(part) for part in (
-                version, docs, qa, ledger, tombstones,
-                docs_seq, qa_seq, ledger_seq, ledger_updated, hist_seq,
-                ledger_hash, stat.st_ino, stat.st_dev))
+            canonical = "|".join(
+                str(part)
+                for part in (
+                    version,
+                    docs,
+                    qa,
+                    ledger,
+                    tombstones,
+                    docs_seq,
+                    qa_seq,
+                    ledger_seq,
+                    ledger_updated,
+                    hist_seq,
+                    ledger_hash,
+                    stat.st_ino,
+                    stat.st_dev,
+                )
+            )
             digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
             return "v%s-docs%s-qa%s-ledger%s-tomb%s-rev%s" % (
-                version, docs, qa, ledger, tombstones, digest)
+                version,
+                docs,
+                qa,
+                ledger,
+                tombstones,
+                digest,
+            )
         except Exception:
             return "unavailable"
 
@@ -188,14 +235,20 @@ class AgentFacade:
         started = time.time()
         db_path = self._db_path()
         if not db_path.exists():
-            return {"available": False, "db_exists": False,
-                    "dataset_version": "unavailable"}
+            return {
+                "available": False,
+                "db_exists": False,
+                "dataset_version": "unavailable",
+            }
         try:
             self._require_schema()
         except DataReqError:
-            return {"available": False, "db_exists": True,
-                    "dataset_version": "unavailable",
-                    "reason": "schema_incomplete"}
+            return {
+                "available": False,
+                "db_exists": True,
+                "dataset_version": "unavailable",
+                "reason": "schema_incomplete",
+            }
         service = self._service()
         with self._no_search_logging(service):
             stats = service.get_stats()
@@ -219,17 +272,18 @@ class AgentFacade:
         if self.immutable:
             return True
         try:
-            return not self._db_path().with_name(
-                self._db_path().name + "-wal").exists()
+            return not self._db_path().with_name(self._db_path().name + "-wal").exists()
         except OSError:
             return False
 
     def doctor(self, deep=False):
         from db.health import check_database
+
         db_path = self._require_db()
         # 무거운 검사는 명시적 opt-in일 때만 돈다.
-        return check_database(db_path, deep=bool(deep),
-                              immutable=self._effective_immutable())
+        return check_database(
+            db_path, deep=bool(deep), immutable=self._effective_immutable()
+        )
 
     # -- 검색·조회 --------------------------------------------------------
 
@@ -238,30 +292,44 @@ class AgentFacade:
         self._require_schema()
         limit = policy.clamp_limit(limit)
         service = self._service()
-        search_type = {"all": "all", "qa": "qa", "doc": "docs", "docs": "docs",
-                       "ledger": "ledger"}.get(category, "all")
+        search_type = {
+            "all": "all",
+            "qa": "qa",
+            "doc": "docs",
+            "docs": "docs",
+            "ledger": "ledger",
+        }.get(category, "all")
         with self._no_search_logging(service):
             if search_type == "ledger":
-                rows = service.query_ledger(year=year, kw=query,
-                                            with_snippet=True)
+                rows = service.query_ledger(year=year, kw=query, with_snippet=True)
                 kinds = ["ledger"] * len(rows)
             elif search_type == "docs":
-                rows = service.query_documents(year=year, kw=query, slim=True,
-                                               with_snippet=True)
+                rows = service.query_documents(
+                    year=year, kw=query, slim=True, with_snippet=True
+                )
                 kinds = ["doc"] * len(rows)
             elif search_type == "qa":
-                rows = service.query_qa_items(year=year, kw=query, slim=True,
-                                              with_snippet=True)
+                rows = service.query_qa_items(
+                    year=year, kw=query, slim=True, with_snippet=True
+                )
                 kinds = ["qa"] * len(rows)
             else:
-                result = service.search_all(kw=query, year=year, slim=True,
-                                            with_snippet=True)
-                rows = (result.get("ledger", []) + result.get("documents", [])
-                        + result.get("qa_items", []))
-                kinds = (["ledger"] * len(result.get("ledger", []))
-                         + ["doc"] * len(result.get("documents", []))
-                         + ["qa"] * len(result.get("qa_items", [])))
-        items = [self._shape(kind, row, query) for kind, row in zip(kinds, rows, strict=True)]
+                result = service.search_all(
+                    kw=query, year=year, slim=True, with_snippet=True
+                )
+                rows = (
+                    result.get("ledger", [])
+                    + result.get("documents", [])
+                    + result.get("qa_items", [])
+                )
+                kinds = (
+                    ["ledger"] * len(result.get("ledger", []))
+                    + ["doc"] * len(result.get("documents", []))
+                    + ["qa"] * len(result.get("qa_items", []))
+                )
+        items = [
+            self._shape(kind, row, query) for kind, row in zip(kinds, rows, strict=True)
+        ]
         page, next_cursor = search_adapter.paginate(items, limit, cursor)
         return {
             "schema": "datareq-search/v1",
@@ -275,9 +343,14 @@ class AgentFacade:
 
     def _shape(self, kind, row, query):
         """목록용 발췌 항목. 목록 인용은 미검증扱い, 해시 검증은 단건 조회에서 한다."""
-        excerpt = policy.mask_text(str(row.get("snippet") or "")[:policy.MAX_SNIPPET_CHARS])
-        stable = {"qa": row.get("qa_id"), "doc": row.get("doc_id"),
-                  "ledger": row.get("ledger_id")}.get(kind, "")
+        excerpt = policy.mask_text(
+            str(row.get("snippet") or "")[: policy.MAX_SNIPPET_CHARS]
+        )
+        stable = {
+            "qa": row.get("qa_id"),
+            "doc": row.get("doc_id"),
+            "ledger": row.get("ledger_id"),
+        }.get(kind, "")
         title = str(row.get("question_title") or row.get("title") or "")
         doc_ref = row.get("doc_id") if kind == "qa" else None
         if kind == "doc":
@@ -308,18 +381,22 @@ class AgentFacade:
             if key not in cols or body_column not in cols:
                 return None
             row = cur.execute(
-                "SELECT * FROM %s WHERE %s = ?" % (table, key), (value,)).fetchone()
+                "SELECT * FROM %s WHERE %s = ?" % (table, key), (value,)
+            ).fetchone()
             return dict(row) if row else None
         finally:
             conn.close()
 
     def get_document(self, doc_id, max_chars=None, offset=None):
-        max_chars = policy.clamp_chars(max_chars, policy.MAX_EXCERPT_CHARS,
-                                       policy.MAX_EXCERPT_CHARS)
+        max_chars = policy.clamp_chars(
+            max_chars, policy.MAX_EXCERPT_CHARS, policy.MAX_EXCERPT_CHARS
+        )
         try:
             start = max(0, int(offset or 0))
         except (TypeError, ValueError) as e:
-            raise DataReqError("invalid_input", "offset은 0 이상의 정수여야 합니다.") from e
+            raise DataReqError(
+                "invalid_input", "offset은 0 이상의 정수여야 합니다."
+            ) from e
         row = self._single_row("documents", "doc_id", doc_id, "full_markdown")
         if row is None:
             # 테이블·행이 없으면 데이터셋 문제와 ID 문제를 구분한다.
@@ -327,7 +404,7 @@ class AgentFacade:
             self._require_schema()
             raise DataReqError("invalid_input", "해당 문서 ID가 없습니다.")
         body = str(row.get("full_markdown") or "")
-        excerpt = body[start:start + max_chars]
+        excerpt = body[start : start + max_chars]
         next_offset = start + len(excerpt) if start + len(excerpt) < len(body) else None
         return {
             "doc_id": doc_id,
@@ -342,19 +419,22 @@ class AgentFacade:
         }
 
     def get_qa(self, qa_id, max_chars=None, offset=None):
-        max_chars = policy.clamp_chars(max_chars, policy.MAX_EXCERPT_CHARS,
-                                       policy.MAX_EXCERPT_CHARS)
+        max_chars = policy.clamp_chars(
+            max_chars, policy.MAX_EXCERPT_CHARS, policy.MAX_EXCERPT_CHARS
+        )
         try:
             start = max(0, int(offset or 0))
         except (TypeError, ValueError) as e:
-            raise DataReqError("invalid_input", "offset은 0 이상의 정수여야 합니다.") from e
+            raise DataReqError(
+                "invalid_input", "offset은 0 이상의 정수여야 합니다."
+            ) from e
         row = self._single_row("qa_items", "qa_id", qa_id, "answer_markdown")
         if row is None:
             # 스키마 검사가 먼저다. 없으면 만들지 않고 실패한다. (감사 ISSUE-002)
             self._require_schema()
             raise DataReqError("invalid_input", "해당 Q&A ID가 없습니다.")
         body = str(row.get("answer_markdown") or "")
-        excerpt = body[start:start + max_chars]
+        excerpt = body[start : start + max_chars]
         next_offset = start + len(excerpt) if start + len(excerpt) < len(body) else None
         return {
             "qa_id": qa_id,
@@ -379,8 +459,12 @@ class AgentFacade:
             rows = service.query_ledger(year=year, kw="", status=status, due=due)
         items = [policy.mask_record(r) for r in rows]
         page, next_cursor = search_adapter.paginate(items, limit, cursor)
-        return {"items": page, "next_cursor": next_cursor,
-                "truncated": next_cursor is not None, "total": len(items)}
+        return {
+            "items": page,
+            "next_cursor": next_cursor,
+            "truncated": next_cursor is not None,
+            "total": len(items),
+        }
 
     def ledger_get(self, ledger_id):
         # 스키마 확인이 서비스 호출보다 먼저다. 없으면 만들지 않고 실패한다. (감사 ISSUE-002)
@@ -421,10 +505,13 @@ class AgentFacade:
     @staticmethod
     def _mask_snapshot(snapshot):
         import json as _json
+
         if not snapshot:
             return snapshot
         try:
-            data = _json.loads(snapshot) if isinstance(snapshot, str) else dict(snapshot)
+            data = (
+                _json.loads(snapshot) if isinstance(snapshot, str) else dict(snapshot)
+            )
         except (ValueError, TypeError):
             return policy.mask_text(str(snapshot))
         for field in ("contact_person", "aide"):
@@ -440,28 +527,42 @@ class AgentFacade:
     def reconcile(self):
         """SQLite↔JSON↔마스터 엑셀 건수 대조. 읽기 전용, 아무것도 고치지 않는다."""
         import json as _json
+
         report = {"db": {}, "json": {}, "excel": {}, "mismatch": False}
         db_path = self._db_path()
         if db_path.exists():
             conn = self._readonly_conn()
             try:
                 cur = conn.cursor()
-                required = {r[0] for r in cur.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'")}
+                required = {
+                    r[0]
+                    for r in cur.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    )
+                }
                 if {"documents", "qa_items", "request_ledger"}.issubset(required):
                     report["db"] = {
                         "available": True,
-                        "documents": cur.execute("SELECT COUNT(*) FROM documents").fetchone()[0],
-                        "qa_items": cur.execute("SELECT COUNT(*) FROM qa_items").fetchone()[0],
+                        "documents": cur.execute(
+                            "SELECT COUNT(*) FROM documents"
+                        ).fetchone()[0],
+                        "qa_items": cur.execute(
+                            "SELECT COUNT(*) FROM qa_items"
+                        ).fetchone()[0],
                         "request_ledger": cur.execute(
                             "SELECT COUNT(*) FROM request_ledger "
-                            "WHERE COALESCE(status, '') != '[삭제]'").fetchone()[0],
+                            "WHERE COALESCE(status, '') != '[삭제]'"
+                        ).fetchone()[0],
                         "tombstones": cur.execute(
                             "SELECT COUNT(*) FROM request_ledger "
-                            "WHERE status = '[삭제]'").fetchone()[0],
+                            "WHERE status = '[삭제]'"
+                        ).fetchone()[0],
                     }
                 else:
-                    report["db"] = {"available": False, "error": "SQLite 스키마가 완전하지 않습니다."}
+                    report["db"] = {
+                        "available": False,
+                        "error": "SQLite 스키마가 완전하지 않습니다.",
+                    }
             finally:
                 conn.close()
         else:
@@ -477,13 +578,17 @@ class AgentFacade:
                     "request_ledger": len(data.get("request_ledger", [])),
                 }
             except (OSError, ValueError, TypeError) as exc:
-                report["json"] = {"available": False, "error": "JSON 읽기 실패: %s" % exc}
+                report["json"] = {
+                    "available": False,
+                    "error": "JSON 읽기 실패: %s" % exc,
+                }
         else:
             report["json"] = {"available": False, "error": "JSON 캐시 파일이 없습니다."}
         if report["db"].get("available") and report["json"].get("available"):
             report["mismatch"] = any(
                 report["db"].get(k) != report["json"].get(k)
-                for k in ("documents", "qa_items", "request_ledger"))
+                for k in ("documents", "qa_items", "request_ledger")
+            )
         return report
 
     def pipeline_plan(self, input_dir):
@@ -493,6 +598,7 @@ class AgentFacade:
             raise DataReqError("invalid_input", "투입 폴더가 없습니다.")
         try:
             from pipeline_guard import PipelineGuard
+
             guard = PipelineGuard(self.base_dir)
             locked = guard.is_locked()
         except Exception:
@@ -513,11 +619,17 @@ class AgentFacade:
                     year = detect_target_year(path)
                 except Exception:
                     year = None
-            files.append({"name": path.name, "suffix": suffix,
-                          "size_bytes": path.stat().st_size,
-                          "year": str(year) if year else "미분류"})
-            by_year[str(year) if year else "미분류"] = by_year.get(
-                str(year) if year else "미분류", 0) + 1
+            files.append(
+                {
+                    "name": path.name,
+                    "suffix": suffix,
+                    "size_bytes": path.stat().st_size,
+                    "year": str(year) if year else "미분류",
+                }
+            )
+            by_year[str(year) if year else "미분류"] = (
+                by_year.get(str(year) if year else "미분류", 0) + 1
+            )
             if len(files) >= 500:
                 break
         return {
@@ -534,4 +646,5 @@ class AgentFacade:
 
     def evidence_pack(self, question, selected_ids=None, max_sources=None):
         from . import evidence as evidence_mod
+
         return evidence_mod.build_pack(self, question, selected_ids, max_sources)

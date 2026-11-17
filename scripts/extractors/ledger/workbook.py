@@ -31,6 +31,7 @@ def connect_readonly(db_path, immutable: bool = False) -> sqlite3.Connection:
     (감사 R4-01)
     """
     from urllib.parse import quote
+
     uri = "file:" + quote(Path(db_path).resolve().as_posix(), safe="/:") + "?mode=ro"
     if immutable:
         uri += "&immutable=1"
@@ -47,7 +48,9 @@ DAILY_BACKUP_SUBDIR = "daily"
 DAILY_BACKUP_KEEP_DAYS = 14
 
 
-def _daily_snapshot(excel_path: Path, backup_dir: Path, keep_days: int = DAILY_BACKUP_KEEP_DAYS):
+def _daily_snapshot(
+    excel_path: Path, backup_dir: Path, keep_days: int = DAILY_BACKUP_KEEP_DAYS
+):
     daily_dir = backup_dir / DAILY_BACKUP_SUBDIR
     today = datetime.date.today().strftime("%Y%m%d")
     dest = daily_dir / f"{excel_path.stem}_{today}{excel_path.suffix}"
@@ -56,7 +59,11 @@ def _daily_snapshot(excel_path: Path, backup_dir: Path, keep_days: int = DAILY_B
     daily_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(str(excel_path), str(dest))
     # 파일명의 `[`·`]`가 glob 문자집합으로 해석되지 않게 이스케이프한다. (2026-09-28 감사 ISSUE-001)
-    snapshots = sorted(daily_dir.glob(f"{glob.escape(excel_path.stem)}_????????{glob.escape(excel_path.suffix)}"))
+    snapshots = sorted(
+        daily_dir.glob(
+            f"{glob.escape(excel_path.stem)}_????????{glob.escape(excel_path.suffix)}"
+        )
+    )
     for old in snapshots[:-keep_days]:
         try:
             old.unlink()
@@ -65,7 +72,9 @@ def _daily_snapshot(excel_path: Path, backup_dir: Path, keep_days: int = DAILY_B
     return dest
 
 
-def backup_master_excel(excel_path, base_dir=None, keep: int = BACKUP_KEEP, force: bool = False) -> Optional[Path]:
+def backup_master_excel(
+    excel_path, base_dir=None, keep: int = BACKUP_KEEP, force: bool = False
+) -> Optional[Path]:
     """마스터 대장을 덮어쓰기 전에 롤링 백업을 남긴다. 백업 경로 또는 None.
 
     `force=True`는 60초 간격 제한을 무시한다. 보류 큐처럼 여러 작업을 한꺼번에 적용하기
@@ -82,7 +91,9 @@ def backup_master_excel(excel_path, base_dir=None, keep: int = BACKUP_KEEP, forc
     try:
         _daily_snapshot(excel_path, backup_dir)
     except Exception as e:
-        print(f"[관리대장 백업 경고] 일별 스냅숏을 남기지 못했습니다 ({backup_dir}): {e}")
+        print(
+            f"[관리대장 백업 경고] 일별 스냅숏을 남기지 못했습니다 ({backup_dir}): {e}"
+        )
     # 보류 큐를 한 번에 flush 할 때 같은 파일을 수십 번 복사하지 않도록 간격을 둔다.
     if not force and now - _LAST_BACKUP_AT.get(key, 0.0) < BACKUP_MIN_INTERVAL_SECONDS:
         return None
@@ -93,7 +104,11 @@ def backup_master_excel(excel_path, base_dir=None, keep: int = BACKUP_KEEP, forc
         shutil.copy2(str(excel_path), str(dest))
         _LAST_BACKUP_AT[key] = now
         # 위와 같은 이유로 파일명 유래 부분만 이스케이프한다. (2026-09-28 감사 ISSUE-001)
-        snapshots = sorted(backup_dir.glob(f"{glob.escape(excel_path.stem)}_*{glob.escape(excel_path.suffix)}"))
+        snapshots = sorted(
+            backup_dir.glob(
+                f"{glob.escape(excel_path.stem)}_*{glob.escape(excel_path.suffix)}"
+            )
+        )
         for old in snapshots[:-keep]:
             try:
                 old.unlink()

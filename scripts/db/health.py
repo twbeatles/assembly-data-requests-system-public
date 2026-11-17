@@ -52,6 +52,7 @@ def check_database(db_path, deep: bool = False, immutable: bool = False) -> dict
     conn = None
     try:
         from extractors.ledger.workbook import connect_readonly
+
         conn = connect_readonly(db_path, immutable=immutable)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
@@ -110,46 +111,65 @@ def check_database(db_path, deep: bool = False, immutable: bool = False) -> dict
         # 4. 끊어진 연결 참조 (제안서 D3) — FK를 걸지 않고 계측만 한다.
         #    `linked_doc_id`에 FK를 걸면 문서 재빌드가 대장 링크를 지워, 불변조건 11
         #    (tombstone은 SQLite에만)과 충돌한다. 그래서 막지 않고 보이게만 한다.
-        dangling_doc = _scalar(cur, """
+        dangling_doc = _scalar(
+            cur,
+            """
             SELECT COUNT(*) FROM request_ledger r
             LEFT JOIN documents d ON r.linked_doc_id = d.doc_id
             WHERE COALESCE(r.linked_doc_id, '') != '' AND d.doc_id IS NULL
-        """)
-        dangling_ledger = _scalar(cur, """
+        """,
+        )
+        dangling_ledger = _scalar(
+            cur,
+            """
             SELECT COUNT(*) FROM documents d
             LEFT JOIN request_ledger r ON d.linked_ledger_id = r.ledger_id
             WHERE COALESCE(d.linked_ledger_id, '') != '' AND r.ledger_id IS NULL
-        """)
-        orphan_qa = _scalar(cur, """
+        """,
+        )
+        orphan_qa = _scalar(
+            cur,
+            """
             SELECT COUNT(*) FROM qa_items q
             LEFT JOIN documents d ON q.doc_id = d.doc_id
             WHERE d.doc_id IS NULL
-        """)
+        """,
+        )
         result["links"] = {
             "dangling_linked_doc_id": dangling_doc,
             "dangling_linked_ledger_id": dangling_ledger,
             "orphan_qa_items": orphan_qa,
         }
         if dangling_doc:
-            result["warnings"].append(f"없는 문서를 가리키는 대장 연결 {dangling_doc}건")
+            result["warnings"].append(
+                f"없는 문서를 가리키는 대장 연결 {dangling_doc}건"
+            )
         if dangling_ledger:
-            result["warnings"].append(f"없는 대장을 가리키는 문서 연결 {dangling_ledger}건")
+            result["warnings"].append(
+                f"없는 대장을 가리키는 문서 연결 {dangling_ledger}건"
+            )
         if orphan_qa:
             result["problems"].append(f"부모 문서가 없는 Q&A {orphan_qa}건")
 
         # 5. 값 품질 — 막지 않고 알린다. 운영 대장은 엑셀 자유 입력이 정본이라
         #    CHECK 제약을 걸면 동기화가 깨진다(불변조건 17·24).
-        empty_year = _scalar(cur, "SELECT COUNT(*) FROM documents WHERE COALESCE(year, '') = ''")
+        empty_year = _scalar(
+            cur, "SELECT COUNT(*) FROM documents WHERE COALESCE(year, '') = ''"
+        )
         # 연도가 없는 문서 중 요구일자는 있는 것 — 이건 추출 결함이라 고칠 수 있다.
-        fixable_year = _scalar(cur, """
+        fixable_year = _scalar(
+            cur,
+            """
             SELECT COUNT(*) FROM documents
             WHERE COALESCE(year, '') = '' AND COALESCE(request_date, '') != ''
-        """)
+        """,
+        )
         result["quality"] = {
             "documents_without_year": empty_year,
             "documents_without_year_but_dated": fixable_year,
             "status_values": {
-                r["st"]: r["c"] for r in cur.execute(
+                r["st"]: r["c"]
+                for r in cur.execute(
                     "SELECT COALESCE(NULLIF(TRIM(status), ''), '(없음)') AS st, COUNT(*) AS c "
                     "FROM request_ledger GROUP BY st ORDER BY c DESC"
                 )
@@ -190,6 +210,7 @@ def check_database(db_path, deep: bool = False, immutable: bool = False) -> dict
 def rebuild_fts_integrity(db_path) -> dict:
     """FTS 인덱스를 본체 기준으로 다시 만든다. 점검에서 어긋남이 나왔을 때 쓴다."""
     from .migrations import rebuild_fts
+
     conn = sqlite3.connect(str(db_path))
     try:
         ok = rebuild_fts(conn)

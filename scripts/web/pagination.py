@@ -8,15 +8,15 @@ def parse_page_params(query):
     """`limit`(1~1000)·`offset`(0 이상) 쿼리 값. 잘못된 값은 무시한다."""
     limit = None
     offset = 0
-    raw_limit = (query.get('limit') or [None])[0]
-    raw_offset = (query.get('offset') or [None])[0]
+    raw_limit = (query.get("limit") or [None])[0]
+    raw_offset = (query.get("offset") or [None])[0]
     try:
-        if raw_limit not in (None, ''):
+        if raw_limit not in (None, ""):
             limit = max(1, min(int(raw_limit), MAX_PAGE_LIMIT))
     except ValueError:
         limit = None
     try:
-        if raw_offset not in (None, ''):
+        if raw_offset not in (None, ""):
             offset = max(0, int(raw_offset))
     except ValueError:
         offset = 0

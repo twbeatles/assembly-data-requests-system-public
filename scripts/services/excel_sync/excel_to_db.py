@@ -36,7 +36,11 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
         master_excel = self.find_master_excel()
         if not master_excel or not master_excel.exists():
             return self._remember_excel_sync(
-                {"success": False, "reason": "no_master_excel", "message": "마스터 엑셀 파일을 찾을 수 없습니다."}
+                {
+                    "success": False,
+                    "reason": "no_master_excel",
+                    "message": "마스터 엑셀 파일을 찾을 수 없습니다.",
+                }
             )
 
         blocked = self._pipeline_block()
@@ -54,18 +58,25 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
             from services.ledger_service import LedgerService
 
             # Read documents from DB to support document auto-linking
-            service = LedgerService(db_path=self.db_path, json_path=self.json_path, base_dir=self.base_dir)
+            service = LedgerService(
+                db_path=self.db_path, json_path=self.json_path, base_dir=self.base_dir
+            )
             conn = service.get_conn()
             try:
                 cur = conn.cursor()
-                docs = [dict(r) for r in cur.execute("SELECT * FROM documents").fetchall()]
+                docs = [
+                    dict(r) for r in cur.execute("SELECT * FROM documents").fetchall()
+                ]
                 # 엑셀을 읽기 **전**의 대장 ID 집합. 삭제 판정은 이 집합에 있던 행만
                 # 대상으로 한다. 파싱 도중 웹에서 새로 등록된 행은 "엑셀에 없다"가
                 # 아니라 "아직 쓰이지 않았다"이므로 판정할 근거가 없다.
                 # 이 방어선이 없으면 동기화 중에 누른 등록이 성공 메시지와 함께
                 # 곧바로 [삭제] 처리된다.
                 known_ledger_ids = {
-                    r[0] for r in cur.execute("SELECT ledger_id FROM request_ledger").fetchall()
+                    r[0]
+                    for r in cur.execute(
+                        "SELECT ledger_id FROM request_ledger"
+                    ).fetchall()
                 }
             finally:
                 conn.close()
@@ -73,9 +84,14 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
             # Parse Excel only (avoid circular DB re-merge)
             # 스탬핑·쓰기에 쓴 바로 그 파일을 파싱한다. 파서가 따로 탐색하면 다른 파일을 고를 수
             # 있다. (감사 R4-03)
-            parsed_items = load_request_ledger(self.base_dir, docs, merge_db_records=False,
-                                               db_path=self.db_path, system_dir=self.base_dir,
-                                               excel_path=master_excel)
+            parsed_items = load_request_ledger(
+                self.base_dir,
+                docs,
+                merge_db_records=False,
+                db_path=self.db_path,
+                system_dir=self.base_dir,
+                excel_path=master_excel,
+            )
 
             # 대장 파일은 있는데 한 건도 읽지 못했다. 헤더·시트명 인식 실패나 잘못된 파일 선택의
             # 신호이지 "대장이 비었다"가 아니다(DB에 엑셀 출처 항목이 있기 때문). 예전에는 이것을
@@ -91,11 +107,19 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
                         f"DB에는 엑셀 출처 항목 {excel_known}건이 있습니다. 시트 이름(연도)과 1행 헤더를 확인하세요."
                     )
                     print(f"🚨 [엑셀 동기화 중단] {message}")
-                    return self._remember_excel_sync({
-                        "success": False, "skipped": True, "reason": "parsed_zero",
-                        "inserted": 0, "updated": 0, "deleted": 0, "total": 0,
-                        "excel": master_excel.name, "message": message,
-                    })
+                    return self._remember_excel_sync(
+                        {
+                            "success": False,
+                            "skipped": True,
+                            "reason": "parsed_zero",
+                            "inserted": 0,
+                            "updated": 0,
+                            "deleted": 0,
+                            "total": 0,
+                            "excel": master_excel.name,
+                            "message": message,
+                        }
+                    )
 
             # 보류 큐·격리 파일에 남은 웹 변경은 아직 Excel에 없다. 이 ID들을 Excel 기준으로
             # 덮어쓰거나 삭제 처리하면 사용자가 등록·수정한 내용이 사라진다.
@@ -124,7 +148,9 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
                             continue
                         guarded_fields = protected_fields[lid]
 
-                    cur.execute("SELECT * FROM request_ledger WHERE ledger_id = ?", (lid,))
+                    cur.execute(
+                        "SELECT * FROM request_ledger WHERE ledger_id = ?", (lid,)
+                    )
                     existing = cur.fetchone()
 
                     # [삭제] is a tombstone written by the web delete path.  It
@@ -132,11 +158,22 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
                     if str(it.get("status") or "").strip() == "[삭제]":
                         if guarded_fields:
                             continue
-                        if existing and str(existing["status"] or "").strip() != "[삭제]":
-                            cur.execute("UPDATE request_ledger SET status = ?, updated_at = ? WHERE ledger_id = ?", ("[삭제]", now_str, lid))
+                        if (
+                            existing
+                            and str(existing["status"] or "").strip() != "[삭제]"
+                        ):
+                            cur.execute(
+                                "UPDATE request_ledger SET status = ?, updated_at = ? WHERE ledger_id = ?",
+                                ("[삭제]", now_str, lid),
+                            )
                             cur.execute(
                                 "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES (?, ?, ?, ?)",
-                                (lid, "EXCEL_SYNC_DELETE", now_str, json.dumps(dict(existing), ensure_ascii=False))
+                                (
+                                    lid,
+                                    "EXCEL_SYNC_DELETE",
+                                    now_str,
+                                    json.dumps(dict(existing), ensure_ascii=False),
+                                ),
                             )
                             deleted += 1
                         continue
@@ -148,25 +185,45 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
                         continue
 
                     if not existing:
-                        cur.execute("""
+                        cur.execute(
+                            """
                             INSERT INTO request_ledger (
                                 ledger_id, year, seq_no, party, requester, aide,
                                 title, details, request_date, deadline, submit_date,
                                 department, status, note, request_type, linked_doc_id,
                                 created_at, updated_at
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            lid, it.get("year", ""), it.get("seq_no", ""), it.get("party", ""),
-                            it.get("requester", ""), it.get("aide", ""), it.get("title", ""),
-                            it.get("details", ""), it.get("request_date", ""), it.get("deadline", ""),
-                            it.get("submit_date", ""), it.get("department", ""), it.get("status", ""),
-                            it.get("note", ""), it.get("request_type", ""), it.get("linked_doc_id", ""),
-                            it.get("created_at", now_str), it.get("updated_at", now_str)
-                        ))
+                        """,
+                            (
+                                lid,
+                                it.get("year", ""),
+                                it.get("seq_no", ""),
+                                it.get("party", ""),
+                                it.get("requester", ""),
+                                it.get("aide", ""),
+                                it.get("title", ""),
+                                it.get("details", ""),
+                                it.get("request_date", ""),
+                                it.get("deadline", ""),
+                                it.get("submit_date", ""),
+                                it.get("department", ""),
+                                it.get("status", ""),
+                                it.get("note", ""),
+                                it.get("request_type", ""),
+                                it.get("linked_doc_id", ""),
+                                it.get("created_at", now_str),
+                                it.get("updated_at", now_str),
+                            ),
+                        )
                         try:
                             cur.execute(
                                 "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES (?, ?, ?, ?)",
-                                (lid, "EXCEL_SYNC_INSERT", now_str, json.dumps(it, ensure_ascii=False))
+                                (
+                                    lid,
+                                    "EXCEL_SYNC_INSERT",
+                                    now_str,
+                                    json.dumps(it, ensure_ascii=False),
+                                ),
                             )
                         except Exception:
                             pass
@@ -178,9 +235,22 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
                         params = []
                         # `year`도 비교한다. 행을 다른 연도 시트로 옮기면 파싱된 year가
                         # 바뀌는데, 예전에는 비교 목록에 없어 DB의 연도가 영영 어긋났다.
-                        for field in ["year", "title", "details", "requester", "party", "aide", "seq_no",
-                                      "request_date", "deadline", "submit_date", "department",
-                                      "status", "note", "request_type"]:
+                        for field in [
+                            "year",
+                            "title",
+                            "details",
+                            "requester",
+                            "party",
+                            "aide",
+                            "seq_no",
+                            "request_date",
+                            "deadline",
+                            "submit_date",
+                            "department",
+                            "status",
+                            "note",
+                            "request_type",
+                        ]:
                             if field in guarded_fields:
                                 continue
                             excel_val = str(it.get(field, "") or "").strip()
@@ -194,17 +264,27 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
                             update_fields.append("updated_at = ?")
                             params.append(now_str)
                             params.append(lid)
-                            cur.execute(f"UPDATE request_ledger SET {', '.join(update_fields)} WHERE ledger_id = ?", params)
+                            cur.execute(
+                                f"UPDATE request_ledger SET {', '.join(update_fields)} WHERE ledger_id = ?",
+                                params,
+                            )
                             try:
                                 cur.execute(
                                     "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES (?, ?, ?, ?)",
-                                    (lid, "EXCEL_SYNC_UPDATE", now_str, json.dumps(dict(existing), ensure_ascii=False))
+                                    (
+                                        lid,
+                                        "EXCEL_SYNC_UPDATE",
+                                        now_str,
+                                        json.dumps(dict(existing), ensure_ascii=False),
+                                    ),
                                 )
                             except Exception:
                                 pass
                             updated += 1
 
-                excel_ids = {it.get("ledger_id") for it in parsed_items if it.get("ledger_id")}
+                excel_ids = {
+                    it.get("ledger_id") for it in parsed_items if it.get("ledger_id")
+                }
                 # 웹에서 등록했지만 아직 한 번도 엑셀에 쓰이지 않은 행. "엑셀에 없다"가 삭제의
                 # 근거가 되지 않는다. 예전에는 요청형태가 '시스템'인지로 이것을 가렸는데,
                 # 운영 대장에서 '시스템'은 "국회 요구자료 시스템으로 접수"라는 업무 값이라
@@ -214,17 +294,23 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
                 active_rows = cur.execute(
                     "SELECT ledger_id FROM request_ledger WHERE COALESCE(status, '') != '[삭제]'"
                 ).fetchall()
-                total_existing = sum(1 for r in active_rows if r["ledger_id"] not in web_only_ids)
+                total_existing = sum(
+                    1 for r in active_rows if r["ledger_id"] not in web_only_ids
+                )
 
                 # Safety guard: 파싱 건수가 급감하면 일괄 삭제하지 않는다. 대장 규모와 무관하게
                 # 비율만으로 판단한다. (도입 초기의 소규모 대장도 보호)
                 allow_delete = True
                 if total_existing > 0 and len(excel_ids) < total_existing * 0.5:
                     allow_delete = False
-                    print(f"⚠️ [엑셀 동기화 안전장치] 파싱 건수({len(excel_ids)}건)가 기존 DB({total_existing}건) 대비 50% 미만이므로 일괄 삭제를 건너뜁니다.")
+                    print(
+                        f"⚠️ [엑셀 동기화 안전장치] 파싱 건수({len(excel_ids)}건)가 기존 DB({total_existing}건) 대비 50% 미만이므로 일괄 삭제를 건너뜁니다."
+                    )
 
                 if excel_ids and allow_delete:
-                    for row in cur.execute("SELECT ledger_id, status FROM request_ledger").fetchall():
+                    for row in cur.execute(
+                        "SELECT ledger_id, status FROM request_ledger"
+                    ).fetchall():
                         lid = row["ledger_id"]
                         st = str(row["status"] or "")
                         if lid in pending_ids or lid in web_only_ids:
@@ -235,11 +321,16 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
                         if lid not in excel_ids and st != "[삭제]":
                             cur.execute(
                                 "UPDATE request_ledger SET status = ?, updated_at = ? WHERE ledger_id = ?",
-                                ("[삭제]", now_str, lid)
+                                ("[삭제]", now_str, lid),
                             )
                             cur.execute(
                                 "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES (?, ?, ?, ?)",
-                                (lid, "EXCEL_SYNC_DELETE", now_str, json.dumps({"ledger_id": lid}, ensure_ascii=False))
+                                (
+                                    lid,
+                                    "EXCEL_SYNC_DELETE",
+                                    now_str,
+                                    json.dumps({"ledger_id": lid}, ensure_ascii=False),
+                                ),
                             )
                             deleted += 1
 
@@ -259,22 +350,38 @@ class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneral
             if write_json:
                 service.sync_json_file(async_mode=False)
             self.bump_version()
-            print(f"✓ 엑셀 수기 수정 감지 ➔ DB 반영 완료 (신규 {inserted}건, 수정 {updated}건, 삭제 {deleted}건)")
+            print(
+                f"✓ 엑셀 수기 수정 감지 ➔ DB 반영 완료 (신규 {inserted}건, 수정 {updated}건, 삭제 {deleted}건)"
+            )
 
-        return self._remember_excel_sync({
-            "success": True,
-            "inserted": inserted,
-            "updated": updated,
-            "deleted": deleted,
-            "total": len(parsed_items),
-            "excel": master_excel.name,
-            "message": f"동기화 완료 (신규 {inserted}건, 수정 {updated}건, 삭제 {deleted}건)"
-        })
+        return self._remember_excel_sync(
+            {
+                "success": True,
+                "inserted": inserted,
+                "updated": updated,
+                "deleted": deleted,
+                "total": len(parsed_items),
+                "excel": master_excel.name,
+                "message": f"동기화 완료 (신규 {inserted}건, 수정 {updated}건, 삭제 {deleted}건)",
+            }
+        )
 
     def _remember_excel_sync(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """마지막 엑셀→DB 동기화 결과를 남긴다. `/api/sync`의 `excel_last_sync`로 보인다."""
-        record = {k: result.get(k) for k in ("success", "reason", "inserted", "updated", "deleted",
-                                               "total", "excel", "message") if k in result}
+        record = {
+            k: result.get(k)
+            for k in (
+                "success",
+                "reason",
+                "inserted",
+                "updated",
+                "deleted",
+                "total",
+                "excel",
+                "message",
+            )
+            if k in result
+        }
         record["at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._last_excel_sync = record
         return result

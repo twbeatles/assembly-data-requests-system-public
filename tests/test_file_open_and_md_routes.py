@@ -2,6 +2,7 @@
 """
 탐색기 파일 위치 열기(/api/open) 및 마크다운 파일 서빙(/_parsed_markdown/) 회귀 테스트.
 """
+
 import io
 import json
 import shutil
@@ -37,7 +38,9 @@ class TestFileOpenAndMdRoutes(unittest.TestCase):
         self.md_dir = self.sys_dir / "_parsed_markdown" / "2026"
         self.md_dir.mkdir(parents=True)
         self.md_file = self.md_dir / "테스트_공문서.hwp.md"
-        self.md_file.write_text("# 테스트 문서 제목\n\n답변 내용 본문입니다.", encoding="utf-8")
+        self.md_file.write_text(
+            "# 테스트 문서 제목\n\n답변 내용 본문입니다.", encoding="utf-8"
+        )
 
         self.db_path = self.sys_dir / "data_requests.db"
         self.db_path.write_bytes(b"dummy db")
@@ -48,8 +51,12 @@ class TestFileOpenAndMdRoutes(unittest.TestCase):
         web_server.BASE_DIR = self.orig_base_dir
         shutil.rmtree(self.temp_root, ignore_errors=True)
 
-    def _create_handler(self, path: str, method: str = "GET", body: Optional[dict] = None):
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+    def _create_handler(
+        self, path: str, method: str = "GET", body: Optional[dict] = None
+    ):
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         handler.path = path
         handler.headers = {"Host": "127.0.0.1"}
         handler.wfile = io.BytesIO()
@@ -145,7 +152,9 @@ class TestFileOpenAndMdRoutes(unittest.TestCase):
     def test_api_open_endpoint_post_success(self):
         """POST /api/open with json body 호출 시 200 성공 JSON을 반환한다."""
         rel = f"2026/{self.hwp_file.name}"
-        handler = self._create_handler("/api/open", method="POST", body={"path": rel, "mode": "explorer"})
+        handler = self._create_handler(
+            "/api/open", method="POST", body={"path": rel, "mode": "explorer"}
+        )
         with mock.patch("subprocess.Popen"):
             handler.do_POST()
         self.assertEqual(handler.sent_status, 200)

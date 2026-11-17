@@ -38,23 +38,34 @@ def test_golden_recall_and_exclusion(tmp_path, capsys):
     failures = []
     for case in agent_golden.GOLDEN_QUERIES:
         started = time.perf_counter()
-        found = facade.search(case["query"], category=case["category"],
-                              year=case["year"], limit=50)
+        found = facade.search(
+            case["query"], category=case["category"], year=case["year"], limit=50
+        )
         elapsed_ms = (time.perf_counter() - started) * 1000
         got = _source_ids(found["items"])
         missing = set(case["must_include"]) - got
         leaked = set(case["must_exclude"]) & got
         payload_bytes = len(json.dumps(found, ensure_ascii=False).encode("utf-8"))
-        rows.append((case["name"], len(got), elapsed_ms, payload_bytes,
-                     sorted(missing), sorted(leaked)))
+        rows.append(
+            (
+                case["name"],
+                len(got),
+                elapsed_ms,
+                payload_bytes,
+                sorted(missing),
+                sorted(leaked),
+            )
+        )
         if missing or leaked:
             failures.append((case["name"], sorted(missing), sorted(leaked)))
         assert payload_bytes <= policy.MAX_RESPONSE_BYTES, case["name"]
     with capsys.disabled():
         print("\n[golden] query active(ms) bytes missing leaked")
         for name, count, ms, size, missing, leaked in rows:
-            print("  %-16s %3d %8.1f %7d %s %s"
-                  % (name, count, ms, size, missing or "-", leaked or "-"))
+            print(
+                "  %-16s %3d %8.1f %7d %s %s"
+                % (name, count, ms, size, missing or "-", leaked or "-")
+            )
     assert not failures, "golden recall failures: %s" % (failures,)
 
 
@@ -77,8 +88,16 @@ def test_golden_no_results_is_distinct(tmp_path):
 def test_golden_cli_facade_parity(tmp_path):
     _facade(tmp_path)
     for case in agent_golden.GOLDEN_QUERIES:
-        argv = ["--data-root", str(tmp_path), "search", case["query"],
-                "--category", case["category"], "--limit", "50"]
+        argv = [
+            "--data-root",
+            str(tmp_path),
+            "search",
+            case["query"],
+            "--category",
+            case["category"],
+            "--limit",
+            "50",
+        ]
         if case["year"]:
             argv += ["--year", case["year"]]
         buffer = io.StringIO()
@@ -87,10 +106,12 @@ def test_golden_cli_facade_parity(tmp_path):
         assert code == 0, case["name"]
         envelope = json.loads(buffer.getvalue())
         facade = AgentFacade(base_dir=tmp_path, allowed_roots=[tmp_path])
-        direct = facade.search(case["query"], category=case["category"],
-                               year=case["year"], limit=50)
-        assert _source_ids(envelope["data"]["items"]) == _source_ids(direct["items"]), \
+        direct = facade.search(
+            case["query"], category=case["category"], year=case["year"], limit=50
+        )
+        assert _source_ids(envelope["data"]["items"]) == _source_ids(direct["items"]), (
             case["name"]
+        )
 
 
 def test_golden_latency_guard(tmp_path, capsys):
@@ -98,14 +119,17 @@ def test_golden_latency_guard(tmp_path, capsys):
     samples = []
     for case in agent_golden.GOLDEN_QUERIES:
         started = time.perf_counter()
-        facade.search(case["query"], category=case["category"],
-                      year=case["year"], limit=50)
+        facade.search(
+            case["query"], category=case["category"], year=case["year"], limit=50
+        )
         samples.append((time.perf_counter() - started) * 1000)
     samples.sort()
     p50 = samples[len(samples) // 2]
     p95 = samples[int(len(samples) * 0.95) - 1]
     with capsys.disabled():
-        print("\n[golden] latency over %d queries: p50=%.1fms p95=%.1fms"
-              % (len(samples), p50, p95))
+        print(
+            "\n[golden] latency over %d queries: p50=%.1fms p95=%.1fms"
+            % (len(samples), p50, p95)
+        )
     # 미니 코퍼스 가드. 운영 규모 평가는 별도 실측 후 설정한다.
     assert p95 < 10000

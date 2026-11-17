@@ -1,4 +1,5 @@
 """Read-only compatibility check before any rebuild or ingestion writes."""
+
 import time
 from contextlib import closing
 from pathlib import Path
@@ -14,10 +15,13 @@ def check_database_version(path):
     if not Path(path).exists():
         return
     from extractors.ledger.workbook import connect_readonly
+
     with closing(connect_readonly(path)) as conn:
         version = get_version(conn)
         if version > SCHEMA_VERSION:
-            raise SchemaTooNewError(f"DB 버전 {version}은 지원 버전 {SCHEMA_VERSION}보다 높습니다. 최신 프로그램으로 실행하세요.")
+            raise SchemaTooNewError(
+                f"DB 버전 {version}은 지원 버전 {SCHEMA_VERSION}보다 높습니다. 최신 프로그램으로 실행하세요."
+            )
 
 
 def _prune_pre_rebuild(target: Path, keep: int = PRE_REBUILD_KEEP) -> None:
@@ -54,13 +58,22 @@ def snapshot_before_rebuild(path):
 
     from extractors.ledger.workbook import connect_readonly
     from write_guard import ensure_writable
+
     path = Path(path)
     if not path.exists():
         return None
-    target = path.parent / ".db_backup" / "pre_rebuild" / (datetime.now().strftime("%Y%m%d_%H%M%S_") + uuid.uuid4().hex[:8] + ".db")
+    target = (
+        path.parent
+        / ".db_backup"
+        / "pre_rebuild"
+        / (datetime.now().strftime("%Y%m%d_%H%M%S_") + uuid.uuid4().hex[:8] + ".db")
+    )
     ensure_writable(target, "재빌드 직전 DB 백업")
     target.parent.mkdir(parents=True, exist_ok=True)
-    with closing(connect_readonly(path)) as source, closing(sqlite3.connect(str(target))) as dest:
+    with (
+        closing(connect_readonly(path)) as source,
+        closing(sqlite3.connect(str(target))) as dest,
+    ):
         source.backup(dest)
     _prune_pre_rebuild(target)
     return target

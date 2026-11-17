@@ -41,10 +41,13 @@ def conflict_destination(destination: Path) -> Path:
     raise RuntimeError(f"동일 이름 충돌 파일이 너무 많습니다: {destination.name}")
 
 
-def migrate_markdown(source_system_dir: Path, destination_system_dir: Path = SYSTEM_DIR) -> dict:
+def migrate_markdown(
+    source_system_dir: Path, destination_system_dir: Path = SYSTEM_DIR
+) -> dict:
     from db.preflight import check_database_version
     from pipeline_guard import PipelineGuard
     from write_guard import ensure_writable
+
     destination_system_dir = Path(destination_system_dir)
     if Path(source_system_dir).resolve() == destination_system_dir.resolve():
         raise ValueError("현재 프로그램 폴더는 이전 설치본으로 지정할 수 없습니다.")
@@ -59,7 +62,9 @@ def migrate_markdown(source_system_dir: Path, destination_system_dir: Path = SYS
             guard.release()
 
 
-def _migrate_markdown_locked(source_system_dir: Path, destination_system_dir: Path) -> dict:
+def _migrate_markdown_locked(
+    source_system_dir: Path, destination_system_dir: Path
+) -> dict:
     """Copy a previous installation's Markdown cache without changing its files."""
     source_system_dir = Path(source_system_dir).resolve()
     destination_system_dir = Path(destination_system_dir).resolve()
@@ -68,7 +73,9 @@ def _migrate_markdown_locked(source_system_dir: Path, destination_system_dir: Pa
 
     source_root = source_system_dir / "_parsed_markdown"
     if not source_root.is_dir():
-        raise FileNotFoundError(f"이전 설치본에 _parsed_markdown 폴더가 없습니다: {source_system_dir}")
+        raise FileNotFoundError(
+            f"이전 설치본에 _parsed_markdown 폴더가 없습니다: {source_system_dir}"
+        )
 
     destination_root = destination_system_dir / "_parsed_markdown"
     files = sorted(path for path in source_root.rglob("*.md") if path.is_file())
@@ -86,15 +93,22 @@ def _migrate_markdown_locked(source_system_dir: Path, destination_system_dir: Pa
             # 그렇지 않으면 기존 충돌 사본을 못 찾아 매 실행마다 사본이 하나씩 는다.
             # (2026-09-28 감사 ISSUE-001)
             siblings = destination.parent.glob(
-                glob.escape(destination.stem) + "__migrated_*" + glob.escape(destination.suffix)
+                glob.escape(destination.stem)
+                + "__migrated_*"
+                + glob.escape(destination.suffix)
             )
-            if any(sha256_file(candidate) == source_hash for candidate in siblings if candidate.is_file()):
+            if any(
+                sha256_file(candidate) == source_hash
+                for candidate in siblings
+                if candidate.is_file()
+            ):
                 skipped += 1
                 continue
             destination = conflict_destination(destination)
             renamed += 1
         destination.parent.mkdir(parents=True, exist_ok=True)
         from write_guard import ensure_writable
+
         ensure_writable(destination, "이전 마크다운")
         fd, staging = tempfile.mkstemp(prefix=".migration-", dir=destination.parent)
         os.close(fd)
@@ -123,7 +137,9 @@ def rebuild_outputs() -> bool:
 
     result = extract_and_build_db.main()
     if not result or not result.get("success"):
-        print(f"✗ SQLite/JSON 재구축 실패: {result.get('error', '알 수 없는 오류') if result else ''}")
+        print(
+            f"✗ SQLite/JSON 재구축 실패: {result.get('error', '알 수 없는 오류') if result else ''}"
+        )
         return False
     if not generate_excel_db.main():
         print("✗ 통합 엑셀 재구축 실패")
@@ -159,10 +175,14 @@ def choose_previous_folder() -> Optional[Path]:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="이전 설치본의 파싱 마크다운 안전 이전")
+    parser = argparse.ArgumentParser(
+        description="이전 설치본의 파싱 마크다운 안전 이전"
+    )
     parser.add_argument("previous_folder", nargs="?", help="이전 프로그램 폴더 경로")
     args = parser.parse_args(argv)
-    previous_folder = Path(args.previous_folder) if args.previous_folder else choose_previous_folder()
+    previous_folder = (
+        Path(args.previous_folder) if args.previous_folder else choose_previous_folder()
+    )
     if previous_folder is None:
         print("마이그레이션을 취소했습니다. 변경된 파일은 없습니다.")
         return 2
@@ -177,7 +197,9 @@ def main(argv=None) -> int:
         "이름 충돌 보존 {renamed}건".format(**summary)
     )
     if not rebuild_outputs():
-        print("원본 설치본과 이전한 마크다운은 그대로 보존되었습니다. 오류를 해결한 뒤 같은 배치를 다시 실행하세요.")
+        print(
+            "원본 설치본과 이전한 마크다운은 그대로 보존되었습니다. 오류를 해결한 뒤 같은 배치를 다시 실행하세요."
+        )
         return 1
     print("✓ SQLite DB, 통합 엑셀, 웹 대시보드에 이전 마크다운을 반영했습니다.")
     return 0

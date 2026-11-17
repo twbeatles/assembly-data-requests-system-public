@@ -41,20 +41,80 @@ from test_audit_phase10_dashboard import (
 
 TODAY = datetime.date(2026, 9, 14)
 LEDGER_FIXTURE = [
-    {"ledger_id": "REQ-2026-001", "year": "2026", "status": "작성중", "deadline": "2026-09-10", "title": "지난 마감", "requester": "김의원"},
-    {"ledger_id": "REQ-2026-002", "year": "2026", "status": "작성중", "deadline": "2026-09-14", "title": "오늘 마감", "requester": "이의원"},
-    {"ledger_id": "REQ-2026-003", "year": "2026", "status": "검토중", "deadline": "2026-09-20", "title": "6일 뒤", "requester": "박의원"},
-    {"ledger_id": "REQ-2026-004", "year": "2026", "status": "작성중", "deadline": "2026-10-30", "title": "먼 마감", "requester": "최의원"},
-    {"ledger_id": "REQ-2026-005", "year": "2026", "status": "제출", "deadline": "2026-09-01", "title": "제출 완료", "requester": "정의원"},
-    {"ledger_id": "REQ-2027-001", "year": "2027", "status": "작성중", "deadline": "", "title": "마감 미정", "requester": "한의원"},
+    {
+        "ledger_id": "REQ-2026-001",
+        "year": "2026",
+        "status": "작성중",
+        "deadline": "2026-09-10",
+        "title": "지난 마감",
+        "requester": "김의원",
+    },
+    {
+        "ledger_id": "REQ-2026-002",
+        "year": "2026",
+        "status": "작성중",
+        "deadline": "2026-09-14",
+        "title": "오늘 마감",
+        "requester": "이의원",
+    },
+    {
+        "ledger_id": "REQ-2026-003",
+        "year": "2026",
+        "status": "검토중",
+        "deadline": "2026-09-20",
+        "title": "6일 뒤",
+        "requester": "박의원",
+    },
+    {
+        "ledger_id": "REQ-2026-004",
+        "year": "2026",
+        "status": "작성중",
+        "deadline": "2026-10-30",
+        "title": "먼 마감",
+        "requester": "최의원",
+    },
+    {
+        "ledger_id": "REQ-2026-005",
+        "year": "2026",
+        "status": "제출",
+        "deadline": "2026-09-01",
+        "title": "제출 완료",
+        "requester": "정의원",
+    },
+    {
+        "ledger_id": "REQ-2027-001",
+        "year": "2027",
+        "status": "작성중",
+        "deadline": "",
+        "title": "마감 미정",
+        "requester": "한의원",
+    },
 ]
-EXPECTED_STATES = {"REQ-2026-001": "overdue", "REQ-2026-002": "soon", "REQ-2026-003": "soon",
-                   "REQ-2026-004": "later", "REQ-2026-005": "done", "REQ-2027-001": "none"}
+EXPECTED_STATES = {
+    "REQ-2026-001": "overdue",
+    "REQ-2026-002": "soon",
+    "REQ-2026-003": "soon",
+    "REQ-2026-004": "later",
+    "REQ-2026-005": "done",
+    "REQ-2027-001": "none",
+}
 
 UI_FUNCS = SEARCH_FUNCS + [
-    "LEDGER_DONE_STATUSES", "DUE_SOON_DAYS", "parseLedgerDate", "startOfDay", "ledgerDueInfo",
-    "matchesDueFilter", "dueBadgeHtml", "compareByDeadline", "collectFilterYears", "collectLedgerStatuses",
-    "countLedgerDue", "emptyStateHints", "excelStatusMessage", "nextRecentSearches", "escapeHtml",
+    "LEDGER_DONE_STATUSES",
+    "DUE_SOON_DAYS",
+    "parseLedgerDate",
+    "startOfDay",
+    "ledgerDueInfo",
+    "matchesDueFilter",
+    "dueBadgeHtml",
+    "compareByDeadline",
+    "collectFilterYears",
+    "collectLedgerStatuses",
+    "countLedgerDue",
+    "emptyStateHints",
+    "excelStatusMessage",
+    "nextRecentSearches",
+    "escapeHtml",
 ]
 
 
@@ -69,11 +129,14 @@ def node_body(code: str) -> str:
 @unittest.skipUnless(NODE, "node가 없어 대시보드 JS 실행 테스트를 건너뜁니다")
 class TestDashboardLedgerUx(unittest.TestCase):
     def test_due_state_badge_and_counts(self):
-        res = run_node(UI_FUNCS, node_body("""
+        res = run_node(
+            UI_FUNCS,
+            node_body("""
 const states = {}; const badges = {};
 for (const it of LEDGER) { states[it.ledger_id] = ledgerDueInfo(it, TODAY).state; badges[it.ledger_id] = dueBadgeHtml(it, TODAY); }
 console.log(JSON.stringify({ states, badges, counts: countLedgerDue(LEDGER, TODAY) }));
-"""))
+"""),
+        )
         self.assertEqual(res["states"], EXPECTED_STATES)
         self.assertIn("마감 4일 지남", res["badges"]["REQ-2026-001"])
         self.assertIn("오늘 마감", res["badges"]["REQ-2026-002"])
@@ -83,7 +146,9 @@ console.log(JSON.stringify({ states, badges, counts: countLedgerDue(LEDGER, TODA
 
     def test_ledger_filters_ignore_document_only_filters(self):
         """관리대장 탭에서 기관·주제·통계표 필터가 켜져 있어도 대장 결과가 0건이 되지 않는다."""
-        res = run_node(UI_FUNCS, node_body("""
+        res = run_node(
+            UI_FUNCS,
+            node_body("""
 activeFilters.inst = '국회'; activeFilters.topic = '딥페이크'; activeFilters.tablesOnly = true;
 const out = {};
 out.all = filterItemsFromList(LEDGER, false).length;
@@ -91,30 +156,52 @@ activeFilters.status = '작성중'; out.status = filterItemsFromList(LEDGER, fal
 activeFilters.status = 'ALL'; activeFilters.due = 'open'; out.open = filterItemsFromList(LEDGER, false).length;
 activeFilters.due = 'ALL'; activeFilters.year = '2027'; out.year = filterItemsFromList(LEDGER, false).map(x => x.ledger_id);
 console.log(JSON.stringify(out));
-"""))
+"""),
+        )
         self.assertEqual(res["all"], 6)
-        self.assertEqual(res["status"], ["REQ-2026-001", "REQ-2026-002", "REQ-2026-004", "REQ-2027-001"])
+        self.assertEqual(
+            res["status"],
+            ["REQ-2026-001", "REQ-2026-002", "REQ-2026-004", "REQ-2027-001"],
+        )
         self.assertEqual(res["open"], 5)
         self.assertEqual(res["year"], ["REQ-2027-001"])
 
     def test_deadline_sort_puts_overdue_first_and_done_last(self):
-        res = run_node(UI_FUNCS, node_body("""
+        res = run_node(
+            UI_FUNCS,
+            node_body("""
 const sorted = LEDGER.slice().sort((a, b) => compareByDeadline(a, b, TODAY)).map(x => x.ledger_id);
 console.log(JSON.stringify(sorted));
-"""))
-        self.assertEqual(res, ["REQ-2026-001", "REQ-2026-002", "REQ-2026-003", "REQ-2026-004", "REQ-2027-001", "REQ-2026-005"])
+"""),
+        )
+        self.assertEqual(
+            res,
+            [
+                "REQ-2026-001",
+                "REQ-2026-002",
+                "REQ-2026-003",
+                "REQ-2026-004",
+                "REQ-2027-001",
+                "REQ-2026-005",
+            ],
+        )
 
     def test_dynamic_year_and_status_chips(self):
-        res = run_node(UI_FUNCS, node_body("""
+        res = run_node(
+            UI_FUNCS,
+            node_body("""
 const docs = [{ year: '2018' }, { year: '2026' }, { year: '' }];
 const ledger = LEDGER.concat([{ ledger_id: 'X', year: '2026', status: '[삭제]' }]);
 console.log(JSON.stringify({ years: collectFilterYears(docs, ledger), statuses: collectLedgerStatuses(ledger) }));
-"""))
+"""),
+        )
         self.assertEqual(res["years"], ["2027", "2026", "2018"])
         self.assertEqual(dict(res["statuses"]), {"작성중": 4, "검토중": 1, "제출": 1})
 
     def test_empty_state_hints_explain_active_filters(self):
-        res = run_node(UI_FUNCS, node_body("""
+        res = run_node(
+            UI_FUNCS,
+            node_body("""
 currentMode = 'docs';
 activeFilters.query = '딥페이크 텔레그램'; activeFilters.inst = '국회';
 const a = emptyStateHints(0, 10);
@@ -122,7 +209,8 @@ activeFilters.query = '-텔레그램'; activeFilters.inst = 'ALL';
 const b = emptyStateHints(0, 10);
 const c = emptyStateHints(0, 0);
 console.log(JSON.stringify({ a, b, c }));
-"""))
+"""),
+        )
         self.assertIn('검색어 "딥페이크 텔레그램"', res["a"]["active"])
         self.assertIn("기관 국회", res["a"]["active"])
         self.assertTrue(any("OR" in h for h in res["a"]["hints"]))
@@ -130,7 +218,9 @@ console.log(JSON.stringify({ a, b, c }));
         self.assertTrue(any("적재된 문서가 없습니다" in h for h in res["c"]["hints"]))
 
     def test_excel_status_banner_and_recent_searches(self):
-        res = run_node(UI_FUNCS, node_body("""
+        res = run_node(
+            UI_FUNCS,
+            node_body("""
 console.log(JSON.stringify({
   none: excelStatusMessage({ excel_pending: 0, excel_failed: 0 }),
   pending: excelStatusMessage({ excel_pending: 2, excel_failed: 0 }),
@@ -140,7 +230,8 @@ console.log(JSON.stringify({
   broken: nextRecentSearches('not-a-list', '딥페이크'),
   esc: escapeHtml(2026),
 }));
-"""))
+"""),
+        )
         self.assertIsNone(res["none"])
         self.assertEqual(res["pending"]["level"], "warn")
         self.assertEqual(res["failed"]["level"], "error")
@@ -168,24 +259,45 @@ class TestDashboardHeaderConfig(unittest.TestCase):
 
     def test_rendered_header_uses_raw_config_values(self):
         from template_renderer import DashboardRenderer
+
         r = DashboardRenderer()
-        cfg = {"department_name": "기획예산팀", "agency_name": "공공기관",
-               "system_title": "자료요구 검색", "system_subtitle": "전문 & 협업</script>"}
-        html = r.render(r.load_template(), "", r.compress_payload({"documents": [], "qa_items": [], "request_ledger": []}), cfg)
+        cfg = {
+            "department_name": "기획예산팀",
+            "agency_name": "공공기관",
+            "system_title": "자료요구 검색",
+            "system_subtitle": "전문 & 협업</script>",
+        }
+        html = r.render(
+            r.load_template(),
+            "",
+            r.compress_payload({"documents": [], "qa_items": [], "request_ledger": []}),
+            cfg,
+        )
         self.assertNotIn("/* __APP_CONFIG_JSON__ */", html)
-        body = extract_js(html, "EMBEDDED_APP_CONFIG") + "\n" + extract_js(html, "appConfig") + """
+        body = (
+            extract_js(html, "EMBEDDED_APP_CONFIG")
+            + "\n"
+            + extract_js(html, "appConfig")
+            + """
 const cleanTitle = (appConfig.system_title || '').replace(/^🛡️\\s*/, '');
 console.log(JSON.stringify({ h1: `${appConfig.department_name} ${cleanTitle}`, sub: `${appConfig.agency_name} ${appConfig.department_name} | ${appConfig.system_subtitle}` }));
 """
+        )
         res = run_node([], body)
         self.assertEqual(res["h1"], "기획예산팀 자료요구 검색")
         self.assertEqual(res["sub"], "공공기관 기획예산팀 | 전문 & 협업</script>")
-        self.assertNotIn("전문 & 협업</script>", html, "설정값이 스크립트 블록을 끊으면 안 된다")
+        self.assertNotIn(
+            "전문 & 협업</script>", html, "설정값이 스크립트 블록을 끊으면 안 된다"
+        )
 
     def test_universal_builder_uses_shared_root_detection(self):
         import build_universal_package
         import system_config
-        self.assertEqual(build_universal_package.WORKSPACE_ROOT, system_config.find_workspace_root(build_universal_package.SYSTEM_DIR))
+
+        self.assertEqual(
+            build_universal_package.WORKSPACE_ROOT,
+            system_config.find_workspace_root(build_universal_package.SYSTEM_DIR),
+        )
 
 
 class TestServerLedgerFeatures(unittest.TestCase):
@@ -198,10 +310,19 @@ class TestServerLedgerFeatures(unittest.TestCase):
             conn.execute(
                 "INSERT INTO request_ledger (ledger_id, year, status, deadline, title, requester, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, '', '')",
-                (it["ledger_id"], it["year"], it["status"], it["deadline"], it["title"], it["requester"]),
+                (
+                    it["ledger_id"],
+                    it["year"],
+                    it["status"],
+                    it["deadline"],
+                    it["title"],
+                    it["requester"],
+                ),
             )
-        conn.execute("INSERT INTO request_ledger (ledger_id, year, status, title, requester) VALUES "
-                     "('REQ-2026-099', '2026', '[삭제]', '삭제됨', '의원')")
+        conn.execute(
+            "INSERT INTO request_ledger (ledger_id, year, status, title, requester) VALUES "
+            "('REQ-2026-099', '2026', '[삭제]', '삭제됨', '의원')"
+        )
         conn.commit()
         conn.close()
         self.svc = LedgerService(self.db, self.tmp / "data_requests.json", self.tmp)
@@ -210,16 +331,26 @@ class TestServerLedgerFeatures(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_due_state_matches_dashboard_rule(self):
-        states = {it["ledger_id"]: ledger_due_state(it, TODAY)[0] for it in LEDGER_FIXTURE}
+        states = {
+            it["ledger_id"]: ledger_due_state(it, TODAY)[0] for it in LEDGER_FIXTURE
+        }
         self.assertEqual(states, EXPECTED_STATES)
 
     def test_query_ledger_status_and_due_filters(self):
         def ids(rows):
             return sorted(r["ledger_id"] for r in rows)
-        self.assertEqual(ids(self.svc.query_ledger(due="overdue", today=TODAY)), ["REQ-2026-001"])
-        self.assertEqual(ids(self.svc.query_ledger(due="soon", today=TODAY)), ["REQ-2026-002", "REQ-2026-003"])
+
+        self.assertEqual(
+            ids(self.svc.query_ledger(due="overdue", today=TODAY)), ["REQ-2026-001"]
+        )
+        self.assertEqual(
+            ids(self.svc.query_ledger(due="soon", today=TODAY)),
+            ["REQ-2026-002", "REQ-2026-003"],
+        )
         self.assertEqual(ids(self.svc.query_ledger(status="검토중")), ["REQ-2026-003"])
-        self.assertEqual(len(self.svc.query_ledger(due="bogus")), 6, "알 수 없는 due 값은 무시한다")
+        self.assertEqual(
+            len(self.svc.query_ledger(due="bogus")), 6, "알 수 없는 due 값은 무시한다"
+        )
 
     def test_ledger_summary(self):
         summary = self.svc.ledger_summary(today=TODAY)
@@ -230,9 +361,15 @@ class TestServerLedgerFeatures(unittest.TestCase):
     def test_paged_response(self):
         rows = [{"i": n} for n in range(25)]
         body = web_server.paged_response(rows, {"limit": ["10"], "offset": ["20"]})
-        self.assertEqual((body["count"], body["total"], body["offset"], body["limit"]), (5, 25, 20, 10))
+        self.assertEqual(
+            (body["count"], body["total"], body["offset"], body["limit"]),
+            (5, 25, 20, 10),
+        )
         self.assertEqual(web_server.paged_response(rows, {})["count"], 25)
-        self.assertEqual(web_server.parse_page_params({"limit": ["99999"], "offset": ["-5"]}), (1000, 0))
+        self.assertEqual(
+            web_server.parse_page_params({"limit": ["99999"], "offset": ["-5"]}),
+            (1000, 0),
+        )
         self.assertEqual(web_server.parse_page_params({"limit": ["abc"]}), (None, 0))
 
     def test_schema_check_runs_once_per_db_file(self):
@@ -248,18 +385,23 @@ class TestServerLedgerFeatures(unittest.TestCase):
             self.svc.query_ledger()
             self.svc.query_documents(kw="자료")
             self.svc.get_stats()
-            self.assertEqual(len(calls), 1, "같은 DB 파일에는 한 번만 DDL을 실행해야 한다")
+            self.assertEqual(
+                len(calls), 1, "같은 DB 파일에는 한 번만 DDL을 실행해야 한다"
+            )
             # 파이프라인이 DB를 새 파일로 교체한 상황 (복사본은 새 파일 식별자를 가진다)
             replacement = self.tmp / "new.db"
             shutil.copy2(self.db, replacement)
             import os
+
             os.replace(replacement, self.db)
             self.svc.query_ledger()
             self.assertEqual(len(calls), 2, "교체된 DB 파일은 다시 확인해야 한다")
 
 
 def load_purge_tool():
-    spec = importlib.util.spec_from_file_location("purge_test_data", SYSTEM_DIR / "tools" / "purge_test_data.py")
+    spec = importlib.util.spec_from_file_location(
+        "purge_test_data", SYSTEM_DIR / "tools" / "purge_test_data.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -279,15 +421,36 @@ class TestPurgeToolPlanning(unittest.TestCase):
             ("REQ-2025-001", "2025", "실의원", "실제 요구자료"),
             ("REQ-2025-002", "2025", "테스트의원", "테스트 제목"),
             ("REQ-2026-001", "2026", "홍길동 의원", "추가 자동 연계 테스트 자료"),
-            ("REQ-2026-002", "2026", "홍길동 의원", "딥페이크 테스트 결과 보고"),  # '테스트'가 들어간 실제 제목
+            (
+                "REQ-2026-002",
+                "2026",
+                "홍길동 의원",
+                "딥페이크 테스트 결과 보고",
+            ),  # '테스트'가 들어간 실제 제목
         ]
         for lid, year, req, title in rows:
-            conn.execute("INSERT INTO request_ledger (ledger_id, year, requester, title, status) VALUES (?, ?, ?, ?, '작성중')",
-                         (lid, year, req, title))
-        conn.execute("INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES ('REQ-2026-009', 'EXCEL_APPLIED', '', ?)",
-                     (json.dumps({"requester": "단위테스트의원", "title": "단위테스트 요구자료 제목"}, ensure_ascii=False),))
-        conn.execute("INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES ('REQ-2025-001', 'UPDATE', '', '{}')")
-        conn.execute("INSERT INTO documents (doc_id, linked_ledger_id) VALUES ('DOC-2026-001', 'REQ-2026-001')")
+            conn.execute(
+                "INSERT INTO request_ledger (ledger_id, year, requester, title, status) VALUES (?, ?, ?, ?, '작성중')",
+                (lid, year, req, title),
+            )
+        conn.execute(
+            "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES ('REQ-2026-009', 'EXCEL_APPLIED', '', ?)",
+            (
+                json.dumps(
+                    {
+                        "requester": "단위테스트의원",
+                        "title": "단위테스트 요구자료 제목",
+                    },
+                    ensure_ascii=False,
+                ),
+            ),
+        )
+        conn.execute(
+            "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES ('REQ-2025-001', 'UPDATE', '', '{}')"
+        )
+        conn.execute(
+            "INSERT INTO documents (doc_id, linked_ledger_id) VALUES ('DOC-2026-001', 'REQ-2026-001')"
+        )
         conn.commit()
         conn.close()
         self.excel = self.tmp / "대장.xlsx"
@@ -314,13 +477,17 @@ class TestPurgeToolPlanning(unittest.TestCase):
 
     def test_signature_match_is_exact(self):
         self.assertTrue(self.tool.is_test_pair("테스트의원", "테스트 제목"))
-        self.assertFalse(self.tool.is_test_pair("홍길동 의원", "딥페이크 테스트 결과 보고"))
+        self.assertFalse(
+            self.tool.is_test_pair("홍길동 의원", "딥페이크 테스트 결과 보고")
+        )
         self.assertFalse(self.tool.is_test_pair("실의원", "테스트 제목"))
 
     def test_database_plan(self):
         plan = self.tool.plan_database(self.db)
         self.assertEqual(plan["purge_ids"], ["REQ-2025-002", "REQ-2026-001"])
-        self.assertEqual(len(plan["history_ids"]), 1, "테스트 스냅숏의 EXCEL_APPLIED 이력만 대상")
+        self.assertEqual(
+            len(plan["history_ids"]), 1, "테스트 스냅숏의 EXCEL_APPLIED 이력만 대상"
+        )
         self.assertEqual(plan["unlink_docs"], ["DOC-2026-001"])
 
     def test_workbook_plan_deletes_test_rows_and_stamps_missing_ids(self):
@@ -331,13 +498,19 @@ class TestPurgeToolPlanning(unittest.TestCase):
         self.assertEqual(len(plan["id_assignments"]), 1)
         sheet, row, lid = plan["id_assignments"][0]
         self.assertEqual((sheet, row), ("2026", 3))
-        self.assertEqual(lid, "REQ-2026-003", "명시 ID가 있는 시트에서는 기존·삭제 ID를 새 행에 주지 않는다")
+        self.assertEqual(
+            lid,
+            "REQ-2026-003",
+            "명시 ID가 있는 시트에서는 기존·삭제 ID를 새 행에 주지 않는다",
+        )
 
     def test_dry_run_does_not_modify_files(self):
         before = (self.db.stat().st_mtime_ns, self.excel.stat().st_mtime_ns)
         db_plan = self.tool.plan_database(self.db)
         self.tool.plan_workbook(self.excel, db_plan["remaining_records"])
-        self.assertEqual((self.db.stat().st_mtime_ns, self.excel.stat().st_mtime_ns), before)
+        self.assertEqual(
+            (self.db.stat().st_mtime_ns, self.excel.stat().st_mtime_ns), before
+        )
 
 
 if __name__ == "__main__":

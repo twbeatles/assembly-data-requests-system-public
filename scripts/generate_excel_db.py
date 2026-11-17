@@ -7,9 +7,7 @@ from typing import Any, cast
 
 import openpyxl
 
-cast(Any, sys.stdout).reconfigure(encoding='utf-8')
-
-
+cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -33,14 +31,9 @@ ROOT_DIR = WORKSPACE_ROOT
 
 CFG = system_config.get_config(SYSTEM_DIR)
 JSON_PATH = SYSTEM_DIR / "data_requests.json"
-EXCEL_PATH = SYSTEM_DIR / CFG.get("excel_filename", "국회_대외기관_자료요구_통합DB.xlsx")
-
-
-
-
-
-
-
+EXCEL_PATH = SYSTEM_DIR / CFG.get(
+    "excel_filename", "국회_대외기관_자료요구_통합DB.xlsx"
+)
 
 
 def main():
@@ -115,19 +108,27 @@ def save_workbook_atomic(wb, excel_path: Path) -> bool:
                 shutil.copy2(tmp_path, excel_path)
                 tmp_path.unlink(missing_ok=True)
             except PermissionError:
-                backup_path = excel_path.with_name(f"{excel_path.stem}_최신동기화_대기.xlsx")
+                backup_path = excel_path.with_name(
+                    f"{excel_path.stem}_최신동기화_대기.xlsx"
+                )
                 try:
                     os.replace(tmp_path, backup_path)
                 except Exception:
                     wb.save(backup_path)
                     tmp_path.unlink(missing_ok=True)
                 print("\n" + "!" * 65)
-                print(f"⚠️ 경고: {excel_path.name} 파일이 엑셀에서 열려 있어 덮어쓰지 못했습니다.")
-                print(f"최신본은 {backup_path.name} 에 저장했습니다. 엑셀을 닫은 뒤 03 배치로 열어 주세요.")
+                print(
+                    f"⚠️ 경고: {excel_path.name} 파일이 엑셀에서 열려 있어 덮어쓰지 못했습니다."
+                )
+                print(
+                    f"최신본은 {backup_path.name} 에 저장했습니다. 엑셀을 닫은 뒤 03 배치로 열어 주세요."
+                )
                 print("!" * 65 + "\n")
                 return False
         print("=" * 60)
-        print(f"고도화 엑셀 통합 DB 생성 완료: {excel_path.name} ({excel_path.stat().st_size:,} bytes)")
+        print(
+            f"고도화 엑셀 통합 DB 생성 완료: {excel_path.name} ({excel_path.stat().st_size:,} bytes)"
+        )
         print("=" * 60)
         return True
     except Exception as e:
@@ -140,6 +141,7 @@ def save_workbook_atomic(wb, excel_path: Path) -> bool:
                 tmp_path.unlink()
         except OSError:
             pass
+
 
 if __name__ == "__main__":
     main()

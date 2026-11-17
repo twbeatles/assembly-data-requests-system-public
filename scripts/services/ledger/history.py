@@ -10,6 +10,7 @@
 수정 한 건의 "이후 값"은 다음 pre 스냅숏(= 다음 변경 직전 상태)이고, 없으면 현재 행이다.
 02번 API(`/api/ledger/history`)와 01번 오프라인 대시보드 페이로드가 같은 함수를 쓴다.
 """
+
 import json
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -30,10 +31,21 @@ ACTION_LABELS = {
 }
 
 FIELD_LABELS = {
-    "year": "연도", "seq_no": "연번", "party": "소속", "requester": "요구자", "aide": "보좌관",
-    "title": "요구자료명", "details": "세부요구내역", "request_date": "요구일자", "deadline": "마감일",
-    "submit_date": "제출일자", "department": "담당부서", "status": "진행상태", "note": "비고",
-    "request_type": "요청형태", "linked_doc_id": "연계문서",
+    "year": "연도",
+    "seq_no": "연번",
+    "party": "소속",
+    "requester": "요구자",
+    "aide": "보좌관",
+    "title": "요구자료명",
+    "details": "세부요구내역",
+    "request_date": "요구일자",
+    "deadline": "마감일",
+    "submit_date": "제출일자",
+    "department": "담당부서",
+    "status": "진행상태",
+    "note": "비고",
+    "request_type": "요청형태",
+    "linked_doc_id": "연계문서",
 }
 # 비교 대상. created_at·updated_at은 매 변경마다 바뀌므로 변경 내역에 넣지 않는다.
 DIFF_FIELDS = tuple(FIELD_LABELS.keys())
@@ -59,8 +71,12 @@ def _clip(value: str, max_len: Optional[int]) -> str:
     return value
 
 
-def _diff(before: Dict[str, Any], after: Dict[str, Any], fields: Iterable[str],
-          max_len: Optional[int]) -> List[Dict[str, str]]:
+def _diff(
+    before: Dict[str, Any],
+    after: Dict[str, Any],
+    fields: Iterable[str],
+    max_len: Optional[int],
+) -> List[Dict[str, str]]:
     changes = []
     for f in fields:
         if f not in FIELD_LABELS or f not in before:
@@ -69,19 +85,29 @@ def _diff(before: Dict[str, Any], after: Dict[str, Any], fields: Iterable[str],
         b, a = _text(before.get(f)), _text(after.get(f))
         if b == a:
             continue
-        changes.append({
-            "field": f, "label": FIELD_LABELS[f],
-            "before": _clip(b, max_len), "after": _clip(a, max_len),
-            # 되돌리기는 잘리지 않은 원래 값으로만 한다. 잘린 값이면 화면이 되돌리기를 막는다.
-            "clipped": bool(max_len and (len(b) > max_len or len(a) > max_len)),
-        })
+        changes.append(
+            {
+                "field": f,
+                "label": FIELD_LABELS[f],
+                "before": _clip(b, max_len),
+                "after": _clip(a, max_len),
+                # 되돌리기는 잘리지 않은 원래 값으로만 한다. 잘린 값이면 화면이 되돌리기를 막는다.
+                "clipped": bool(max_len and (len(b) > max_len or len(a) > max_len)),
+            }
+        )
     return changes
 
 
-def build_ledger_timeline(rows: List[Dict[str, Any]], current: Optional[Dict[str, Any]] = None,
-                          limit: int = 50, max_value_len: Optional[int] = None) -> List[Dict[str, Any]]:
+def build_ledger_timeline(
+    rows: List[Dict[str, Any]],
+    current: Optional[Dict[str, Any]] = None,
+    limit: int = 50,
+    max_value_len: Optional[int] = None,
+) -> List[Dict[str, Any]]:
     """한 대장 항목의 이력 행(오래된 순이 아니어도 된다) → 최신순 타임라인."""
-    ordered = sorted((dict(r) for r in rows or []), key=lambda r: int(r.get("history_id") or 0))
+    ordered = sorted(
+        (dict(r) for r in rows or []), key=lambda r: int(r.get("history_id") or 0)
+    )
     snaps = [_load_snapshot(r.get("snapshot")) for r in ordered]
     current = dict(current or {})
     out = []
@@ -105,20 +131,31 @@ def build_ledger_timeline(rows: List[Dict[str, Any]], current: Optional[Dict[str
                     break
             if after is None:
                 after = current
-            named = [f.strip() for f in _text(row.get("changed_fields")).split(",") if f.strip()]
+            named = [
+                f.strip()
+                for f in _text(row.get("changed_fields")).split(",")
+                if f.strip()
+            ]
             fields = [f for f in named if f in FIELD_LABELS] or list(DIFF_FIELDS)
             entry["changes"] = _diff(snap, after, fields, max_value_len)
             if not entry["changes"]:
                 entry["summary"] = "바뀐 칸을 확인할 수 없습니다 (이전 기록 형식)"
         elif action in DELETE_ACTIONS:
             if "status" in snap:
-                entry["changes"] = _diff(snap, {"status": "[삭제]"}, ["status"], max_value_len)
+                entry["changes"] = _diff(
+                    snap, {"status": "[삭제]"}, ["status"], max_value_len
+                )
             entry["summary"] = "항목 삭제"
         elif action == "RESTORE":
-            entry["changes"] = [{
-                "field": "status", "label": FIELD_LABELS["status"], "before": "[삭제]",
-                "after": _clip(_text(snap.get("status")), max_value_len), "clipped": False,
-            }]
+            entry["changes"] = [
+                {
+                    "field": "status",
+                    "label": FIELD_LABELS["status"],
+                    "before": "[삭제]",
+                    "after": _clip(_text(snap.get("status")), max_value_len),
+                    "clipped": False,
+                }
+            ]
             entry["summary"] = "삭제한 항목을 되살림"
         elif action in POST_STATE_ACTIONS:
             title = _text(snap.get("title"))
@@ -130,7 +167,9 @@ def build_ledger_timeline(rows: List[Dict[str, Any]], current: Optional[Dict[str
     return out[: max(1, int(limit))]
 
 
-def load_ledger_timelines(conn, per_item: int = 15, max_value_len: Optional[int] = 300) -> Dict[str, List[Dict[str, Any]]]:
+def load_ledger_timelines(
+    conn, per_item: int = 15, max_value_len: Optional[int] = 300
+) -> Dict[str, List[Dict[str, Any]]]:
     """전체 대장의 타임라인 {ledger_id: [...]}. 01번 오프라인 대시보드에 싣는다.
 
     삭제 tombstone 항목은 싣지 않는다(불변조건 11 — 파생 산출물에 삭제 항목을 넣지 않는다).
@@ -140,17 +179,24 @@ def load_ledger_timelines(conn, per_item: int = 15, max_value_len: Optional[int]
     try:
         current_rows = {
             r["ledger_id"]: dict(r)
-            for r in _dict_rows(conn, "SELECT * FROM request_ledger WHERE COALESCE(status, '') != '[삭제]'")
+            for r in _dict_rows(
+                conn,
+                "SELECT * FROM request_ledger WHERE COALESCE(status, '') != '[삭제]'",
+            )
         }
         grouped: Dict[str, List[Dict[str, Any]]] = {}
-        for r in _dict_rows(conn, "SELECT * FROM ledger_history ORDER BY history_id ASC"):
+        for r in _dict_rows(
+            conn, "SELECT * FROM ledger_history ORDER BY history_id ASC"
+        ):
             lid = _text(r.get("ledger_id"))
             if lid in current_rows:
                 grouped.setdefault(lid, []).append(r)
     except Exception:
         return {}
     return {
-        lid: build_ledger_timeline(rows, current_rows.get(lid), limit=per_item, max_value_len=max_value_len)
+        lid: build_ledger_timeline(
+            rows, current_rows.get(lid), limit=per_item, max_value_len=max_value_len
+        )
         for lid, rows in grouped.items()
     }
 

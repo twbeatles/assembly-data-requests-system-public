@@ -30,7 +30,9 @@ NODE = shutil.which("node")
 
 def extract_js(src: str, name: str) -> str:
     """템플릿에서 최상위 function/const/let 선언 하나를 괄호 균형으로 잘라 낸다."""
-    m = re.search(rf"^(?:(?:async )?function {name}\(|(?:const|let) {name}\s*=)", src, re.M)
+    m = re.search(
+        rf"^(?:(?:async )?function {name}\(|(?:const|let) {name}\s*=)", src, re.M
+    )
     if not m:
         raise AssertionError(f"템플릿에서 {name} 선언을 찾지 못했습니다")
     i = m.start()
@@ -43,7 +45,7 @@ def extract_js(src: str, name: str) -> str:
             elif src[k] == "}":
                 depth -= 1
                 if depth == 0:
-                    return src[i:k + 1]
+                    return src[i : k + 1]
     depth = 0
     for k in range(i, len(src)):
         ch = src[k]
@@ -52,7 +54,7 @@ def extract_js(src: str, name: str) -> str:
         elif ch in "]})":
             depth -= 1
         elif ch == ";" and depth == 0:
-            return src[i:k + 1]
+            return src[i : k + 1]
     raise AssertionError(f"{name} 선언의 끝을 찾지 못했습니다")
 
 
@@ -65,12 +67,16 @@ let favorites = [];
 let activeFilters = { query: '', year: 'ALL', inst: 'ALL', topic: 'ALL', onlyFavorites: false, tablesOnly: false, sort: 'relevance' };
 """
     code = prelude + "\n".join(extract_js(src, n) for n in names) + "\n" + body
-    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fp:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".js", delete=False, encoding="utf-8"
+    ) as fp:
         fp.write(code)
         path = fp.name
     try:
         assert NODE is not None
-        proc = subprocess.run([NODE, path], capture_output=True, text=True, encoding="utf-8", timeout=60)
+        proc = subprocess.run(
+            [NODE, path], capture_output=True, text=True, encoding="utf-8", timeout=60
+        )
     finally:
         Path(path).unlink(missing_ok=True)
     if proc.returncode != 0:
@@ -79,26 +85,66 @@ let activeFilters = { query: '', year: 'ALL', inst: 'ALL', topic: 'ALL', onlyFav
 
 
 SEARCH_FUNCS = [
-    "SYNONYMS", "KOREAN_PARTICLES", "KOREAN_PARTICLES_LONGEST_FIRST", "stripKoreanParticle",
-    "CHOSEONG_LIST", "getChoseong",
-    "getChoseongNoSpace", "isChoseongOnly", "buildHybridKoreanRegex", "searchCacheSignature", "searchCache",
+    "SYNONYMS",
+    "KOREAN_PARTICLES",
+    "KOREAN_PARTICLES_LONGEST_FIRST",
+    "stripKoreanParticle",
+    "CHOSEONG_LIST",
+    "getChoseong",
+    "getChoseongNoSpace",
+    "isChoseongOnly",
+    "buildHybridKoreanRegex",
+    "searchCacheSignature",
+    "searchCache",
     "noSpaceIncludes",
-    "SEARCH_FIELD_ALIASES", "SEARCH_EXACT_FIELDS", "normalizeSearchDate", "takeSearchField", "searchFieldsMatch",
-    "parseSearchTokens", "escapeRegExpLiteral", "prepareSearchQuery", "matchSearchItem", "sortSearchResults",
+    "SEARCH_FIELD_ALIASES",
+    "SEARCH_EXACT_FIELDS",
+    "normalizeSearchDate",
+    "takeSearchField",
+    "searchFieldsMatch",
+    "parseSearchTokens",
+    "escapeRegExpLiteral",
+    "prepareSearchQuery",
+    "matchSearchItem",
+    "sortSearchResults",
     "filterItemsFromList",
 ]
 SANITIZE_FUNCS = [
-    "escapeHtml", "SANITIZE_TAGS", "SANITIZE_DROP_WITH_CONTENT", "SANITIZE_ATTRS",
-    "decodeHtmlEntities", "isSafeUrl", "rebuildTag", "sanitizeHtml",
+    "escapeHtml",
+    "SANITIZE_TAGS",
+    "SANITIZE_DROP_WITH_CONTENT",
+    "SANITIZE_ATTRS",
+    "decodeHtmlEntities",
+    "isSafeUrl",
+    "rebuildTag",
+    "sanitizeHtml",
 ]
 
 DOCS = [
-    {"doc_id": "D1", "year": "2026", "title": "딥페이크 성착취물 텔레그램 유포 대응", "requester": "김의원",
-     "answer_summary": "요약", "full_markdown": "텔레그램 핫라인 운영"},
-    {"doc_id": "D2", "year": "2026", "title": "딥페이크 피해 지원 현황", "requester": "이의원",
-     "answer_summary": "요약", "full_markdown": "피해자 지원 예산은 긴급구조금으로 편성했습니다."},
-    {"doc_id": "D3", "year": "2026", "title": "대외위원회 트위터 시정요구", "requester": "박의원",
-     "answer_summary": "요약", "full_markdown": "시정요구 내역"},
+    {
+        "doc_id": "D1",
+        "year": "2026",
+        "title": "딥페이크 성착취물 텔레그램 유포 대응",
+        "requester": "김의원",
+        "answer_summary": "요약",
+        "full_markdown": "텔레그램 핫라인 운영",
+    },
+    {
+        "doc_id": "D2",
+        "year": "2026",
+        "title": "딥페이크 피해 지원 현황",
+        "requester": "이의원",
+        "answer_summary": "요약",
+        "full_markdown": "피해자 지원 예산은 긴급구조금으로 편성했습니다.",
+    },
+    {
+        "doc_id": "D3",
+        "year": "2026",
+        "title": "대외위원회 트위터 시정요구",
+        "requester": "박의원",
+        "answer_summary": "요약",
+        "full_markdown": "시정요구 내역",
+    },
 ]
 
 
@@ -126,13 +172,20 @@ console.log(JSON.stringify(out));
             "심의위": ["D3"],
             "딥페이크피해": ["D2"],
             "텔레그램을": ["D1"],
-            "\"피해 지원\"": ["D2"],
+            '"피해 지원"': ["D2"],
         }
         self.assertEqual(self.search(DOCS, list(expected)), expected)
 
     def test_full_text_body_is_searched(self):
         """요약(300자)이 아니라 전문에만 있는 단어도 찾는다."""
-        qa = [{"qa_id": "Q1", "doc_id": "D2", "question_title": "예산 질의", "answer_markdown": "답변 본문에만 있는 긴급구조금"}]
+        qa = [
+            {
+                "qa_id": "Q1",
+                "doc_id": "D2",
+                "question_title": "예산 질의",
+                "answer_markdown": "답변 본문에만 있는 긴급구조금",
+            }
+        ]
         res = self.search(DOCS + qa, ["긴급구조금", "핫라인"])
         self.assertEqual(res["긴급구조금"], ["D2", "Q1"])
         self.assertEqual(res["핫라인"], ["D1"])
@@ -154,12 +207,20 @@ console.log(JSON.stringify({ keys: Object.keys(item), json: JSON.stringify(item)
         self.assertIn("filterItemsAsync(", render_src)
         async_src = extract_js(src, "filterItemsFromListAsync")
         self.assertIn("matchSearchItem(", async_src)
-        self.assertNotIn("/api/search", render_src, "서버 결과로 클라이언트 검색 문법을 우회하면 안 된다")
+        self.assertNotIn(
+            "/api/search",
+            render_src,
+            "서버 결과로 클라이언트 검색 문법을 우회하면 안 된다",
+        )
 
     def test_qa_chip_handler_resolves_document_globally(self):
         """[R3-19a] 인라인 onclick은 전역 스코프에서 실행된다. 지역 변수 doc을 참조하면 안 된다."""
         src = TEMPLATE.read_text(encoding="utf-8")
-        chip_lines = [line for line in src.splitlines() if "badge-qa-chip" in line and "onclick" in line]
+        chip_lines = [
+            line
+            for line in src.splitlines()
+            if "badge-qa-chip" in line and "onclick" in line
+        ]
         self.assertTrue(chip_lines)
         for line in chip_lines:
             self.assertNotIn("openDocModal(doc,", line)
@@ -181,14 +242,40 @@ class TestDashboardSearchUsability(unittest.TestCase):
     """검색 용이성 점검: 필드 한정자·조사 처리·유사 답변 필터 독립·띄어쓰기 무시 미리보기."""
 
     ITEMS = [
-        {"doc_id": "D1", "year": "2026", "request_date": "2026-02-10", "title": "딥페이크 예산 현황",
-         "requester": "김철수 의원", "institution": "국회", "full_markdown": "예산 내역"},
-        {"doc_id": "D2", "year": "2025", "request_date": "2025-07-01", "title": "텔레그램 시정 요구 내역",
-         "requester": "이영희 의원", "institution": "국회입법조사처", "full_markdown": "시정 요구 결과"},
-        {"ledger_id": "L1", "year": "2026", "request_date": "2026-03-05", "title": "딥페이크 자료",
-         "requester": "김철수 의원", "status": "제출완료"},
-        {"ledger_id": "L2", "year": "2026", "request_date": "2026-03-06", "title": "딥페이크 추가",
-         "requester": "박민수 의원", "status": "미제출"},
+        {
+            "doc_id": "D1",
+            "year": "2026",
+            "request_date": "2026-02-10",
+            "title": "딥페이크 예산 현황",
+            "requester": "김철수 의원",
+            "institution": "국회",
+            "full_markdown": "예산 내역",
+        },
+        {
+            "doc_id": "D2",
+            "year": "2025",
+            "request_date": "2025-07-01",
+            "title": "텔레그램 시정 요구 내역",
+            "requester": "이영희 의원",
+            "institution": "국회입법조사처",
+            "full_markdown": "시정 요구 결과",
+        },
+        {
+            "ledger_id": "L1",
+            "year": "2026",
+            "request_date": "2026-03-05",
+            "title": "딥페이크 자료",
+            "requester": "김철수 의원",
+            "status": "제출완료",
+        },
+        {
+            "ledger_id": "L2",
+            "year": "2026",
+            "request_date": "2026-03-06",
+            "title": "딥페이크 추가",
+            "requester": "박민수 의원",
+            "status": "미제출",
+        },
     ]
 
     def search(self, queries):
@@ -204,10 +291,18 @@ console.log(JSON.stringify(out));
         return run_node(SEARCH_FUNCS, body)
 
     def test_field_qualifiers_match_server_grammar(self):
-        res = self.search([
-            "요구자:김철수", "의원:김철수 딥페이크", "기간:2026-03", "기간:2025..2025",
-            "상태:제출완료", "상태:제출", "기관:입법조사처", "모르는칸:값",
-        ])
+        res = self.search(
+            [
+                "요구자:김철수",
+                "의원:김철수 딥페이크",
+                "기간:2026-03",
+                "기간:2025..2025",
+                "상태:제출완료",
+                "상태:제출",
+                "기관:입법조사처",
+                "모르는칸:값",
+            ]
+        )
         self.assertEqual(res["요구자:김철수"], ["D1", "L1"])
         self.assertEqual(res["의원:김철수 딥페이크"], ["D1", "L1"])
         self.assertEqual(res["기간:2026-03"], ["L1", "L2"])
@@ -220,12 +315,22 @@ console.log(JSON.stringify(out));
         self.assertEqual(res["모르는칸:값"], [])
 
     def test_particle_longest_first(self):
-        out = run_node(SEARCH_FUNCS, """
+        out = run_node(
+            SEARCH_FUNCS,
+            """
 console.log(JSON.stringify(['예산이나', '예산에서는', '텔레그램을', '국가'].map(stripKoreanParticle)));
-""")
+""",
+        )
         self.assertEqual(out, ["예산", "예산", "텔레그램", "국가"])
         from search.lang import strip_particle
-        self.assertEqual([strip_particle(w) for w in ["예산이나", "예산에서는", "텔레그램을", "국가"]], out)
+
+        self.assertEqual(
+            [
+                strip_particle(w)
+                for w in ["예산이나", "예산에서는", "텔레그램을", "국가"]
+            ],
+            out,
+        )
 
     def test_similar_suggestion_ignores_screen_filters(self):
         body = f"""
@@ -243,8 +348,15 @@ console.log(JSON.stringify({{
         self.assertTrue(out["similar"])
 
     def test_snippet_and_highlight_ignore_spacing(self):
-        names = ["escapeHtml", "isChoseongOnly", "looseTokenPattern", "__highlightRegexCache",
-                 "highlightRegexFor", "highlightTextString", "getSnippet"]
+        names = [
+            "escapeHtml",
+            "isChoseongOnly",
+            "looseTokenPattern",
+            "__highlightRegexCache",
+            "highlightRegexFor",
+            "highlightTextString",
+            "getSnippet",
+        ]
         body = """
 const long = '가'.repeat(300) + ' 시정 요구 결과입니다';
 console.log(JSON.stringify({
@@ -274,10 +386,10 @@ console.log(JSON.stringify(out));
             '<a href="javascript&colon;alert(1)">x</a>',
             '<a href="jav&#x61;script:alert(1)">x</a>',
             '<a href="  JaVaScRiPt:alert(1)">x</a>',
-            '<img src=x onerror=alert(1)>',
+            "<img src=x onerror=alert(1)>",
             '<img src="x" onerror="alert(1)"',
-            '<details open ontoggle=alert(1)>',
-            '<svg><script>alert(1)</script></svg>',
+            "<details open ontoggle=alert(1)>",
+            "<svg><script>alert(1)</script></svg>",
             '<iframe src="https://evil"></iframe>',
             '<p style="background:url(javascript:alert(1))">x</p>',
             '<a href="data:text/html,<script>alert(1)</script>">x</a>',
@@ -286,23 +398,36 @@ console.log(JSON.stringify(out));
         for vector, html in out.items():
             lowered = html.lower()
             with self.subTest(vector=vector):
-                self.assertNotRegex(lowered, r"<[^>]*\son\w+\s*=", "이벤트 핸들러 속성이 남으면 안 된다")
+                self.assertNotRegex(
+                    lowered, r"<[^>]*\son\w+\s*=", "이벤트 핸들러 속성이 남으면 안 된다"
+                )
                 self.assertNotIn("<script", lowered)
                 self.assertNotIn("<iframe", lowered)
                 self.assertNotIn("<svg", lowered)
-                self.assertNotRegex(lowered, r'(href|src)="[^"]*(javascript|data:text)', "위험한 URL이 남으면 안 된다")
+                self.assertNotRegex(
+                    lowered,
+                    r'(href|src)="[^"]*(javascript|data:text)',
+                    "위험한 URL이 남으면 안 된다",
+                )
                 self.assertNotIn("style=", lowered)
 
     def test_document_tables_and_literal_angle_text_are_preserved(self):
         samples = [
             '<table><tr><td colspan="2" rowspan="3">A</td></tr></table>',
-            '<JB> 보도 내용',
+            "<JB> 보도 내용",
             '<img src="image_001.png" alt="image">',
             '<a href="https://www.example.go.kr/">링크</a>',
         ]
         out = self.sanitize(samples)
-        self.assertEqual(out[samples[0]], '<table><tr><td colspan="2" rowspan="3">A</td></tr></table>')
-        self.assertEqual(out[samples[1]], "&lt;JB&gt; 보도 내용", "원문 꺾쇠 표기가 태그로 해석돼 사라지면 안 된다")
+        self.assertEqual(
+            out[samples[0]],
+            '<table><tr><td colspan="2" rowspan="3">A</td></tr></table>',
+        )
+        self.assertEqual(
+            out[samples[1]],
+            "&lt;JB&gt; 보도 내용",
+            "원문 꺾쇠 표기가 태그로 해석돼 사라지면 안 된다",
+        )
         self.assertEqual(out[samples[2]], '<img src="image_001.png" alt="image">')
         self.assertIn('href="https://www.example.go.kr/"', out[samples[3]])
 
@@ -319,7 +444,15 @@ class TestServerSearchGrammar(unittest.TestCase):
             conn.execute(
                 "INSERT INTO documents (doc_id, year, title, requester, question_list, answer_full_text, full_markdown) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (d["doc_id"], d["year"], d["title"], d["requester"], d["title"], d["full_markdown"], d["full_markdown"]),
+                (
+                    d["doc_id"],
+                    d["year"],
+                    d["title"],
+                    d["requester"],
+                    d["title"],
+                    d["full_markdown"],
+                    d["full_markdown"],
+                ),
             )
         conn.commit()
         conn.close()
@@ -332,8 +465,12 @@ class TestServerSearchGrammar(unittest.TestCase):
         return sorted(d["doc_id"] for d in self.svc.query_documents(kw=kw))
 
     def test_fts_expression_supports_or_and_not_without_parentheses(self):
-        self.assertEqual(build_fts_match("딥페이크 -텔레그램"), '"딥페이크" NOT "텔레그램"')
-        self.assertEqual(build_fts_match("텔레그램 OR 트위터"), '"텔레그램" OR "트위터"')
+        self.assertEqual(
+            build_fts_match("딥페이크 -텔레그램"), '"딥페이크" NOT "텔레그램"'
+        )
+        self.assertEqual(
+            build_fts_match("텔레그램 OR 트위터"), '"텔레그램" OR "트위터"'
+        )
         self.assertEqual(build_fts_match("ㄷㅍㅇㅋ"), "")
         self.assertEqual(parse_query('"최근 3년" 현황')["phrases"], ["최근 3년"])
 
@@ -346,7 +483,9 @@ class TestServerSearchGrammar(unittest.TestCase):
 
     def test_search_response_can_omit_full_text(self):
         """[T-16] 목록 응답은 문서 전문을 싣지 않는다."""
-        rows = self.svc.search_all(kw="딥페이크", search_type="docs", slim=True)["documents"]
+        rows = self.svc.search_all(kw="딥페이크", search_type="docs", slim=True)[
+            "documents"
+        ]
         self.assertTrue(rows)
         for row in rows:
             self.assertNotIn("full_markdown", row)
@@ -364,17 +503,50 @@ class TestLauncherGuiWorkerDoesNotTouchTk(unittest.TestCase):
 
     def test_worker_only_posts_events(self):
         import ast
+
         tree = ast.parse((SCRIPTS_DIR / "launcher_gui.py").read_text(encoding="utf-8"))
-        run = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "run_smart_update")
-        worker = next(n for n in ast.walk(run) if isinstance(n, ast.FunctionDef) and n.name == "worker")
-        cb = next(n for n in ast.walk(worker) if isinstance(n, ast.FunctionDef) and n.name == "cb")
-        tk_methods = {"after", "config", "configure", "destroy", "update", "update_idletasks"}
-        calls = [n.func.attr for n in ast.walk(cb) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)]
-        self.assertFalse(tk_methods & set(calls), f"cb가 Tk 메서드를 직접 부른다: {calls}")
+        run = next(
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == "run_smart_update"
+        )
+        worker = next(
+            n
+            for n in ast.walk(run)
+            if isinstance(n, ast.FunctionDef) and n.name == "worker"
+        )
+        cb = next(
+            n
+            for n in ast.walk(worker)
+            if isinstance(n, ast.FunctionDef) and n.name == "cb"
+        )
+        tk_methods = {
+            "after",
+            "config",
+            "configure",
+            "destroy",
+            "update",
+            "update_idletasks",
+        }
+        calls = [
+            n.func.attr
+            for n in ast.walk(cb)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+        ]
+        self.assertFalse(
+            tk_methods & set(calls), f"cb가 Tk 메서드를 직접 부른다: {calls}"
+        )
         self.assertIn("put", calls)
-        top_calls = [n.value.func.attr for n in worker.body if isinstance(n, ast.Expr) and isinstance(n.value, ast.Call)
-                     and isinstance(n.value.func, ast.Attribute)]
-        self.assertNotIn("after", top_calls, "완료 처리도 큐로 넘겨 메인 스레드가 실행해야 한다")
+        top_calls = [
+            n.value.func.attr
+            for n in worker.body
+            if isinstance(n, ast.Expr)
+            and isinstance(n.value, ast.Call)
+            and isinstance(n.value.func, ast.Attribute)
+        ]
+        self.assertNotIn(
+            "after", top_calls, "완료 처리도 큐로 넘겨 메인 스레드가 실행해야 한다"
+        )
 
 
 class TestCorsIsPortScoped(unittest.TestCase):
@@ -386,12 +558,18 @@ class TestCorsIsPortScoped(unittest.TestCase):
         class FakeServer:
             server_address = ("127.0.0.1", 8080)
 
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         handler.server = FakeServer()
         sent = {}
         handler.send_header = lambda k, v: sent.__setitem__(k, v)
         from unittest import mock
-        for origin, allowed in (("http://127.0.0.1:8080", True), ("http://localhost:3000", False)):
+
+        for origin, allowed in (
+            ("http://127.0.0.1:8080", True),
+            ("http://localhost:3000", False),
+        ):
             sent.clear()
             handler.headers = {"Origin": origin}
             with mock.patch.object(web_server.SimpleHTTPRequestHandler, "end_headers"):

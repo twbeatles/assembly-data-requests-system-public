@@ -16,13 +16,22 @@ def _facade(tmp_path):
 def test_result_envelope_fixed_fields(tmp_path):
     _facade(tmp_path)
     from agent_bridge.cli import _hoist_global_flags, build_parser, execute
+
     parser = build_parser()
     args = parser.parse_args(_hoist_global_flags(["search", "딥페이크", "--json"]))
     envelope, code = execute(args, base_dir=str(tmp_path))
     assert code == 0
     assert envelope["schema"] == RESULT_SCHEMA
-    assert set(envelope) == {"schema", "ok", "request_id", "operation",
-                             "data", "warnings", "error", "meta"}
+    assert set(envelope) == {
+        "schema",
+        "ok",
+        "request_id",
+        "operation",
+        "data",
+        "warnings",
+        "error",
+        "meta",
+    }
     assert envelope["ok"] is True and envelope["error"] is None
     assert envelope["operation"] == "search"
 
@@ -50,7 +59,7 @@ def test_limit_and_chars_are_clamped(tmp_path):
     assert policy.clamp_limit(None) == policy.DEFAULT_LIMIT
     found = facade.search("딥페이크", limit=10000)
     assert len(found["items"]) <= policy.MAX_LIMIT
-    doc = facade.get_document("DOC-2026-001", max_chars=10 ** 9)
+    doc = facade.get_document("DOC-2026-001", max_chars=10**9)
     assert len(doc["excerpt"]) <= policy.MAX_EXCERPT_CHARS
 
 

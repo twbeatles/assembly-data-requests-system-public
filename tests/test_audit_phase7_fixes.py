@@ -63,7 +63,9 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         """Test that get_ledger_service caches and reuses the service instance."""
         svc1 = get_ledger_service()
         svc2 = get_ledger_service()
-        self.assertIs(svc1, svc2, "get_ledger_service must return the same cached instance")
+        self.assertIs(
+            svc1, svc2, "get_ledger_service must return the same cached instance"
+        )
 
     def test_pipeline_guard_atomic_exclusive(self):
         """Test that PipelineGuard uses atomic exclusive creation preventing concurrent double-acquisition."""
@@ -107,10 +109,16 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         guard = PipelineGuard(self.base_path)
         guard.path.write_text(str(dead_pid), encoding="utf-8")
         self.assertTrue(guard.path.exists())
-        self.assertFalse(guard.is_locked(), "죽은 PID 락은 is_locked()가 False여야 한다")
+        self.assertFalse(
+            guard.is_locked(), "죽은 PID 락은 is_locked()가 False여야 한다"
+        )
         acquired = guard.acquire(allow_reentrant=False)
-        self.assertTrue(acquired, "죽은 PID 락이 있으면 새 프로세스가 락을 잡을 수 있어야 한다")
-        self.assertEqual(guard.path.read_text(encoding="utf-8").strip(), str(os.getpid()))
+        self.assertTrue(
+            acquired, "죽은 PID 락이 있으면 새 프로세스가 락을 잡을 수 있어야 한다"
+        )
+        self.assertEqual(
+            guard.path.read_text(encoding="utf-8").strip(), str(os.getpid())
+        )
         guard.release()
 
     def test_search_query_special_chars_sanitization(self):
@@ -119,18 +127,24 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         unsafe_inputs = [
             '"""딥페이크"""',
             '텔레그램* OR "대외기관"',
-            '시정요구 (최근 3년) [보고서]',
-            '테스트:^~\\//질의',
-            '""'
+            "시정요구 (최근 3년) [보고서]",
+            "테스트:^~\\//질의",
+            '""',
         ]
         for inp in unsafe_inputs:
             fts_query = build_fts_match(inp)
             # FTS query should not contain unmatched quotes or raw reserved characters
             if fts_query:
                 # Every quote should be paired
-                self.assertEqual(fts_query.count('"') % 2, 0, f"Unbalanced quotes in: {fts_query}")
-                for ch in ['*', '^', '(', ')', '{', '}', '[', ']', ':', '~', '\\', '/']:
-                    self.assertNotIn(ch, fts_query, f"Reserved character '{ch}' must be stripped: {fts_query}")
+                self.assertEqual(
+                    fts_query.count('"') % 2, 0, f"Unbalanced quotes in: {fts_query}"
+                )
+                for ch in ["*", "^", "(", ")", "{", "}", "[", "]", ":", "~", "\\", "/"]:
+                    self.assertNotIn(
+                        ch,
+                        fts_query,
+                        f"Reserved character '{ch}' must be stripped: {fts_query}",
+                    )
 
         # Normal query check
         # trigram은 3글자 미만을 색인하지 않으므로 MATCH 문자열에는 3글자 이상 낱말만 담긴다.
@@ -140,12 +154,17 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         self.assertIn('"성범죄"', normal_match)
         self.assertIn('"시정요구"', normal_match)
         self.assertIn(" AND ", normal_match)
-        self.assertEqual(build_fts_match("디지털 성범죄 대응"), "",
-                         "2글자 낱말이 섞이면 FTS로 표현할 수 없어 대체 경로로 보낸다")
+        self.assertEqual(
+            build_fts_match("디지털 성범죄 대응"),
+            "",
+            "2글자 낱말이 섞이면 FTS로 표현할 수 없어 대체 경로로 보낸다",
+        )
 
     def test_history_limit_boundary(self):
         """Test that get_ledger_history bounds limit between 1 and 1000."""
-        svc = LedgerService(db_path=self.db_path, json_path=self.json_path, base_dir=self.base_path)
+        svc = LedgerService(
+            db_path=self.db_path, json_path=self.json_path, base_dir=self.base_path
+        )
 
         # Insert test history row
         conn = svc.get_conn()
@@ -153,7 +172,7 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         for i in range(5):
             cur.execute(
                 "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES (?, ?, ?, ?)",
-                (f"REQ-2026-00{i}", "INSERT", "2026-09-11 12:00:00", "{}")
+                (f"REQ-2026-00{i}", "INSERT", "2026-09-11 12:00:00", "{}"),
             )
         conn.commit()
         conn.close()
@@ -174,14 +193,19 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         conn = DatabaseManager.get_connection(self.db_path)
         cur = conn.cursor()
         for i in range(15):
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO request_ledger (ledger_id, year, requester, title, request_type, status)
                 VALUES (?, '2026', '의원', '기존요구', '일반', '제출')
-            """, (f"REQ-2026-{i+1:03d}",))
+            """,
+                (f"REQ-2026-{i + 1:03d}",),
+            )
         conn.commit()
         conn.close()
 
-        sync_svc = ExcelSyncService(base_dir=self.base_path, db_path=self.db_path, json_path=self.json_path)
+        sync_svc = ExcelSyncService(
+            base_dir=self.base_path, db_path=self.db_path, json_path=self.json_path
+        )
 
         # Mock find_master_excel and load_request_ledger returning only 2 items (< 50% of 15)
         dummy_excel = self.base_path / "dummy.xlsx"
@@ -189,27 +213,45 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         sync_svc.find_master_excel = lambda: dummy_excel
 
         from unittest.mock import patch
+
         partial_items = [
-            {"ledger_id": "REQ-2026-001", "year": "2026", "requester": "의원", "title": "수정요구"}
+            {
+                "ledger_id": "REQ-2026-001",
+                "year": "2026",
+                "requester": "의원",
+                "title": "수정요구",
+            }
         ]
-        with patch("extractors.ledger_parser.load_request_ledger", return_value=partial_items):
+        with patch(
+            "extractors.ledger_parser.load_request_ledger", return_value=partial_items
+        ):
             res = sync_svc.sync_excel_to_db()
             self.assertTrue(res["success"])
 
         # Verify that the other 14 records were NOT marked as [삭제]
         conn = DatabaseManager.get_connection(self.db_path)
         cur = conn.cursor()
-        deleted_count = cur.execute("SELECT COUNT(*) FROM request_ledger WHERE status = '[삭제]'").fetchone()[0]
+        deleted_count = cur.execute(
+            "SELECT COUNT(*) FROM request_ledger WHERE status = '[삭제]'"
+        ).fetchone()[0]
         conn.close()
-        self.assertEqual(deleted_count, 0, "Bulk deletion must be prevented when parsed items are fewer than 50%")
+        self.assertEqual(
+            deleted_count,
+            0,
+            "Bulk deletion must be prevented when parsed items are fewer than 50%",
+        )
 
     def test_pending_queue_save_resilience(self):
         """Test that _save_pending_queue logs errors gracefully when disk write fails without raising exceptions."""
-        sync_svc = ExcelSyncService(base_dir=self.base_path, db_path=self.db_path, json_path=self.json_path)
+        sync_svc = ExcelSyncService(
+            base_dir=self.base_path, db_path=self.db_path, json_path=self.json_path
+        )
         sync_svc._pending_queue = [{"action": "insert", "item": {"title": "test"}}]
 
         # Trigger save with read-only / invalid path mock
-        with patch("pathlib.Path.write_text", side_effect=PermissionError("Permission denied")):
+        with patch(
+            "pathlib.Path.write_text", side_effect=PermissionError("Permission denied")
+        ):
             # Should not raise exception
             try:
                 sync_svc._save_pending_queue()
@@ -220,7 +262,9 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         """Test is_public_static accepts only safe public static files and rejects hidden/invalid paths."""
         self.assertTrue(RequestLedgerHandler.is_public_static("/"))
         self.assertTrue(RequestLedgerHandler.is_public_static("/index.html"))
-        self.assertTrue(RequestLedgerHandler.is_public_static("/사용설명서_및_안내.html"))
+        self.assertTrue(
+            RequestLedgerHandler.is_public_static("/사용설명서_및_안내.html")
+        )
 
         # Hidden html or directory traversal must be rejected
         self.assertFalse(RequestLedgerHandler.is_public_static("/.hidden.html"))
@@ -239,7 +283,11 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         sys_dir.mkdir()
 
         detected_root = system_config.find_workspace_root(sys_dir)
-        self.assertEqual(detected_root.resolve(), temp_ws.resolve(), "Should identify parent directory containing year folder 2027")
+        self.assertEqual(
+            detected_root.resolve(),
+            temp_ws.resolve(),
+            "Should identify parent directory containing year folder 2027",
+        )
 
     def test_read_json_body_detail_validation(self):
         """Test read_json_body_detail for size limits and json formatting errors."""
@@ -258,6 +306,7 @@ class TestAuditPhase7Fixes(unittest.TestCase):
 
         # Malformed json
         import io
+
         handler.headers = {"Content-Length": "5"}
         handler.rfile = io.BytesIO(b"{bad}")
         data, code, msg = handler.read_json_body_detail()
@@ -267,13 +316,15 @@ class TestAuditPhase7Fixes(unittest.TestCase):
 
     def test_pii_masking_on_ledger_input(self):
         """Test that insert_ledger_item and update_ledger_item automatically mask personal phone numbers and resident IDs."""
-        svc = LedgerService(db_path=self.db_path, json_path=self.json_path, base_dir=self.base_path)
+        svc = LedgerService(
+            db_path=self.db_path, json_path=self.json_path, base_dir=self.base_path
+        )
         item_data = {
             "title": "개인정보 보호 테스트",
             "requester": "감사의원",
             "year": "2026",
             "details": "연락처: 010-9876-5432, 주민번호: 880101-1234567 기재 내역",
-            "note": "비고란 번호 010.1111.2222 포함"
+            "note": "비고란 번호 010.1111.2222 포함",
         }
         res = svc.insert_ledger_item(item_data)
         assert res is not None
@@ -290,10 +341,10 @@ class TestAuditPhase7Fixes(unittest.TestCase):
         self.assertIn("010-****-2222", row["note"])
 
         # Test update masking
-        update_res = svc.update_ledger_item(inserted_id, {
-            "details": "수정된 연락처: 010-5555-6666",
-            "note": "수정 비고"
-        })
+        update_res = svc.update_ledger_item(
+            inserted_id,
+            {"details": "수정된 연락처: 010-5555-6666", "note": "수정 비고"},
+        )
         self.assertTrue(update_res["success"])
         updated_row = svc.get_ledger_item(inserted_id)
         assert updated_row is not None

@@ -1,4 +1,5 @@
 """Alias to write_all_bats.py for backward compatibility"""
+
 import sys
 from pathlib import Path
 

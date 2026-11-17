@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
-cast(Any, sys.stdout).reconfigure(encoding='utf-8')
+cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = SCRIPTS_DIR.parent
@@ -36,6 +36,7 @@ def sha256_file(filepath: Path) -> str:
         while chunk := f.read(65536):
             h.update(chunk)
     return h.hexdigest()
+
 
 def verify_distribution(dist_path: Path, name: str) -> bool:
     print(f"\n🔍 [{name}] 구조 및 필수 파일 검증 중: {dist_path.name}")
@@ -62,7 +63,7 @@ def verify_distribution(dist_path: Path, name: str) -> bool:
         "05_통합검색프로그램_실행.bat",
         "07_기존자료_안전마이그레이션.bat",
         "config.json",
-        "자료요구_통합검색_대시보드.html"
+        "자료요구_통합검색_대시보드.html",
     ]
 
     all_ok = True
@@ -99,6 +100,7 @@ def verify_distribution(dist_path: Path, name: str) -> bool:
 
     return all_ok
 
+
 def verify_strict_code_parity(dept_path: Path, univ_path: Path) -> bool:
     print("\n🔬 [정밀 검증] 원본 vs 부서배포용 vs 범용배포용 SHA256 코드 동일성 대조")
     src_scripts = SCRIPTS_DIR
@@ -110,7 +112,7 @@ def verify_strict_code_parity(dept_path: Path, univ_path: Path) -> bool:
         if "__pycache__" in root:
             continue
         for f in files:
-            if f.endswith(('.py', '.html', '.js', '.sql')):
+            if f.endswith((".py", ".html", ".js", ".sql")):
                 full = Path(root) / f
                 rel = full.relative_to(src_scripts)
                 src_files.append(rel)
@@ -149,13 +151,16 @@ def verify_strict_code_parity(dept_path: Path, univ_path: Path) -> bool:
             mismatches.append((b_src.name, "범용배포본 배치파일 해시 불일치/누락"))
 
     if not mismatches:
-        print(f"  ✓ 스크립트 {len(src_files)}종 및 핵심 리소스 100% SHA256 무결성 일치 확인 완료")
+        print(
+            f"  ✓ 스크립트 {len(src_files)}종 및 핵심 리소스 100% SHA256 무결성 일치 확인 완료"
+        )
         return True
     else:
         print(f"  ❌ 불일치 항목 {len(mismatches)}건 발생:")
         for item, reason in mismatches:
             print(f"     - {item}: {reason}")
         return False
+
 
 def sync_all():
     start_t = time.time()
@@ -180,13 +185,18 @@ def sync_all():
     elapsed = time.time() - start_t
     print("\n" + "=" * 65)
     if ok_dept and ok_univ and ok_parity:
-        print(f"🎉 모든 배포용 패키지 동기화 및 100% 코드 동일성 검증 완료! (소요시간: {elapsed:.2f}초)")
+        print(
+            f"🎉 모든 배포용 패키지 동기화 및 100% 코드 동일성 검증 완료! (소요시간: {elapsed:.2f}초)"
+        )
         print(f" 1. [부서 전용] {dept_dist_path}")
         print(f" 2. [타부서용]  {univ_dist_path}")
     else:
-        print("⚠️ 일부 항목에 불일치 또는 누락이 발견되었습니다. 상단 검증 로그를 확인하세요.")
+        print(
+            "⚠️ 일부 항목에 불일치 또는 누락이 발견되었습니다. 상단 검증 로그를 확인하세요."
+        )
     print("=" * 65)
     return ok_dept and ok_univ and ok_parity
+
 
 if __name__ == "__main__":
     success = sync_all()

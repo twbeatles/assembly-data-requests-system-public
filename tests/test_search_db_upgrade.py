@@ -4,6 +4,7 @@
 소스 문자열 grep으로 검증하지 않는다(테스트 규칙). 실제 DB를 만들어 질의하고,
 대시보드 JS는 템플릿에서 떼어 Node로 실행한다.
 """
+
 from __future__ import annotations
 
 import json
@@ -52,27 +53,73 @@ def _seed(db_path: Path):
             "INSERT INTO documents (doc_id, year, request_date, institution, requester, doc_number, "
             "title, question_list, answer_summary, answer_full_text, full_markdown, has_tables) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            ("D1", "2026", "2026-03-05", "국회", "김철수 의원", "0517",
-             "딥페이크 대응 현황", "1. 접속차단 현황", "요약", TRUNCATED, LONG_BODY, "N"),
+            (
+                "D1",
+                "2026",
+                "2026-03-05",
+                "국회",
+                "김철수 의원",
+                "0517",
+                "딥페이크 대응 현황",
+                "1. 접속차단 현황",
+                "요약",
+                TRUNCATED,
+                LONG_BODY,
+                "N",
+            ),
         )
         conn.execute(
             "INSERT INTO documents (doc_id, year, request_date, institution, requester, doc_number, "
             "title, question_list, answer_summary, answer_full_text, full_markdown, has_tables) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            ("D2", "2025", "2025-06-10", "대외기관", "홍길동 의원", "0831",
-             "국회 자료요구 통계", "2. 통계", "요약", "짧은 본문", "# 전문\n\n국회 관련 통계 자료", "N"),
+            (
+                "D2",
+                "2025",
+                "2025-06-10",
+                "대외기관",
+                "홍길동 의원",
+                "0831",
+                "국회 자료요구 통계",
+                "2. 통계",
+                "요약",
+                "짧은 본문",
+                "# 전문\n\n국회 관련 통계 자료",
+                "N",
+            ),
         )
         conn.execute(
             "INSERT INTO qa_items (qa_id, doc_id, year, request_date, requester, q_num, "
             "question_title, answer_full, answer_markdown, has_tables) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            ("D1-Q1", "D1", "2026", "2026-03-05", "김철수 의원", 1,
-             "접속차단 실적", TRUNCATED, LONG_BODY, "N"),
+            (
+                "D1-Q1",
+                "D1",
+                "2026",
+                "2026-03-05",
+                "김철수 의원",
+                1,
+                "접속차단 실적",
+                TRUNCATED,
+                LONG_BODY,
+                "N",
+            ),
         )
         conn.execute(
             "INSERT INTO request_ledger (ledger_id, year, seq_no, party, requester, title, details, "
             "request_date, deadline, submit_date, status, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            ("REQ-2026-001", "2026", "17", "일반정당", "김철수 의원", "딥페이크 시정요구 내역",
-             "최근 3개년 조치 현황", "2026-03-05", "2026-03-09", "2026-03-08", "제출", ""),
+            (
+                "REQ-2026-001",
+                "2026",
+                "17",
+                "일반정당",
+                "김철수 의원",
+                "딥페이크 시정요구 내역",
+                "최근 3개년 조치 현황",
+                "2026-03-05",
+                "2026-03-09",
+                "2026-03-08",
+                "제출",
+                "",
+            ),
         )
         conn.commit()
     finally:
@@ -86,7 +133,9 @@ class SearchUpgradeTests(unittest.TestCase):
         cls.base = Path(cls.tmp)
         cls.db = cls.base / "data_requests.db"
         _seed(cls.db)
-        cls.svc = LedgerService(db_path=cls.db, json_path=cls.base / "d.json", base_dir=cls.base)
+        cls.svc = LedgerService(
+            db_path=cls.db, json_path=cls.base / "d.json", base_dir=cls.base
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -111,8 +160,11 @@ class SearchUpgradeTests(unittest.TestCase):
     # --- S2: 2글자 질의 ------------------------------------------------------
     def test_two_char_query_is_not_expressed_in_fts(self):
         self.assertEqual(build_fts_match("국회"), "")
-        self.assertEqual(build_fts_match("딥페이크 국회"), "",
-                         "2글자가 섞이면 전체를 대체 경로로 보낸다")
+        self.assertEqual(
+            build_fts_match("딥페이크 국회"),
+            "",
+            "2글자가 섞이면 전체를 대체 경로로 보낸다",
+        )
         self.assertNotEqual(build_fts_match("딥페이크"), "")
 
     def test_two_char_query_still_returns_rows(self):
@@ -122,7 +174,9 @@ class SearchUpgradeTests(unittest.TestCase):
 
     def test_prefilter_keeps_negation_results(self):
         """제외어가 있어도 선필터가 결과를 줄이면 안 된다."""
-        with_neg = self.svc.query_documents(kw="국회 -딥페이크", slim=True, use_synonyms=False)
+        with_neg = self.svc.query_documents(
+            kw="국회 -딥페이크", slim=True, use_synonyms=False
+        )
         ids = [d["doc_id"] for d in with_neg]
         self.assertIn("D2", ids)
         self.assertNotIn("D1", ids)
@@ -134,11 +188,21 @@ class SearchUpgradeTests(unittest.TestCase):
         동의어가 켜지면 선필터를 통째로 껐다가(느림), 다시 켰을 때는 공백 제거 비교를
         짧은 필드에만 걸어 본문에서 갈라진 낱말을 놓쳤다(운영 질의가 72건→70건).
         """
-        for kw in ("국회", "통계", "딥페이크 현황", "국회 OR 딥페이크", "딥페이크 -통계"):
+        for kw in (
+            "국회",
+            "통계",
+            "딥페이크 현황",
+            "국회 OR 딥페이크",
+            "딥페이크 -통계",
+        ):
             for use_syn in (False, True):
                 with self.subTest(kw=kw, synonyms=use_syn):
-                    narrowed = {d["doc_id"] for d in
-                                self.svc.query_documents(kw=kw, slim=True, use_synonyms=use_syn)}
+                    narrowed = {
+                        d["doc_id"]
+                        for d in self.svc.query_documents(
+                            kw=kw, slim=True, use_synonyms=use_syn
+                        )
+                    }
                     plan = parse_query(kw)
                     conn = sqlite3.connect(str(self.db))
                     conn.row_factory = sqlite3.Row
@@ -146,13 +210,22 @@ class SearchUpgradeTests(unittest.TestCase):
                         fields = fts_spec.FTS_SPECS["documents_fts"][1]
                         cho = fts_spec.FTS_CHOSEONG_FIELDS["documents_fts"]
                         brute = {
-                            r["doc_id"] for r in conn.execute("SELECT * FROM documents")
-                            if row_matches(plan, [r[f] for f in fields],
-                                           [r[f] for f in cho], use_syn)
+                            r["doc_id"]
+                            for r in conn.execute("SELECT * FROM documents")
+                            if row_matches(
+                                plan,
+                                [r[f] for f in fields],
+                                [r[f] for f in cho],
+                                use_syn,
+                            )
                         }
                     finally:
                         conn.close()
-                    self.assertEqual(narrowed, brute, f"선필터가 결과를 바꿨다: {kw} (동의어={use_syn})")
+                    self.assertEqual(
+                        narrowed,
+                        brute,
+                        f"선필터가 결과를 바꿨다: {kw} (동의어={use_syn})",
+                    )
 
     def test_prefilter_finds_terms_split_by_whitespace_in_body(self):
         """본문에서 공백으로 갈라진 낱말도 찾아야 한다.
@@ -173,9 +246,15 @@ class SearchUpgradeTests(unittest.TestCase):
         try:
             for use_syn in (False, True):
                 with self.subTest(synonyms=use_syn):
-                    ids = [d["doc_id"] for d in
-                           self.svc.query_documents(kw="국회", slim=True, use_synonyms=use_syn)]
-                    self.assertIn("D-SPLIT", ids, "본문에서 공백으로 갈라진 낱말을 놓쳤다")
+                    ids = [
+                        d["doc_id"]
+                        for d in self.svc.query_documents(
+                            kw="국회", slim=True, use_synonyms=use_syn
+                        )
+                    ]
+                    self.assertIn(
+                        "D-SPLIT", ids, "본문에서 공백으로 갈라진 낱말을 놓쳤다"
+                    )
         finally:
             conn = sqlite3.connect(str(self.db))
             try:
@@ -210,17 +289,24 @@ class SearchUpgradeTests(unittest.TestCase):
         try:
             for use_syn in (False, True):
                 with self.subTest(synonyms=use_syn):
-                    ids = [d["doc_id"] for d in
-                           self.svc.query_documents(kw="국회", slim=True,
-                                                    use_synonyms=use_syn)]
+                    ids = [
+                        d["doc_id"]
+                        for d in self.svc.query_documents(
+                            kw="국회", slim=True, use_synonyms=use_syn
+                        )
+                    ]
                     for doc_id in splits:
-                        self.assertIn(doc_id, ids,
-                                        f"비표준 공백으로 갈라진 낱말을 놓쳤다: {doc_id}")
+                        self.assertIn(
+                            doc_id,
+                            ids,
+                            f"비표준 공백으로 갈라진 낱말을 놓쳤다: {doc_id}",
+                        )
         finally:
             conn = sqlite3.connect(str(self.db))
             try:
-                conn.execute("DELETE FROM documents WHERE doc_id IN (?,?,?,?)",
-                             tuple(splits))
+                conn.execute(
+                    "DELETE FROM documents WHERE doc_id IN (?,?,?,?)", tuple(splits)
+                )
                 conn.commit()
             finally:
                 conn.close()
@@ -231,13 +317,21 @@ class SearchUpgradeTests(unittest.TestCase):
             spec, fts_name, text_fields, cho_fields = LedgerService._spec(kind)
             self.assertEqual(tuple(text_fields), fts_spec.FTS_SPECS[fts_name][1])
             for f in cho_fields:
-                self.assertIn(f, text_fields, f"{kind}: 초성 필드는 검색 필드의 부분집합이어야 한다")
-            self.assertEqual(len(fts_spec.FTS_WEIGHTS[fts_name]), len(text_fields),
-                             f"{fts_name}: bm25 가중치 개수가 컬럼 수와 달라 검색이 실패한다")
+                self.assertIn(
+                    f,
+                    text_fields,
+                    f"{kind}: 초성 필드는 검색 필드의 부분집합이어야 한다",
+                )
+            self.assertEqual(
+                len(fts_spec.FTS_WEIGHTS[fts_name]),
+                len(text_fields),
+                f"{fts_name}: bm25 가중치 개수가 컬럼 수와 달라 검색이 실패한다",
+            )
 
     # --- S4: 동의어 ----------------------------------------------------------
     def test_synonyms_shared_between_server_and_dashboard(self):
         import search_synonyms
+
         self.assertIn("딥페이크", search_synonyms.SYNONYMS)
         self.assertIn("허위영상물", search_synonyms.expand("딥페이크"))
         assembled = DashboardRenderer().load_template()
@@ -245,21 +339,32 @@ class SearchUpgradeTests(unittest.TestCase):
         self.assertIn('"허위영상물"', assembled)
 
     def test_synonym_expansion_widens_server_results(self):
-        no_syn = self.svc.query_documents(kw="허위영상물", slim=True, use_synonyms=False)
-        with_syn = self.svc.query_documents(kw="허위영상물", slim=True, use_synonyms=True)
+        no_syn = self.svc.query_documents(
+            kw="허위영상물", slim=True, use_synonyms=False
+        )
+        with_syn = self.svc.query_documents(
+            kw="허위영상물", slim=True, use_synonyms=True
+        )
         self.assertEqual(no_syn, [])
-        self.assertIn("D1", [d["doc_id"] for d in with_syn],
-                      "동의어를 켜면 '딥페이크' 문서가 나와야 한다")
+        self.assertIn(
+            "D1",
+            [d["doc_id"] for d in with_syn],
+            "동의어를 켜면 '딥페이크' 문서가 나와야 한다",
+        )
 
     # --- S5: 스니펫 ----------------------------------------------------------
     def test_snippet_is_returned_for_both_paths(self):
         for kw in ("딥페이크", "국회"):  # FTS 경로 / 대체 경로
             with self.subTest(kw=kw):
-                res = self.svc.search_all(kw=kw, slim=True, use_synonyms=False, with_snippet=True)
+                res = self.svc.search_all(
+                    kw=kw, slim=True, use_synonyms=False, with_snippet=True
+                )
                 found = res["documents"] + res["qa_items"] + res["ledger"]
                 self.assertTrue(found, f"{kw}: 결과가 있어야 스니펫을 볼 수 있다")
-                self.assertTrue(all("snippet" in r for r in found),
-                                "경로에 따라 스니펫이 있었다 없었다 하면 안 된다")
+                self.assertTrue(
+                    all("snippet" in r for r in found),
+                    "경로에 따라 스니펫이 있었다 없었다 하면 안 된다",
+                )
 
     # --- S6: 필드 한정·기간 --------------------------------------------------
     def test_field_qualifiers(self):
@@ -285,7 +390,9 @@ class SearchUpgradeTests(unittest.TestCase):
     def test_normalize_date_expands_partial_values(self):
         self.assertEqual(normalize_date("2026"), "2026-01-01")
         self.assertEqual(normalize_date("2026", end_of_range=True), "2026-12-31")
-        self.assertEqual(normalize_date("2026-02", end_of_range=True), "2026-28"[:4] + "-02-28")
+        self.assertEqual(
+            normalize_date("2026-02", end_of_range=True), "2026-28"[:4] + "-02-28"
+        )
 
     def test_february_end_covers_leap_day(self):
         """윤년 2월은 29일까지가 범위다. (감사 R6-05)
@@ -318,6 +425,7 @@ class SearchUpgradeTests(unittest.TestCase):
         plan = parse_query("국회")
         huge = "가" * 200000
         import time
+
         started = time.time()
         score_row(plan, [(huge, 10)])
         self.assertLess(time.time() - started, 1.0, "본문 초성 변환이 되살아났다")
@@ -330,9 +438,13 @@ class SearchUpgradeTests(unittest.TestCase):
 
     # --- S9: 검색 로그 -------------------------------------------------------
     def test_zero_result_queries_are_logged(self):
-        self.svc.query_documents(kw="존재하지않는낱말xyz", slim=True, use_synonyms=False)
+        self.svc.query_documents(
+            kw="존재하지않는낱말xyz", slim=True, use_synonyms=False
+        )
         insights = self.svc.search_insights()
-        self.assertTrue(any(r["query"] == "존재하지않는낱말xyz" for r in insights["zero_result"]))
+        self.assertTrue(
+            any(r["query"] == "존재하지않는낱말xyz" for r in insights["zero_result"])
+        )
 
 
 class DatabaseUpgradeTests(unittest.TestCase):
@@ -416,14 +528,24 @@ class DatabaseUpgradeTests(unittest.TestCase):
         def _schema(path):
             c = sqlite3.connect(str(path))
             try:
-                tables = sorted(r[0] for r in c.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"))
-                return {t: sorted(r[1] for r in c.execute(f"PRAGMA table_info({t})")) for t in tables}
+                tables = sorted(
+                    r[0]
+                    for r in c.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                    )
+                )
+                return {
+                    t: sorted(r[1] for r in c.execute(f"PRAGMA table_info({t})"))
+                    for t in tables
+                }
             finally:
                 c.close()
 
-        self.assertEqual(_schema(fresh), _schema(legacy),
-                         "새 DB와 마이그레이션한 DB의 스키마가 갈라졌다")
+        self.assertEqual(
+            _schema(fresh),
+            _schema(legacy),
+            "새 DB와 마이그레이션한 DB의 스키마가 갈라졌다",
+        )
 
     def test_fresh_database_is_not_reported_as_migrated(self):
         """새로 만든 DB에 마이그레이션이 돌면 안 된다.
@@ -437,7 +559,9 @@ class DatabaseUpgradeTests(unittest.TestCase):
         try:
             DatabaseManager.ensure_schema(conn)
             result = migrations.apply_migrations(conn)
-            self.assertEqual(result["applied"], [], "새 DB에 마이그레이션 단계가 돌았다")
+            self.assertEqual(
+                result["applied"], [], "새 DB에 마이그레이션 단계가 돌았다"
+            )
             self.assertEqual(migrations.get_version(conn), migrations.SCHEMA_VERSION)
         finally:
             conn.close()
@@ -470,19 +594,24 @@ class DatabaseUpgradeTests(unittest.TestCase):
             for name in fts_spec.fts_trigger_names():
                 conn.execute(f"DROP TRIGGER IF EXISTS {name}")
             conn.execute(
-                "INSERT INTO documents (doc_id, year, title, full_markdown) VALUES ('D9','2026','유령','x')")
+                "INSERT INTO documents (doc_id, year, title, full_markdown) VALUES ('D9','2026','유령','x')"
+            )
             conn.commit()
         finally:
             conn.close()
         report = check_database(self.db)
         self.assertFalse(report["success"])
-        self.assertTrue(any("documents_fts" in p for p in report["problems"]), report["problems"])
+        self.assertTrue(
+            any("documents_fts" in p for p in report["problems"]), report["problems"]
+        )
 
     def test_health_check_reports_dangling_links(self):
         _seed(self.db)
         conn = sqlite3.connect(str(self.db))
         try:
-            conn.execute("UPDATE request_ledger SET linked_doc_id = 'NOPE' WHERE ledger_id='REQ-2026-001'")
+            conn.execute(
+                "UPDATE request_ledger SET linked_doc_id = 'NOPE' WHERE ledger_id='REQ-2026-001'"
+            )
             conn.commit()
         finally:
             conn.close()
@@ -497,12 +626,15 @@ class DatabaseUpgradeTests(unittest.TestCase):
         그대로였다.
         """
         from services.ledger.autolink import repair_broken_links
+
         _seed(self.db)
         conn = sqlite3.connect(str(self.db))
         conn.row_factory = sqlite3.Row
         try:
             # 이 대장 항목은 요구자·요구일이 D1과 같아 다시 이어질 수 있다.
-            conn.execute("UPDATE request_ledger SET linked_doc_id='GONE' WHERE ledger_id='REQ-2026-001'")
+            conn.execute(
+                "UPDATE request_ledger SET linked_doc_id='GONE' WHERE ledger_id='REQ-2026-001'"
+            )
             # 다시 이을 근거가 없는 항목 하나를 더 만든다.
             conn.execute(
                 "INSERT INTO request_ledger (ledger_id, year, seq_no, requester, title, "
@@ -510,16 +642,26 @@ class DatabaseUpgradeTests(unittest.TestCase):
                 "VALUES ('REQ-2026-999','2026','99','없는사람','근거 없음','2019-01-01','2019-01-02','제출','ALSO-GONE')"
             )
             conn.commit()
-            self.assertEqual(check_database(self.db)["links"]["dangling_linked_doc_id"], 2)
+            self.assertEqual(
+                check_database(self.db)["links"]["dangling_linked_doc_id"], 2
+            )
 
             out = repair_broken_links(conn)
             self.assertEqual(out["checked"], 2)
             self.assertEqual(out["relinked"] + out["cleared"], 2)
 
-            rows = {r["ledger_id"]: r["linked_doc_id"] for r in
-                    conn.execute("SELECT ledger_id, linked_doc_id FROM request_ledger")}
-            self.assertEqual(rows["REQ-2026-001"], "D1", "재연결 값이 DB에 저장되지 않았다")
-            self.assertEqual(rows["REQ-2026-999"], "", "이을 수 없으면 값을 비워야 한다")
+            rows = {
+                r["ledger_id"]: r["linked_doc_id"]
+                for r in conn.execute(
+                    "SELECT ledger_id, linked_doc_id FROM request_ledger"
+                )
+            }
+            self.assertEqual(
+                rows["REQ-2026-001"], "D1", "재연결 값이 DB에 저장되지 않았다"
+            )
+            self.assertEqual(
+                rows["REQ-2026-999"], "", "이을 수 없으면 값을 비워야 한다"
+            )
         finally:
             conn.close()
         self.assertEqual(check_database(self.db)["links"]["dangling_linked_doc_id"], 0)
@@ -530,14 +672,19 @@ class DatabaseUpgradeTests(unittest.TestCase):
         conn = sqlite3.connect(str(self.db))
         try:
             conn.execute(
-                "INSERT INTO documents (doc_id, title, full_markdown) VALUES ('D-UNDATED','날짜없음','본문')")
+                "INSERT INTO documents (doc_id, title, full_markdown) VALUES ('D-UNDATED','날짜없음','본문')"
+            )
             conn.commit()
         finally:
             conn.close()
         report = check_database(self.db)
-        self.assertTrue(any("날짜가 없어" in n for n in report["notes"]), report["notes"])
-        self.assertFalse([w for w in report["warnings"] if "연도" in w],
-                         f"고칠 수 없는 항목이 경고로 올라왔다: {report['warnings']}")
+        self.assertTrue(
+            any("날짜가 없어" in n for n in report["notes"]), report["notes"]
+        )
+        self.assertFalse(
+            [w for w in report["warnings"] if "연도" in w],
+            f"고칠 수 없는 항목이 경고로 올라왔다: {report['warnings']}",
+        )
         self.assertTrue(report["success"])
 
     def test_dated_document_missing_year_is_a_warning(self):
@@ -547,18 +694,23 @@ class DatabaseUpgradeTests(unittest.TestCase):
         try:
             conn.execute(
                 "INSERT INTO documents (doc_id, request_date, title, full_markdown) "
-                "VALUES ('D-DATED','2026-04-01','연도누락','본문')")
+                "VALUES ('D-DATED','2026-04-01','연도누락','본문')"
+            )
             conn.commit()
         finally:
             conn.close()
         report = check_database(self.db)
         self.assertEqual(report["quality"]["documents_without_year_but_dated"], 1)
-        self.assertTrue([w for w in report["warnings"] if "연도" in w], report["warnings"])
+        self.assertTrue(
+            [w for w in report["warnings"] if "연도" in w], report["warnings"]
+        )
 
     # --- D4: 집계·인덱스 ------------------------------------------------------
     def test_ledger_summary_counts_without_loading_bodies(self):
         _seed(self.db)
-        svc = LedgerService(db_path=self.db, json_path=self.base / "d.json", base_dir=self.base)
+        svc = LedgerService(
+            db_path=self.db, json_path=self.base / "d.json", base_dir=self.base
+        )
         summary = svc.ledger_summary()
         self.assertEqual(summary["total"], 1)
         self.assertEqual(summary["by_status"], {"제출": 1})
@@ -567,8 +719,12 @@ class DatabaseUpgradeTests(unittest.TestCase):
         _seed(self.db)
         conn = sqlite3.connect(str(self.db))
         try:
-            names = {r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='index'")}
+            names = {
+                r[0]
+                for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='index'"
+                )
+            }
         finally:
             conn.close()
         self.assertIn("idx_ledger_deadline", names)
@@ -576,14 +732,17 @@ class DatabaseUpgradeTests(unittest.TestCase):
     # --- D7: 이력 필드 --------------------------------------------------------
     def test_update_history_records_changed_fields(self):
         _seed(self.db)
-        svc = LedgerService(db_path=self.db, json_path=self.base / "d.json", base_dir=self.base)
+        svc = LedgerService(
+            db_path=self.db, json_path=self.base / "d.json", base_dir=self.base
+        )
         svc.update_ledger_item("REQ-2026-001", {"note": "확인함"})
         conn = sqlite3.connect(str(self.db))
         conn.row_factory = sqlite3.Row
         try:
             row = conn.execute(
                 "SELECT changed_fields, actor FROM ledger_history "
-                "WHERE action='UPDATE' ORDER BY history_id DESC LIMIT 1").fetchone()
+                "WHERE action='UPDATE' ORDER BY history_id DESC LIMIT 1"
+            ).fetchone()
         finally:
             conn.close()
         self.assertIsNotNone(row)
@@ -593,6 +752,7 @@ class DatabaseUpgradeTests(unittest.TestCase):
     def test_snapshot_and_history_dump(self):
         _seed(self.db)
         from db import backup as db_backup
+
         out = db_backup.run_all(self.db, self.base)
         self.assertTrue(out["database"]["success"], out["database"])
         self.assertTrue(Path(out["database"]["path"]).exists())
@@ -604,7 +764,9 @@ class DatabaseUpgradeTests(unittest.TestCase):
     # --- D9: 읽기 전용 --------------------------------------------------------
     def test_readonly_connection_refuses_writes(self):
         _seed(self.db)
-        svc = LedgerService(db_path=self.db, json_path=self.base / "d.json", base_dir=self.base)
+        svc = LedgerService(
+            db_path=self.db, json_path=self.base / "d.json", base_dir=self.base
+        )
         conn = svc.get_conn(readonly=True)
         try:
             with self.assertRaises(sqlite3.OperationalError):
@@ -630,7 +792,7 @@ def _extract_js_function(src: str, name: str) -> str:
         elif src[k] == "}":
             depth -= 1
             if depth == 0:
-                return src[m.start():k + 1]
+                return src[m.start() : k + 1]
     raise AssertionError(f"{name} 선언의 끝을 찾지 못했습니다")
 
 
@@ -639,8 +801,10 @@ class SearchLogRetentionTests(unittest.TestCase):
 
     `search_log`는 검색할 때마다 1행씩 쌓이고 지우는 코드가 없어 영원히 늘었다.
     """
+
     def setUp(self):
         import datetime
+
         self.tmp = tempfile.mkdtemp(prefix="search_log_retention_")
         self.base = Path(self.tmp)
         self.db = self.base / "t.db"
@@ -656,7 +820,8 @@ class SearchLogRetentionTests(unittest.TestCase):
                     ("오래된 조회", "docs", 5, 10, 1, old),
                     ("오래된 0건", "docs", 0, 10, 0, old),
                     ("최근 조회", "docs", 3, 10, 1, now),
-                ])
+                ],
+            )
             conn.commit()
         finally:
             conn.close()
@@ -691,10 +856,13 @@ class SearchLogRetentionTests(unittest.TestCase):
 
     def test_auto_prune_runs_at_most_once_per_day(self):
         from unittest import mock
-        svc = LedgerService(db_path=self.db, json_path=self.base / "d.json",
-                            base_dir=self.base)
-        with mock.patch.object(DatabaseManager, "prune_search_log",
-                                return_value=0) as pruned:
+
+        svc = LedgerService(
+            db_path=self.db, json_path=self.base / "d.json", base_dir=self.base
+        )
+        with mock.patch.object(
+            DatabaseManager, "prune_search_log", return_value=0
+        ) as pruned:
             svc._maybe_prune_search_log()
             svc._maybe_prune_search_log()
             self.assertEqual(pruned.call_count, 1)
@@ -710,18 +878,49 @@ class DashboardPayloadTests(unittest.TestCase):
         astral_answer = "이모지 뒤 답변"
         astral_body = "머리말 📌 기호와 " + astral_answer + " 뒷부분."
         return {
-            "documents": [{"doc_id": "D1", "title": "제목", "full_markdown": body,
-                           "answer_full_text": body[:20]},
-                          {"doc_id": "D2", "title": "이모지 문서",
-                           "full_markdown": astral_body, "answer_full_text": ""}],
+            "documents": [
+                {
+                    "doc_id": "D1",
+                    "title": "제목",
+                    "full_markdown": body,
+                    "answer_full_text": body[:20],
+                },
+                {
+                    "doc_id": "D2",
+                    "title": "이모지 문서",
+                    "full_markdown": astral_body,
+                    "answer_full_text": "",
+                },
+            ],
             "qa_items": [
-                {"qa_id": "D1-Q1", "doc_id": "D1", "q_num": 1, "question_title": "질문",
-                 "answer_markdown": answer, "answer_full": answer[:20], "has_tables": "N"},
+                {
+                    "qa_id": "D1-Q1",
+                    "doc_id": "D1",
+                    "q_num": 1,
+                    "question_title": "질문",
+                    "answer_markdown": answer,
+                    "answer_full": answer[:20],
+                    "has_tables": "N",
+                },
                 # 부모 본문에 없는 답변은 예전처럼 전문을 그대로 싣는다.
-                {"qa_id": "D1-Q2", "doc_id": "D1", "q_num": 2, "question_title": "질문2",
-                 "answer_markdown": "부모 본문에 없는 답변", "answer_full": "", "has_tables": "N"},
-                {"qa_id": "D2-Q1", "doc_id": "D2", "q_num": 1, "question_title": "이모지 질문",
-                 "answer_markdown": astral_answer, "answer_full": "", "has_tables": "N"},
+                {
+                    "qa_id": "D1-Q2",
+                    "doc_id": "D1",
+                    "q_num": 2,
+                    "question_title": "질문2",
+                    "answer_markdown": "부모 본문에 없는 답변",
+                    "answer_full": "",
+                    "has_tables": "N",
+                },
+                {
+                    "qa_id": "D2-Q1",
+                    "doc_id": "D2",
+                    "q_num": 1,
+                    "question_title": "이모지 질문",
+                    "answer_markdown": astral_answer,
+                    "answer_full": "",
+                    "has_tables": "N",
+                },
             ],
             "request_ledger": [],
         }
@@ -731,7 +930,9 @@ class DashboardPayloadTests(unittest.TestCase):
         by_id = {q["qa_id"]: q for q in slim["qa_items"]}
         self.assertIn("am_ref", by_id["D1-Q1"])
         self.assertNotIn("answer_markdown", by_id["D1-Q1"])
-        self.assertIn("answer_markdown", by_id["D1-Q2"], "못 찾으면 전문을 그대로 실어야 한다")
+        self.assertIn(
+            "answer_markdown", by_id["D1-Q2"], "못 찾으면 전문을 그대로 실어야 한다"
+        )
 
     def test_rehydration_is_byte_identical(self):
         raw = self._payload()
@@ -739,22 +940,28 @@ class DashboardPayloadTests(unittest.TestCase):
         restored = DashboardRenderer.rehydrate_qa_bodies(slim)
         original = {q["qa_id"]: q["answer_markdown"] for q in raw["qa_items"]}
         for q in restored["qa_items"]:
-            self.assertEqual(q["answer_markdown"], original[q["qa_id"]],
-                             f"{q['qa_id']}: 복원본이 원문과 다르다")
+            self.assertEqual(
+                q["answer_markdown"],
+                original[q["qa_id"]],
+                f"{q['qa_id']}: 복원본이 원문과 다르다",
+            )
 
     def test_payload_is_smaller_than_inlining_everything(self):
         raw = self._payload()
         slim = DashboardRenderer.build_slim_payload(raw)
         inlined = DashboardRenderer.rehydrate_qa_bodies(slim)
-        self.assertLess(len(json.dumps(slim, ensure_ascii=False)),
-                        len(json.dumps(inlined, ensure_ascii=False)))
+        self.assertLess(
+            len(json.dumps(slim, ensure_ascii=False)),
+            len(json.dumps(inlined, ensure_ascii=False)),
+        )
 
     def test_full_markdown_is_never_dropped(self):
         """전문 보존 정책 2항 — 문서 본문은 어떤 경우에도 빠지거나 잘리지 않는다."""
         raw = self._payload()
         slim = DashboardRenderer.build_slim_payload(raw)
-        self.assertEqual(slim["documents"][0]["full_markdown"],
-                         raw["documents"][0]["full_markdown"])
+        self.assertEqual(
+            slim["documents"][0]["full_markdown"], raw["documents"][0]["full_markdown"]
+        )
 
     def test_dashboard_js_rehydrates_same_as_python(self):
         """브라우저 쪽 복원 규칙이 파이썬과 같은 결과를 내는지 Node로 실행해 확인한다.
@@ -767,37 +974,56 @@ class DashboardPayloadTests(unittest.TestCase):
         if not node:
             self.skipTest("node가 없어 대시보드 JS를 실행할 수 없습니다")
         template = (SCRIPTS_DIR / "templates" / "dashboard_template.html").read_text(
-            encoding="utf-8")
+            encoding="utf-8"
+        )
         # 복원 규칙은 문서당 한 번 본문을 분석하는 makeAnswerRehydrator에 있다(7회차 대용량 대응).
-        func = (_extract_js_function(template, "makeAnswerRehydrator") + chr(10)
-                + _extract_js_function(template, "rehydrateAnswerMarkdown"))
+        func = (
+            _extract_js_function(template, "makeAnswerRehydrator")
+            + chr(10)
+            + _extract_js_function(template, "rehydrateAnswerMarkdown")
+        )
         raw = self._payload()
         slim = DashboardRenderer.build_slim_payload(raw)
-        script = func + chr(10) + chr(10).join([
-            "const DB = %s;" % json.dumps(slim, ensure_ascii=False),
-            "const DOCS_MAP = {};",
-            "DB.documents.forEach(d => { DOCS_MAP[d.doc_id] = d; });",
-            "const out = {};",
-            "DB.qa_items.forEach(q => {",
-            "  const doc = DOCS_MAP[q.doc_id];",
-            "  if (q.am_ref && !q.answer_markdown) {",
-            "    const body = (doc && doc.full_markdown) || '';",
-            "    q.answer_markdown = rehydrateAnswerMarkdown(body, q.am_ref);",
-            "    delete q.am_ref;",
-            "  }",
-            "  out[q.qa_id] = q.answer_markdown;",
-            "});",
-            "console.log(JSON.stringify(out));",
-        ])
+        script = (
+            func
+            + chr(10)
+            + chr(10).join(
+                [
+                    "const DB = %s;" % json.dumps(slim, ensure_ascii=False),
+                    "const DOCS_MAP = {};",
+                    "DB.documents.forEach(d => { DOCS_MAP[d.doc_id] = d; });",
+                    "const out = {};",
+                    "DB.qa_items.forEach(q => {",
+                    "  const doc = DOCS_MAP[q.doc_id];",
+                    "  if (q.am_ref && !q.answer_markdown) {",
+                    "    const body = (doc && doc.full_markdown) || '';",
+                    "    q.answer_markdown = rehydrateAnswerMarkdown(body, q.am_ref);",
+                    "    delete q.am_ref;",
+                    "  }",
+                    "  out[q.qa_id] = q.answer_markdown;",
+                    "});",
+                    "console.log(JSON.stringify(out));",
+                ]
+            )
+        )
         # stdin을 DEVNULL로 준다. 호출 셸의 stdin이 상속 불가능한 핸들이면
         # Windows에서 DuplicateHandle이 실패해 테스트가 환경 문제로 깨진다.
-        proc = subprocess.run([node, "-e", script], capture_output=True, text=True,
-                              encoding="utf-8", timeout=60, stdin=subprocess.DEVNULL)
+        proc = subprocess.run(
+            [node, "-e", script],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60,
+            stdin=subprocess.DEVNULL,
+        )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         js_result = json.loads(proc.stdout)
         for q in raw["qa_items"]:
-            self.assertEqual(js_result[q["qa_id"]], q["answer_markdown"],
-                             f'{q["qa_id"]}: JS 복원이 원문과 다르다')
+            self.assertEqual(
+                js_result[q["qa_id"]],
+                q["answer_markdown"],
+                f"{q['qa_id']}: JS 복원이 원문과 다르다",
+            )
 
 
 if __name__ == "__main__":

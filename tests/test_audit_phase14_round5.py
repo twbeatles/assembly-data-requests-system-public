@@ -22,8 +22,14 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from db.database_manager import DatabaseManager
 
-HISTORY_COLS_6 = ("ledger_id", "action", "changed_at", "snapshot",
-                  "changed_fields", "actor")
+HISTORY_COLS_6 = (
+    "ledger_id",
+    "action",
+    "changed_at",
+    "snapshot",
+    "changed_fields",
+    "actor",
+)
 
 
 def _make_src_db(path, rows, old_schema=False):
@@ -74,10 +80,22 @@ class TestCopyLedgerHistoryKeepsNewColumns(unittest.TestCase):
 
     def test_six_columns_are_copied(self):
         rows = [
-            ("REQ-2026-0001", "UPDATE", "2026-09-20 10:00:00", '{"a": 1}',
-             '["deadline"]', "web:admin"),
-            ("REQ-2026-0002", "DELETE", "2026-09-20 11:00:00", '{"b": 2}',
-             "", "excel:watcher"),
+            (
+                "REQ-2026-0001",
+                "UPDATE",
+                "2026-09-20 10:00:00",
+                '{"a": 1}',
+                '["deadline"]',
+                "web:admin",
+            ),
+            (
+                "REQ-2026-0002",
+                "DELETE",
+                "2026-09-20 11:00:00",
+                '{"b": 2}',
+                "",
+                "excel:watcher",
+            ),
         ]
         _make_src_db(self.src, rows)
         n = DatabaseManager.copy_ledger_history(self.src, self.dest_conn)
@@ -86,24 +104,31 @@ class TestCopyLedgerHistoryKeepsNewColumns(unittest.TestCase):
         self.assertEqual([tuple(r) for r in got], rows)
 
     def test_old_schema_falls_back_to_four_columns(self):
-        _make_src_db(self.src, [("REQ-2026-0009", "INSERT", "2026-01-01 00:00:00", "{}")],
-                     old_schema=True)
+        _make_src_db(
+            self.src,
+            [("REQ-2026-0009", "INSERT", "2026-01-01 00:00:00", "{}")],
+            old_schema=True,
+        )
         n = DatabaseManager.copy_ledger_history(self.src, self.dest_conn)
         self.assertEqual(n, 1)
         got = _read_dest_rows(self.dest_conn)
         self.assertEqual(len(got), 1)
-        self.assertEqual(got[0][:4], ("REQ-2026-0009", "INSERT", "2026-01-01 00:00:00", "{}"))
+        self.assertEqual(
+            got[0][:4], ("REQ-2026-0009", "INSERT", "2026-01-01 00:00:00", "{}")
+        )
         self.assertIsNone(got[0][4])
         self.assertIsNone(got[0][5])
 
     def test_missing_source_returns_zero(self):
         self.assertEqual(
-            DatabaseManager.copy_ledger_history(self.tmp / "nope.db", self.dest_conn), 0)
+            DatabaseManager.copy_ledger_history(self.tmp / "nope.db", self.dest_conn), 0
+        )
 
     def test_corrupt_source_returns_zero_without_raising(self):
         self.src.write_bytes(b"not a sqlite database at all" * 100)
         self.assertEqual(
-            DatabaseManager.copy_ledger_history(self.src, self.dest_conn), 0)
+            DatabaseManager.copy_ledger_history(self.src, self.dest_conn), 0
+        )
         self.assertEqual(_read_dest_rows(self.dest_conn), [])
 
 
@@ -112,6 +137,7 @@ class TestDerivedWorkbookAtomicSave(unittest.TestCase):
 
     def setUp(self):
         import generate_excel_db
+
         self.mod = generate_excel_db
         self.tmp = Path(tempfile.mkdtemp(prefix="audit_phase14_"))
 
@@ -130,7 +156,10 @@ class TestDerivedWorkbookAtomicSave(unittest.TestCase):
         self.assertFalse((self.tmp / "통합.tmp.xlsx").exists())
         probe = openpyxl.load_workbook(target, read_only=True)
         try:
-            self.assertIn("값", [c.value for row in cast(Any, probe.active).iter_rows() for c in row])
+            self.assertIn(
+                "값",
+                [c.value for row in cast(Any, probe.active).iter_rows() for c in row],
+            )
         finally:
             probe.close()
 
@@ -160,6 +189,7 @@ class TestCopyPathWarnAndSkip(unittest.TestCase):
 
     def setUp(self):
         import add_documents_smart
+
         self.mod = add_documents_smart
         self.tmp = Path(tempfile.mkdtemp(prefix="audit_phase14_"))
         self.workspace = self.tmp / "ws"
@@ -197,8 +227,9 @@ class TestCopyPathWarnAndSkip(unittest.TestCase):
     def test_copy_failure_without_skipped_list_still_skips(self):
         busy = self.inbox / "260920 박의원 요구자료(3).hwp"
         busy.write_bytes(b"busy")
-        with mock.patch.object(self.mod.shutil, "copy2",
-                               side_effect=PermissionError("대상 잠김")):
+        with mock.patch.object(
+            self.mod.shutil, "copy2", side_effect=PermissionError("대상 잠김")
+        ):
             moved = self._run([str(busy)], move=False)
         self.assertEqual(moved, [])
         self.assertFalse((self.workspace / "2026" / busy.name).exists())

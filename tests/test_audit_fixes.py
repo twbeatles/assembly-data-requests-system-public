@@ -26,11 +26,17 @@ def run_dashboard_bat_in_copy(source_dir: Path):
     """
     import shutil
     import tempfile
+
     # 운영 폴더 이름처럼 공백·쉼표·괄호를 섞는다(`10. 국회, 대외기관 … (기획예산팀)`).
     work = Path(tempfile.mkdtemp(prefix="bat run, 국회 (괄호) "))
     try:
-        shutil.copy2(source_dir / "01_웹대시보드_실행.bat", work / "01_웹대시보드_실행.bat")
-        shutil.copy2(source_dir / "자료요구_통합검색_대시보드.html", work / "자료요구_통합검색_대시보드.html")
+        shutil.copy2(
+            source_dir / "01_웹대시보드_실행.bat", work / "01_웹대시보드_실행.bat"
+        )
+        shutil.copy2(
+            source_dir / "자료요구_통합검색_대시보드.html",
+            work / "자료요구_통합검색_대시보드.html",
+        )
         env = os.environ.copy()
         env["DATAREQ_NO_BROWSER"] = "1"
         proc = subprocess.Popen(
@@ -55,12 +61,16 @@ class TestAuditFixes(unittest.TestCase):
         self.assertEqual(extract_and_build_db.parse_date("251015"), "2025-10-15")
         self.assertEqual(extract_and_build_db.parse_date("240801"), "2024-08-01")
         self.assertEqual(extract_and_build_db.parse_date("2026-03-09"), "2026-03-09")
-        self.assertEqual(extract_and_build_db.parse_date("2025년 8월 14일"), "2025-08-14")
+        self.assertEqual(
+            extract_and_build_db.parse_date("2025년 8월 14일"), "2025-08-14"
+        )
 
         # Invalid dates must return "" or not create invalid calendar dates
         self.assertEqual(extract_and_build_db.parse_date("259999"), "")
         self.assertEqual(extract_and_build_db.parse_date("251399"), "")
-        self.assertEqual(extract_and_build_db.parse_date("250230"), "")  # Feb 30th invalid
+        self.assertEqual(
+            extract_and_build_db.parse_date("250230"), ""
+        )  # Feb 30th invalid
         self.assertEqual(extract_and_build_db.parse_date("000000"), "")
         self.assertEqual(extract_and_build_db.parse_date(""), "")
 
@@ -98,10 +108,12 @@ class TestAuditFixes(unittest.TestCase):
             "request_date": "2025-10-10",
             "requester": "국회",
             "doc_number": "1234",
-            "title": "테스트 문서"
+            "title": "테스트 문서",
         }
-        qa_items = extract_and_build_db.split_into_qa_items("DOC-TEST", doc_meta, content)
-        
+        qa_items = extract_and_build_db.split_into_qa_items(
+            "DOC-TEST", doc_meta, content
+        )
+
         # '□ 업무 추진 현황' and '* 참고사항' should NOT be extracted as Q&A questions
         titles = [q["question_title"] for q in qa_items]
         self.assertNotIn("□ 업무 추진 현황", titles)
@@ -120,7 +132,9 @@ class TestAuditFixes(unittest.TestCase):
 
     def test_json_script_closing_escape(self):
         """Test that </script> in JSON is safely escaped so it cannot break HTML script tags."""
-        sample_json = json.dumps({"content": "</script><script>alert('xss')</script>"}, ensure_ascii=False)
+        sample_json = json.dumps(
+            {"content": "</script><script>alert('xss')</script>"}, ensure_ascii=False
+        )
         escaped_json = sample_json.replace("</script>", "<\\/script>")
         self.assertNotIn("</script>", escaped_json)
         self.assertIn("<\\/script>", escaped_json)
@@ -134,11 +148,15 @@ class TestAuditFixes(unittest.TestCase):
             ROOT_DIR / "03_엑셀DB_열기.bat",
             ROOT_DIR / "04_부서명_간편설정.bat",
             ROOT_DIR / "05_통합검색프로그램_실행.bat",
-            ROOT_DIR / "배포용_자료요구_통합검색시스템" / "00_새자료_추가_및_DB동기화.bat",
+            ROOT_DIR
+            / "배포용_자료요구_통합검색시스템"
+            / "00_새자료_추가_및_DB동기화.bat",
             ROOT_DIR / "배포용_자료요구_통합검색시스템" / "01_웹대시보드_실행.bat",
             ROOT_DIR / "배포용_자료요구_통합검색시스템" / "02_웹관리서버_실행.bat",
             ROOT_DIR / "배포용_자료요구_통합검색시스템" / "03_엑셀DB_열기.bat",
-            ROOT_DIR / "배포용_자료요구_통합검색시스템" / "05_통합검색프로그램_실행.bat"
+            ROOT_DIR
+            / "배포용_자료요구_통합검색시스템"
+            / "05_통합검색프로그램_실행.bat",
         ]
         for bf in bat_files:
             if bf.exists():
@@ -159,7 +177,9 @@ class TestAuditFixes(unittest.TestCase):
                 data = json.load(fp)
             docs = data.get("documents", [])
             doc_ids = [d["doc_id"] for d in docs]
-            self.assertEqual(len(doc_ids), len(set(doc_ids)), "All doc_ids must be strictly unique")
+            self.assertEqual(
+                len(doc_ids), len(set(doc_ids)), "All doc_ids must be strictly unique"
+            )
 
     def test_pii_masking(self):
         """Test that mobile phone numbers and emails are masked while official numbers remain."""
@@ -198,16 +218,23 @@ class TestAuditFixes(unittest.TestCase):
         html_path = ROOT_DIR / "자료요구_통합검색_대시보드.html"
         if not html_path.exists():
             self.skipTest("운영 대시보드 산출물은 소스 체크아웃에 포함되지 않습니다.")
-        
+
         # 전문 보존이 용량 한도보다 우선. Gzip HTML은 수십 MB까지 허용한다.
         file_size = html_path.stat().st_size
-        self.assertLess(file_size, 80 * 1024 * 1024, f"Dashboard HTML should be < 80MB, was {file_size:,} bytes")
+        self.assertLess(
+            file_size,
+            80 * 1024 * 1024,
+            f"Dashboard HTML should be < 80MB, was {file_size:,} bytes",
+        )
 
         html_text = html_path.read_text(encoding="utf-8")
         self.assertIn('id="COMPRESSED_DATA"', html_text)
         self.assertIn("DecompressionStream", html_text)
 
-        match = re.search(r'<script id="COMPRESSED_DATA" type="text/plain">([\s\S]*?)</script>', html_text)
+        match = re.search(
+            r'<script id="COMPRESSED_DATA" type="text/plain">([\s\S]*?)</script>',
+            html_text,
+        )
         self.assertIsNotNone(match, "COMPRESSED_DATA script tag must be found in HTML")
         assert match is not None
 
@@ -220,11 +247,19 @@ class TestAuditFixes(unittest.TestCase):
         self.assertIn("qa_items", db)
         self.assertGreaterEqual(len(db["documents"]), 233)
         self.assertGreaterEqual(len(db["qa_items"]), 1130)
-        missing_body = [d.get("doc_id") for d in db["documents"] if not d.get("full_markdown")]
-        self.assertEqual(missing_body, [], f"대시보드 문서에 전문이 없음: {missing_body[:8]}")
+        missing_body = [
+            d.get("doc_id") for d in db["documents"] if not d.get("full_markdown")
+        ]
+        self.assertEqual(
+            missing_body, [], f"대시보드 문서에 전문이 없음: {missing_body[:8]}"
+        )
 
         # Ensure main JavaScript code is properly enclosed inside <script> tag
-        self.assertRegex(html_text, r'</script>\s*<script>\s*let DB\s*=', "Main JS code must be wrapped in <script> tag")
+        self.assertRegex(
+            html_text,
+            r"</script>\s*<script>\s*let DB\s*=",
+            "Main JS code must be wrapped in <script> tag",
+        )
 
     def test_sqlite_db_optimization_and_pragmas(self):
         """운영 DB가 최적화돼 있고 WAL이 켜져 있으며 크기가 예상 범위인지 본다."""
@@ -238,19 +273,23 @@ class TestAuditFixes(unittest.TestCase):
         # 이 선을 넘으면 용량이 어디서 늘었는지부터 본다: python tools/db_report.py
         file_size = db_path.stat().st_size
         self.assertLess(
-            file_size, 400 * 1024 * 1024,
+            file_size,
+            400 * 1024 * 1024,
             f"DB가 400MB를 넘었습니다({file_size:,} 바이트). "
-            f"`python tools/db_report.py`로 어느 테이블·인덱스가 커졌는지 확인하십시오."
+            f"`python tools/db_report.py`로 어느 테이블·인덱스가 커졌는지 확인하십시오.",
         )
 
         # 운영 DB는 immutable로 연다. mode=ro만으로도 WAL 사이드카(-shm/-wal)가 바뀌어
         # 격리 테스트가 비결정적으로 실패했다. (감사 R4-01)
         from extractors.ledger_parser import connect_readonly
+
         conn = connect_readonly(db_path, immutable=True)
         try:
             cur = conn.cursor()
             cur.execute("PRAGMA integrity_check;")
-            self.assertEqual(cur.fetchone()[0], "ok", "DB integrity check must return ok")
+            self.assertEqual(
+                cur.fetchone()[0], "ok", "DB integrity check must return ok"
+            )
         finally:
             conn.close()
 
@@ -263,11 +302,30 @@ class TestAuditFixes(unittest.TestCase):
     def test_sqlite_fts5_external_content_and_triggers(self):
         """Test that FTS5 tables use external content (no _content shadow tables) and triggers keep them in sync."""
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "fts.db"
             conn = sqlite3.connect(str(db_path))
             DatabaseManager.init_schema(conn)
-            conn.execute("INSERT INTO qa_items (qa_id, doc_id, year, request_date, institution, requester, doc_number, q_num, question_title, answer_full, answer_markdown, has_tables, parsed_md_path, original_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", ("QA-SEED", "DOC-SEED", "2026", "2026-01-01", "국회", "테스트", "1", 1, "텔레그램 질의", "텔레그램 답변", "텔레그램 답변", "N", "", ""))
+            conn.execute(
+                "INSERT INTO qa_items (qa_id, doc_id, year, request_date, institution, requester, doc_number, q_num, question_title, answer_full, answer_markdown, has_tables, parsed_md_path, original_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "QA-SEED",
+                    "DOC-SEED",
+                    "2026",
+                    "2026-01-01",
+                    "국회",
+                    "테스트",
+                    "1",
+                    1,
+                    "텔레그램 질의",
+                    "텔레그램 답변",
+                    "텔레그램 답변",
+                    "N",
+                    "",
+                    "",
+                ),
+            )
             conn.commit()
             self._assert_fts_external_content_and_triggers(conn)
 
@@ -275,8 +333,14 @@ class TestAuditFixes(unittest.TestCase):
         cur = conn.cursor()
 
         # 1. External content tables do NOT have _content shadow tables
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('documents_fts_content', 'qa_items_fts_content')")
-        self.assertEqual(len(cur.fetchall()), 0, "External content tables must not have duplicate _content shadow tables")
+        cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('documents_fts_content', 'qa_items_fts_content')"
+        )
+        self.assertEqual(
+            len(cur.fetchall()),
+            0,
+            "External content tables must not have duplicate _content shadow tables",
+        )
 
         # 2. FTS5 queries work with external content
         cur.execute("""
@@ -287,24 +351,41 @@ class TestAuditFixes(unittest.TestCase):
             LIMIT 5
         """)
         rows = cur.fetchall()
-        self.assertGreater(len(rows), 0, "FTS5 query with external content must return matching rows")
+        self.assertGreater(
+            len(rows), 0, "FTS5 query with external content must return matching rows"
+        )
 
         # 3. Test insert & delete triggers
         cur.execute("BEGIN TRANSACTION")
         test_qa_id = "DOC-TEST-FTS-SYNC"
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO qa_items (qa_id, doc_id, year, request_date, institution, requester, doc_number, q_num, question_title, answer_full, answer_markdown, has_tables, parsed_md_path, original_path)
             VALUES (?, 'DOC-TEST', '2026', '2026-09-08', '국회', '테스트의원', '9999', 1, '테스트질의 동기화검증키워드', '테스트답변 본문내용', '테스트', 'N', '', '')
-        """, (test_qa_id,))
+        """,
+            (test_qa_id,),
+        )
 
-        cur.execute("SELECT rowid FROM qa_items_fts WHERE qa_items_fts MATCH '\"동기화검증키워드\"*'")
+        cur.execute(
+            "SELECT rowid FROM qa_items_fts WHERE qa_items_fts MATCH '\"동기화검증키워드\"*'"
+        )
         match = cur.fetchall()
-        self.assertEqual(len(match), 1, "AFTER INSERT trigger must automatically index new row in FTS5")
+        self.assertEqual(
+            len(match),
+            1,
+            "AFTER INSERT trigger must automatically index new row in FTS5",
+        )
 
         cur.execute("DELETE FROM qa_items WHERE qa_id = ?", (test_qa_id,))
-        cur.execute("SELECT rowid FROM qa_items_fts WHERE qa_items_fts MATCH '\"동기화검증키워드\"*'")
+        cur.execute(
+            "SELECT rowid FROM qa_items_fts WHERE qa_items_fts MATCH '\"동기화검증키워드\"*'"
+        )
         match_del = cur.fetchall()
-        self.assertEqual(len(match_del), 0, "AFTER DELETE trigger must automatically remove deleted row from FTS5")
+        self.assertEqual(
+            len(match_del),
+            0,
+            "AFTER DELETE trigger must automatically remove deleted row from FTS5",
+        )
 
         cur.execute("ROLLBACK")
         conn.close()
@@ -312,6 +393,7 @@ class TestAuditFixes(unittest.TestCase):
     def test_composite_indexes_eliminate_filesort(self):
         """Test that composite indexes eliminate USE TEMP B-TREE FOR ORDER BY in query execution plans."""
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmp:
             conn = sqlite3.connect(str(Path(tmp) / "indexes.db"))
             DatabaseManager.init_schema(conn)
@@ -321,22 +403,46 @@ class TestAuditFixes(unittest.TestCase):
         cur = conn.cursor()
 
         # Query 1: Default Q&A list ordered by date DESC
-        cur.execute("EXPLAIN QUERY PLAN SELECT qa_id, request_date, requester, question_title, doc_number FROM qa_items ORDER BY request_date DESC, qa_id ASC LIMIT 500")
+        cur.execute(
+            "EXPLAIN QUERY PLAN SELECT qa_id, request_date, requester, question_title, doc_number FROM qa_items ORDER BY request_date DESC, qa_id ASC LIMIT 500"
+        )
         plan1 = [row[3] for row in cur.fetchall()]
-        self.assertFalse(any("USE TEMP B-TREE FOR ORDER BY" in p for p in plan1), f"Filesort detected in plan1: {plan1}")
-        self.assertTrue(any("idx_qa_date_order" in p for p in plan1), f"idx_qa_date_order not used in plan1: {plan1}")
+        self.assertFalse(
+            any("USE TEMP B-TREE FOR ORDER BY" in p for p in plan1),
+            f"Filesort detected in plan1: {plan1}",
+        )
+        self.assertTrue(
+            any("idx_qa_date_order" in p for p in plan1),
+            f"idx_qa_date_order not used in plan1: {plan1}",
+        )
 
         # Query 2: Q&A filter by year ordered by date DESC
-        cur.execute("EXPLAIN QUERY PLAN SELECT qa_id, request_date, requester, question_title, doc_number FROM qa_items WHERE year = '2026' ORDER BY request_date DESC, qa_id ASC LIMIT 500")
+        cur.execute(
+            "EXPLAIN QUERY PLAN SELECT qa_id, request_date, requester, question_title, doc_number FROM qa_items WHERE year = '2026' ORDER BY request_date DESC, qa_id ASC LIMIT 500"
+        )
         plan2 = [row[3] for row in cur.fetchall()]
-        self.assertFalse(any("USE TEMP B-TREE FOR ORDER BY" in p for p in plan2), f"Filesort detected in plan2: {plan2}")
-        self.assertTrue(any("idx_qa_year_date" in p for p in plan2), f"idx_qa_year_date not used in plan2: {plan2}")
+        self.assertFalse(
+            any("USE TEMP B-TREE FOR ORDER BY" in p for p in plan2),
+            f"Filesort detected in plan2: {plan2}",
+        )
+        self.assertTrue(
+            any("idx_qa_year_date" in p for p in plan2),
+            f"idx_qa_year_date not used in plan2: {plan2}",
+        )
 
         # Query 3: Documents filter by year ordered by date DESC
-        cur.execute("EXPLAIN QUERY PLAN SELECT doc_id, request_date, requester, title, doc_number FROM documents WHERE year = '2026' ORDER BY request_date DESC, doc_id ASC LIMIT 500")
+        cur.execute(
+            "EXPLAIN QUERY PLAN SELECT doc_id, request_date, requester, title, doc_number FROM documents WHERE year = '2026' ORDER BY request_date DESC, doc_id ASC LIMIT 500"
+        )
         plan3 = [row[3] for row in cur.fetchall()]
-        self.assertFalse(any("USE TEMP B-TREE FOR ORDER BY" in p for p in plan3), f"Filesort detected in plan3: {plan3}")
-        self.assertTrue(any("idx_doc_year_date" in p for p in plan3), f"idx_doc_year_date not used in plan3: {plan3}")
+        self.assertFalse(
+            any("USE TEMP B-TREE FOR ORDER BY" in p for p in plan3),
+            f"Filesort detected in plan3: {plan3}",
+        )
+        self.assertTrue(
+            any("idx_doc_year_date" in p for p in plan3),
+            f"idx_doc_year_date not used in plan3: {plan3}",
+        )
 
         conn.close()
 
@@ -344,10 +450,15 @@ class TestAuditFixes(unittest.TestCase):
         """Test launcher GUI helper clean_fts_query and dashboard DOCS_MAP/QA_MAP."""
         import launcher_gui
 
-        self.assertEqual(launcher_gui.clean_fts_query("딥페이크 텔레그램"), '"딥페이크" AND "텔레그램"')
+        self.assertEqual(
+            launcher_gui.clean_fts_query("딥페이크 텔레그램"),
+            '"딥페이크" AND "텔레그램"',
+        )
         # `!`·`*` 같은 FTS 예약문자를 떼어내는지 본다. 2글자 낱말(의원)이 섞이면 trigram으로
         # 표현할 수 없어 빈 문자열이 되므로, 정리 동작만 보려면 3글자 이상 낱말을 쓴다.
-        self.assertEqual(launcher_gui.clean_fts_query("홍길동! 시정요구*"), '"홍길동" AND "시정요구"')
+        self.assertEqual(
+            launcher_gui.clean_fts_query("홍길동! 시정요구*"), '"홍길동" AND "시정요구"'
+        )
         self.assertEqual(launcher_gui.clean_fts_query("홍길동! 의원*"), "")
         self.assertEqual(launcher_gui.clean_fts_query(""), "")
 
@@ -400,9 +511,17 @@ class TestAuditFixes(unittest.TestCase):
                 tables = ["documents", "qa_items", "request_ledger"]
                 schema_info = {}
                 for t in tables:
-                    cols = [row[1] for row in cur.execute(f"PRAGMA table_info({t})").fetchall()]
+                    cols = [
+                        row[1]
+                        for row in cur.execute(f"PRAGMA table_info({t})").fetchall()
+                    ]
                     schema_info[t] = cols
-                fts_tables = [row[0] for row in cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('documents_fts', 'qa_items_fts', 'request_ledger_fts')").fetchall()]
+                fts_tables = [
+                    row[0]
+                    for row in cur.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('documents_fts', 'qa_items_fts', 'request_ledger_fts')"
+                    ).fetchall()
+                ]
                 schema_info["fts"] = sorted(fts_tables)
                 conn.close()
                 return schema_info
@@ -413,8 +532,16 @@ class TestAuditFixes(unittest.TestCase):
 
             # Assert columns match across all three
             for t in ["documents", "qa_items", "request_ledger"]:
-                self.assertEqual(schema_server[t], schema_prod[t], f"Table {t} columns mismatch between web_server and prod")
-                self.assertEqual(schema_pkg[t], schema_prod[t], f"Table {t} columns mismatch between build_package and prod")
+                self.assertEqual(
+                    schema_server[t],
+                    schema_prod[t],
+                    f"Table {t} columns mismatch between web_server and prod",
+                )
+                self.assertEqual(
+                    schema_pkg[t],
+                    schema_prod[t],
+                    f"Table {t} columns mismatch between build_package and prod",
+                )
 
             # Check critical qa_items column names
             self.assertIn("question_title", schema_server["qa_items"])
@@ -440,16 +567,24 @@ class TestAuditFixes(unittest.TestCase):
             ROOT_DIR / "02_웹관리서버_실행.bat",
             ROOT_DIR / "03_엑셀DB_열기.bat",
             ROOT_DIR / "04_부서명_간편설정.bat",
-            ROOT_DIR / "05_통합검색프로그램_실행.bat"
+            ROOT_DIR / "05_통합검색프로그램_실행.bat",
         ]
         for bf in bat_files:
             if bf.exists():
                 text = bf.read_text(encoding="cp949")
                 # Ensure no %CD% inside parenthesis blocks
-                self.assertNotIn("%CD%", text, f"%CD% found in {bf.name}, can break CMD parser in folders with ()")
+                self.assertNotIn(
+                    "%CD%",
+                    text,
+                    f"%CD% found in {bf.name}, can break CMD parser in folders with ()",
+                )
                 # Ensure goto error handling structure is used
                 if "if not exist" in text:
-                    self.assertIn("goto", text, f"{bf.name} should use goto for safe error handling")
+                    self.assertIn(
+                        "goto",
+                        text,
+                        f"{bf.name} should use goto for safe error handling",
+                    )
 
         # A source checkout deliberately has no generated dashboard.  The launch
         # behavior itself is exercised only when that deployment artifact exists.
@@ -459,7 +594,9 @@ class TestAuditFixes(unittest.TestCase):
         # (운영 폴더가 아니라 임시 사본에서 실행한다. 상대 경로로 넘기면 일부 Windows 환경의 cmd.exe가
         # 한글 배치 파일명을 찾지 못하므로 절대 경로로 호출한다.)
         out_text, returncode = run_dashboard_bat_in_copy(ROOT_DIR)
-        self.assertEqual(returncode, 0, f"01_웹대시보드_실행.bat failed with returncode {returncode}")
+        self.assertEqual(
+            returncode, 0, f"01_웹대시보드_실행.bat failed with returncode {returncode}"
+        )
         self.assertNotIn("[오류]", out_text)
         self.assertIn("웹 브라우저를 실행합니다", out_text)
 
@@ -468,7 +605,7 @@ class TestAuditFixes(unittest.TestCase):
         folders = [
             ROOT_DIR,
             ROOT_DIR / "배포용_자료요구_통합검색시스템",
-            ROOT_DIR.parent / "국회자료요구_스마트시스템_범용배포용"
+            ROOT_DIR.parent / "국회자료요구_스마트시스템_범용배포용",
         ]
         total_bats_checked = 0
         for fld in folders:
@@ -479,16 +616,25 @@ class TestAuditFixes(unittest.TestCase):
                 text = bat_file.read_text(encoding="cp949")
                 # Rule validator must pass without exception
                 write_all_bats.validate_batch_file_rules(text, bat_file.name)
-                
+
                 # If it is 01_웹대시보드_실행.bat, test actual execution
-                if bat_file.name == "01_웹대시보드_실행.bat" and (fld / "자료요구_통합검색_대시보드.html").exists():
+                if (
+                    bat_file.name == "01_웹대시보드_실행.bat"
+                    and (fld / "자료요구_통합검색_대시보드.html").exists()
+                ):
                     out, returncode = run_dashboard_bat_in_copy(fld)
-                    self.assertEqual(returncode, 0, f"{bat_file} failed with returncode {returncode}")
+                    self.assertEqual(
+                        returncode, 0, f"{bat_file} failed with returncode {returncode}"
+                    )
                     self.assertIn("웹 브라우저를 실행합니다", out)
 
         # A clean source checkout contains the seven primary launchers; generated
         # distribution folders add more only after an explicit packaging run.
-        self.assertGreaterEqual(total_bats_checked, 7, f"Expected at least 7 primary batch files, checked {total_bats_checked}")
+        self.assertGreaterEqual(
+            total_bats_checked,
+            7,
+            f"Expected at least 7 primary batch files, checked {total_bats_checked}",
+        )
 
 
 class TestRepairedLinksJsonRefresh(unittest.TestCase):
@@ -497,33 +643,47 @@ class TestRepairedLinksJsonRefresh(unittest.TestCase):
     예전에는 JSON을 먼저 쓰고 복구를 뒤에 해서, 끊어진 연결이 있던 실행의
     파생 산출물(통합 XLSX·대시보드 HTML) 연결 표시가 한 사이클 늦었다.
     """
+
     def test_repaired_links_are_reflected_in_json(self):
         import shutil
         import tempfile
 
         from db.database_manager import DatabaseManager
         from services.ledger.autolink import repair_broken_links
+
         tmp = Path(tempfile.mkdtemp(prefix="r6_03_"))
         try:
             db = tmp / "t.db"
             conn = DatabaseManager.get_connection(db)
             try:
                 DatabaseManager.ensure_schema(conn)
-                conn.execute("INSERT INTO documents (doc_id, year, request_date, title, full_markdown) "
-                             "VALUES (?, ?, ?, ?, ?)",
-                             ("D1", "2026", "2026-01-01", "제목", "본문"))
-                conn.execute("INSERT INTO request_ledger (ledger_id, year, title, requester, "
-                             "linked_doc_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                             ("REQ-2026-001", "2026", "제목", "의원",
-                              "D-GONE", "2026-01-01 00:00:00", "2026-01-01 00:00:00"))
+                conn.execute(
+                    "INSERT INTO documents (doc_id, year, request_date, title, full_markdown) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    ("D1", "2026", "2026-01-01", "제목", "본문"),
+                )
+                conn.execute(
+                    "INSERT INTO request_ledger (ledger_id, year, title, requester, "
+                    "linked_doc_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        "REQ-2026-001",
+                        "2026",
+                        "제목",
+                        "의원",
+                        "D-GONE",
+                        "2026-01-01 00:00:00",
+                        "2026-01-01 00:00:00",
+                    ),
+                )
                 conn.commit()
             finally:
                 conn.close()
             combined = {
                 "documents": [{"doc_id": "D1", "linked_ledger_id": ""}],
                 "qa_items": [],
-                "request_ledger": [{"ledger_id": "REQ-2026-001",
-                                    "linked_doc_id": "D-GONE"}],
+                "request_ledger": [
+                    {"ledger_id": "REQ-2026-001", "linked_doc_id": "D-GONE"}
+                ],
             }
             fix_conn = DatabaseManager.get_connection(db)
             try:
@@ -542,8 +702,11 @@ class TestRepairedLinksJsonRefresh(unittest.TestCase):
                 ).fetchone()[0]
             finally:
                 db_conn.close()
-            self.assertEqual(back["request_ledger"][0]["linked_doc_id"], db_led or "",
-                             "JSON 연결이 복구 후 DB 값과 같아야 한다")
+            self.assertEqual(
+                back["request_ledger"][0]["linked_doc_id"],
+                db_led or "",
+                "JSON 연결이 복구 후 DB 값과 같아야 한다",
+            )
             self.assertGreaterEqual(patched, 1)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -551,5 +714,3 @@ class TestRepairedLinksJsonRefresh(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

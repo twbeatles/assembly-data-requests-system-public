@@ -6,6 +6,7 @@
 되는데 읽기는 파일을 찾지 못해 0건이 됐고, 엑셀 수기 수정이 조용히 DB에 반영되지 않았다.
 (감사 R4-03) 두 경로 모두 이 모듈만 쓴다.
 """
+
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -43,7 +44,11 @@ def _unique_dirs(paths) -> List[Path]:
 def ledger_search_dirs(system_dir, root_dir=None) -> List[Path]:
     """탐색 순서: 시스템 폴더 → root_dir → 워크스페이스 루트(각각 투입 폴더 포함)."""
     system_dir = Path(system_dir)
-    bases = [system_dir, Path(root_dir) if root_dir else None, system_config.find_workspace_root(system_dir)]
+    bases = [
+        system_dir,
+        Path(root_dir) if root_dir else None,
+        system_config.find_workspace_root(system_dir),
+    ]
     dirs = []
     for base in _unique_dirs(bases):
         dirs.append(base)
@@ -60,7 +65,9 @@ def _glob_all(directory: Path, patterns) -> List[Path]:
     return found
 
 
-def discover_master_excel(system_dir, root_dir=None, cfg=None) -> Tuple[Optional[Path], List[Path], bool]:
+def discover_master_excel(
+    system_dir, root_dir=None, cfg=None
+) -> Tuple[Optional[Path], List[Path], bool]:
     """마스터 대장 엑셀을 고른다. (선택한 경로 또는 None, 후보 목록(최신순), 고정 여부)
 
     규칙:
@@ -73,7 +80,9 @@ def discover_master_excel(system_dir, root_dir=None, cfg=None) -> Tuple[Optional
     """
     system_dir = Path(system_dir)
     cfg = cfg if cfg is not None else system_config.get_config(system_dir)
-    patterns = cfg.get("ledger_patterns") or system_config.DEFAULT_CONFIG["ledger_patterns"]
+    patterns = (
+        cfg.get("ledger_patterns") or system_config.DEFAULT_CONFIG["ledger_patterns"]
+    )
     excel_out_name = cfg.get("excel_filename", "국회_대외기관_자료요구_통합DB.xlsx")
 
     pinned = str(cfg.get("master_excel") or "").strip()
@@ -83,7 +92,9 @@ def discover_master_excel(system_dir, root_dir=None, cfg=None) -> Tuple[Optional
             pinned_path = system_dir / pinned
         if pinned_path.exists():
             return pinned_path, [pinned_path], True
-        print(f"[마스터 엑셀 설정 경고] config.json의 master_excel 경로를 찾을 수 없습니다: {pinned_path}")
+        print(
+            f"[마스터 엑셀 설정 경고] config.json의 master_excel 경로를 찾을 수 없습니다: {pinned_path}"
+        )
 
     search_dirs = ledger_search_dirs(system_dir, root_dir)
     candidates = []
@@ -94,12 +105,15 @@ def discover_master_excel(system_dir, root_dir=None, cfg=None) -> Tuple[Optional
             candidates.extend(_glob_all(directory, FALLBACK_PATTERNS))
 
     valid = [
-        c for c in candidates
+        c
+        for c in candidates
         if not c.name.startswith("~$")
         and c.name != excel_out_name
         and not system_config.is_inside_distribution_copy(c, system_dir)
     ]
-    non_templates = [c for c in valid if not c.name.startswith("(양식)") and "템플릿" not in c.name]
+    non_templates = [
+        c for c in valid if not c.name.startswith("(양식)") and "템플릿" not in c.name
+    ]
     chosen = non_templates or valid
 
     if not chosen:

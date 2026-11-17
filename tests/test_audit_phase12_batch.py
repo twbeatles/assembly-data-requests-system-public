@@ -78,10 +78,15 @@ class BatchRuleTests(unittest.TestCase):
             path = SYSTEM_DIR / name
             if not path.exists():
                 continue
-            expected = content.replace("\r\n", "\n").replace("\n", "\r\n").encode("cp949")
+            expected = (
+                content.replace("\r\n", "\n").replace("\n", "\r\n").encode("cp949")
+            )
             with self.subTest(bat=name):
-                self.assertEqual(path.read_bytes(), expected,
-                                 f"{name}이 생성기 출력과 다릅니다. python scripts/write_all_bats.py로 다시 만드세요.")
+                self.assertEqual(
+                    path.read_bytes(),
+                    expected,
+                    f"{name}이 생성기 출력과 다릅니다. python scripts/write_all_bats.py로 다시 만드세요.",
+                )
 
     def test_distribution_bats_match_generator(self):
         """수신 부서가 실제로 받는 두 배포본도 생성기와 같은지 확인한다."""
@@ -94,7 +99,9 @@ class BatchRuleTests(unittest.TestCase):
                 continue
             for name, content in write_all_bats.DISTRIBUTED_BATS:
                 path = package_dir / name
-                expected = content.replace("\r\n", "\n").replace("\n", "\r\n").encode("cp949")
+                expected = (
+                    content.replace("\r\n", "\n").replace("\n", "\r\n").encode("cp949")
+                )
                 with self.subTest(package=package_dir.name, bat=name):
                     self.assertTrue(path.exists(), f"배포본에 배치파일 누락: {path}")
                     self.assertEqual(path.read_bytes(), expected)
@@ -110,8 +117,12 @@ class BatchExecutionTests(unittest.TestCase):
         root = Path(cls.tmp.name)
         venv = root / "venv"
         # pip 없는 venv = openpyxl이 없는 Python 3.9+ 환경
-        subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(venv)],
-                       check=True, capture_output=True, timeout=120)
+        subprocess.run(
+            [sys.executable, "-m", "venv", "--without-pip", str(venv)],
+            check=True,
+            capture_output=True,
+            timeout=120,
+        )
         cls.venv_scripts = str(venv / "Scripts")
 
     @classmethod
@@ -130,29 +141,42 @@ class BatchExecutionTests(unittest.TestCase):
     def run_bat(self, work, bat, path_env):
         env = dict(os.environ, PATH=path_env, DATAREQ_NO_BROWSER="1")
         env.pop("PYTHONPATH", None)
-        r = subprocess.run(["cmd.exe", "/d", "/c", str(bat)], cwd=str(work), env=env,
-                           stdin=subprocess.DEVNULL, capture_output=True, timeout=120)
+        r = subprocess.run(
+            ["cmd.exe", "/d", "/c", str(bat)],
+            cwd=str(work),
+            env=env,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            timeout=120,
+        )
         return r.returncode, r.stdout.decode("cp949", "replace")
 
     def test_no_python_shows_guide(self):
-        work, bat = self.make_work(write_all_bats.SYSTEM_BAT_00,
-                                   {"scripts/add_documents_smart.py": "raise SystemExit(0)\n"})
+        work, bat = self.make_work(
+            write_all_bats.SYSTEM_BAT_00,
+            {"scripts/add_documents_smart.py": "raise SystemExit(0)\n"},
+        )
         rc, out = self.run_bat(work, bat, SYSTEM32)
         self.assertEqual(rc, 1, out)
         self.assertIn("Python 환경을 찾지 못했습니다", out)
 
     def test_missing_openpyxl_shows_install_command(self):
-        work, bat = self.make_work(write_all_bats.SYSTEM_BAT_02,
-                                   {"scripts/web_server.py": "raise SystemExit(0)\n"})
+        work, bat = self.make_work(
+            write_all_bats.SYSTEM_BAT_02,
+            {"scripts/web_server.py": "raise SystemExit(0)\n"},
+        )
         rc, out = self.run_bat(work, bat, self.venv_scripts + ";" + SYSTEM32)
         self.assertEqual(rc, 1, out)
         self.assertIn("-m pip install openpyxl", out)
 
     def test_failure_code_is_preserved(self):
-        work, bat = self.make_work(write_all_bats.SYSTEM_BAT_00, {
-            "scripts/add_documents_smart.py": "raise SystemExit(3)\n",
-            "openpyxl.py": "",  # -c 실행은 현재 폴더를 sys.path에 넣으므로 의존성 확인만 통과시킨다
-        })
+        work, bat = self.make_work(
+            write_all_bats.SYSTEM_BAT_00,
+            {
+                "scripts/add_documents_smart.py": "raise SystemExit(3)\n",
+                "openpyxl.py": "",  # -c 실행은 현재 폴더를 sys.path에 넣으므로 의존성 확인만 통과시킨다
+            },
+        )
         rc, out = self.run_bat(work, bat, self.venv_scripts + ";" + SYSTEM32)
         self.assertEqual(rc, 3, out)
         self.assertIn("오류코드: 3", out)
@@ -160,27 +184,35 @@ class BatchExecutionTests(unittest.TestCase):
     def test_gui_fallback_prefers_pythonw(self):
         start_line = 'start "" %GUICMD% scripts\\launcher_gui.py'
         self.assertIn(start_line, write_all_bats.SYSTEM_BAT_05)
-        text = write_all_bats.SYSTEM_BAT_05.replace(start_line, "echo GUICMD=[%GUICMD%]")
+        text = write_all_bats.SYSTEM_BAT_05.replace(
+            start_line, "echo GUICMD=[%GUICMD%]"
+        )
         work, bat = self.make_work(text, {"scripts/launcher_gui.py": ""})
         rc, out = self.run_bat(work, bat, self.venv_scripts + ";" + SYSTEM32)
         self.assertEqual(rc, 0, out)
         self.assertIn("pythonw.exe", out.lower())
 
     def test_migration_cancel_is_successful_and_non_destructive(self):
-        work, bat = self.make_work(write_all_bats.SYSTEM_BAT_07, {
-            "scripts/migrate_existing_install.py": "raise SystemExit(2)\n",
-            "openpyxl.py": "",
-        })
+        work, bat = self.make_work(
+            write_all_bats.SYSTEM_BAT_07,
+            {
+                "scripts/migrate_existing_install.py": "raise SystemExit(2)\n",
+                "openpyxl.py": "",
+            },
+        )
         rc, out = self.run_bat(work, bat, self.venv_scripts + ";" + SYSTEM32)
         self.assertEqual(rc, 0, out)
         self.assertIn("폴더 선택이 취소", out)
         self.assertNotIn("완료되었습니다", out)
 
     def test_migration_failure_code_is_preserved(self):
-        work, bat = self.make_work(write_all_bats.SYSTEM_BAT_07, {
-            "scripts/migrate_existing_install.py": "raise SystemExit(7)\n",
-            "openpyxl.py": "",
-        })
+        work, bat = self.make_work(
+            write_all_bats.SYSTEM_BAT_07,
+            {
+                "scripts/migrate_existing_install.py": "raise SystemExit(7)\n",
+                "openpyxl.py": "",
+            },
+        )
         rc, out = self.run_bat(work, bat, self.venv_scripts + ";" + SYSTEM32)
         self.assertEqual(rc, 7, out)
         self.assertIn("오류코드: 7", out)

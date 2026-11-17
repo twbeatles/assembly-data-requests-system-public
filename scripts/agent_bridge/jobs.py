@@ -20,9 +20,15 @@ def create_job(operation, params=None):
     now = time.time()
     with _LOCK:
         _prune_locked(now)
-        _JOBS[job_id] = {"job_id": job_id, "operation": operation,
-                         "params": dict(params or {}), "status": "planned",
-                         "created_at": now, "updated_at": now, "steps": []}
+        _JOBS[job_id] = {
+            "job_id": job_id,
+            "operation": operation,
+            "params": dict(params or {}),
+            "status": "planned",
+            "created_at": now,
+            "updated_at": now,
+            "steps": [],
+        }
         return dict(_JOBS[job_id])
 
 
@@ -48,7 +54,10 @@ def get_job(job_id):
 
 
 def _prune_locked(now):
-    stale = [key for key, job in _JOBS.items()
-             if now - job.get("created_at", now) > TTL_SECONDS]
+    stale = [
+        key
+        for key, job in _JOBS.items()
+        if now - job.get("created_at", now) > TTL_SECONDS
+    ]
     for key in stale:
         del _JOBS[key]

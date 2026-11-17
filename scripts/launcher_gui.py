@@ -8,6 +8,7 @@ from tkinter import messagebox, ttk
 
 try:
     import ctypes
+
     ctypes.windll.shcore.SetProcessDpiAwareness(1)
 except Exception:
     pass
@@ -29,16 +30,18 @@ from gui.views import ViewsMixin
 
 
 def get_base_dir() -> Path:
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     else:
         return Path(__file__).resolve().parent.parent
+
 
 BASE_DIR = get_base_dir()
 DB_PATH = BASE_DIR / "data_requests.db"
 
 try:
     import system_config
+
     CFG = system_config.get_config(BASE_DIR)
 except Exception:
     CFG = {}
@@ -49,13 +52,18 @@ MANUAL_PATH = BASE_DIR / "사용설명서_및_안내.html"
 
 DEPT_CONFIG = {
     "dept_name": CFG.get("department_name", "기획예산팀"),
-    "system_title": CFG.get("system_title", "기획예산팀 국회·대외기관 자료요구 통합 검색 시스템")
+    "system_title": CFG.get(
+        "system_title", "기획예산팀 국회·대외기관 자료요구 통합 검색 시스템"
+    ),
 }
+
 
 class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTypeIssues]  # static-only cycle; runtime base is object
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title(DEPT_CONFIG.get("system_title", "국회·대외기관 자료요구 통합 검색 시스템"))
+        self.root.title(
+            DEPT_CONFIG.get("system_title", "국회·대외기관 자료요구 통합 검색 시스템")
+        )
         self.root.geometry("1180x760")
         self.root.minsize(980, 620)
         self.center_window(1180, 760)
@@ -71,7 +79,7 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
         self.root.after(100, self.init_db_and_load)
 
     def get_db_conn(self):
-        if not hasattr(self, '_db_conn') or self._db_conn is None:
+        if not hasattr(self, "_db_conn") or self._db_conn is None:
             self._db_conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
             self._db_conn.execute("PRAGMA journal_mode = WAL;")
             self._db_conn.execute("PRAGMA query_only = 1;")
@@ -80,7 +88,7 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
         return self._db_conn
 
     def close_db_conn(self):
-        if hasattr(self, '_db_conn') and self._db_conn:
+        if hasattr(self, "_db_conn") and self._db_conn:
             try:
                 self._db_conn.close()
             except Exception:
@@ -91,20 +99,15 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
         self.close_db_conn()
         self.root.destroy()
 
-
-
-
-
-
-
-
     def do_search(self):
         if not DB_PATH.exists():
             return
 
         kw = self.kw_entry.get().strip()
         year = self.year_combo.get()
-        target = target_key(self.target_var.get() if hasattr(self, "target_var") else "qa")
+        target = target_key(
+            self.target_var.get() if hasattr(self, "target_var") else "qa"
+        )
         self.current_keyword = kw
         self.current_target = target
 
@@ -129,12 +132,23 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
             self.current_rows = rows
             self.current_rows_map = {r["id"]: r for r in rows}
             for r in rows:
-                self.tree.insert("", tk.END, iid=r["id"], values=(
-                    r["id"], r["date"] or "-", r["requester"] or "-", r["title"], self.extra_column_text(r, target),
-                ))
+                self.tree.insert(
+                    "",
+                    tk.END,
+                    iid=r["id"],
+                    values=(
+                        r["id"],
+                        r["date"] or "-",
+                        r["requester"] or "-",
+                        r["title"],
+                        self.extra_column_text(r, target),
+                    ),
+                )
 
             cnt = len(rows)
-            limit_msg = f" — 상위 {cnt:,}건만 표시, 검색어를 좁혀 주세요" if total > cnt else ""
+            limit_msg = (
+                f" — 상위 {cnt:,}건만 표시, 검색어를 좁혀 주세요" if total > cnt else ""
+            )
             self.count_label.config(text=f"검색 결과: {total:,}건{engine}{limit_msg}")
 
             if rows:
@@ -156,7 +170,10 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
         if target != "ledger":
             return row.get("num") or "-"
         from services.ledger.due import ledger_due_state
-        state, days = ledger_due_state({"status": row.get("status"), "deadline": row.get("deadline")})
+
+        state, days = ledger_due_state(
+            {"status": row.get("status"), "deadline": row.get("deadline")}
+        )
         status = row.get("status") or "-"
         if state == "overdue" and days is not None:
             return f"🚨 기한 경과 {-days}일 · {status}"
@@ -261,7 +278,9 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
                     for t in kw.split():
                         sql += " AND (title LIKE ? OR details LIKE ? OR requester LIKE ? OR party LIKE ? OR seq_no LIKE ? OR note LIKE ?)"
                         kw_wild = f"%{t}%"
-                        params.extend([kw_wild, kw_wild, kw_wild, kw_wild, kw_wild, kw_wild])
+                        params.extend(
+                            [kw_wild, kw_wild, kw_wild, kw_wild, kw_wild, kw_wild]
+                        )
                 sql += " ORDER BY year DESC, request_date DESC, seq_no DESC LIMIT 500"
 
                 cur.execute(sql, params)
@@ -333,9 +352,16 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
                 rows = filtered[:500]
 
         return [
-            {"id": r[0], "date": r[1] or "", "requester": r[2] or "",
-             "title": (r[3] or "").strip().replace("\n", " "),
-             "num": r[4] or "", "deadline": "", "status": "", "snippet": ""}
+            {
+                "id": r[0],
+                "date": r[1] or "",
+                "requester": r[2] or "",
+                "title": (r[3] or "").strip().replace("\n", " "),
+                "num": r[4] or "",
+                "deadline": "",
+                "status": "",
+                "snippet": "",
+            }
             for r in rows
         ]
 
@@ -349,7 +375,13 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
         if not match:
             return
 
-        row_id, date, req, title, doc_num = match["id"], match["date"], match["requester"], match["title"], match["num"]
+        row_id, date, req, title, doc_num = (
+            match["id"],
+            match["date"],
+            match["requester"],
+            match["title"],
+            match["num"],
+        )
         self.det_title_lbl.config(text=f"[{row_id}] {title}")
         num_label = "연번" if row_id.startswith("REQ-") else "문서번호"
         meta_str = f"요구일자: {date or '미상'} | 요구자: {req or '미분류'} | {num_label}: ({doc_num or '-'})"
@@ -363,26 +395,37 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
                 conn = self.get_db_conn()
                 cur = conn.cursor()
                 if row_id.startswith("REQ-"):
-                    cur.execute("SELECT details, note, status, deadline, department, submit_date, linked_doc_id FROM request_ledger WHERE ledger_id = ?", (row_id,))
+                    cur.execute(
+                        "SELECT details, note, status, deadline, department, submit_date, linked_doc_id FROM request_ledger WHERE ledger_id = ?",
+                        (row_id,),
+                    )
                     r_det = cur.fetchone()
                     if r_det:
-                        body = f"[세부 요구내역]\n{r_det[0] or '(세부 요구내역 없음)'}\n\n" \
-                               f"■ 진행상태: {r_det[2] or '-'}  |  담당부서: {r_det[4] or '-'}\n" \
-                               f"■ 요구일: {date or '-'}  |  마감일: {r_det[3] or '-'}  |  제출일: {r_det[5] or '-'}\n" \
-                               f"■ 연계 공문서: {r_det[6] or '없음'}\n" \
-                               f"■ 비고: {r_det[1] or '-'}"
+                        body = (
+                            f"[세부 요구내역]\n{r_det[0] or '(세부 요구내역 없음)'}\n\n"
+                            f"■ 진행상태: {r_det[2] or '-'}  |  담당부서: {r_det[4] or '-'}\n"
+                            f"■ 요구일: {date or '-'}  |  마감일: {r_det[3] or '-'}  |  제출일: {r_det[5] or '-'}\n"
+                            f"■ 연계 공문서: {r_det[6] or '없음'}\n"
+                            f"■ 비고: {r_det[1] or '-'}"
+                        )
                     else:
                         body = ""
                 elif "-Q" in row_id:
                     # 문서 상세와 같은 이유로 Q&A 상세도 정본을 쓴다. answer_full은
                     # 엑셀 전용 잘림본이라 긴 답변이 중간에서 끊겨 보였다.
-                    cur.execute("SELECT answer_markdown FROM qa_items WHERE qa_id = ?", (row_id,))
+                    cur.execute(
+                        "SELECT answer_markdown FROM qa_items WHERE qa_id = ?",
+                        (row_id,),
+                    )
                     r_det = cur.fetchone()
                     body = r_det[0] if r_det and r_det[0] else ""
                 else:
                     # answer_full_text is Excel's 30,000-character export field;
                     # the GUI detail view must use the canonical full text.
-                    cur.execute("SELECT full_markdown FROM documents WHERE doc_id = ?", (row_id,))
+                    cur.execute(
+                        "SELECT full_markdown FROM documents WHERE doc_id = ?",
+                        (row_id,),
+                    )
                     r_det = cur.fetchone()
                     body = r_det[0] if r_det and r_det[0] else ""
                 if len(self.detail_cache) > 250:
@@ -416,18 +459,20 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
         ry = self.root.winfo_y()
         rw = self.root.winfo_width()
         rh = self.root.winfo_height()
-        progress_win.geometry(f"+{rx + (rw - 450)//2}+{ry + (rh - 170)//2}")
+        progress_win.geometry(f"+{rx + (rw - 450) // 2}+{ry + (rh - 170) // 2}")
 
         status_lbl = tk.Label(
             progress_win,
             text="⏳ 신규 문서 감지 및 고속 증분 파싱 준비 중...",
             font=("Malgun Gothic", 10, "bold"),
             fg="#1e293b",
-            pady=16
+            pady=16,
         )
         status_lbl.pack()
 
-        pbar = ttk.Progressbar(progress_win, mode="determinate", length=360, maximum=100)
+        pbar = ttk.Progressbar(
+            progress_win, mode="determinate", length=360, maximum=100
+        )
         pbar.pack(pady=4)
         pbar["value"] = 10
 
@@ -454,6 +499,7 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
             err_msg = None
             result_data = None
             try:
+
                 def cb(msg, pct):
                     ui_events.put(("status", msg, pct))
 
@@ -462,7 +508,10 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
                     sys.path.insert(0, str(scripts_path))
 
                 import add_documents_smart
-                result_data = add_documents_smart.run_smart_add(selected_files, status_callback=cb)
+
+                result_data = add_documents_smart.run_smart_add(
+                    selected_files, status_callback=cb
+                )
             except Exception as e:
                 err_msg = str(e)
 
@@ -476,7 +525,11 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
                 except Exception:
                     pass
 
-                if not err_msg and isinstance(result_data, dict) and not result_data.get("success", True):
+                if (
+                    not err_msg
+                    and isinstance(result_data, dict)
+                    and not result_data.get("success", True)
+                ):
                     # 파이프라인이 예외 없이 실패로 끝난 경우에도 실패를 알린다.
                     err_msg = result_data.get("error") or (
                         "파이프라인 단계가 실패하여 기존 산출물을 유지했습니다.\n"
@@ -532,7 +585,7 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
                         messagebox.showerror(
                             "자료 갱신 안내",
                             f"갱신 결과를 표시하는 중 오류가 발생했습니다:\n\n{ui_err}\n\n"
-                            "데이터 갱신 자체는 완료되었을 수 있습니다. 프로그램을 다시 실행해 확인하세요."
+                            "데이터 갱신 자체는 완료되었을 수 있습니다. 프로그램을 다시 실행해 확인하세요.",
                         )
                     except Exception:
                         pass
@@ -562,10 +615,12 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
         th.start()
         self.root.after(100, pump_ui_events)
 
+
 def main():
     root = tk.Tk()
     LauncherApp(root)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()

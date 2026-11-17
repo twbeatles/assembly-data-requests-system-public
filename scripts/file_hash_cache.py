@@ -64,9 +64,14 @@ class FileHashCache:
         if not isinstance(data, dict) or data.get("version") != CACHE_VERSION:
             return
         for key, entry in (data.get("files") or {}).items():
-            if (isinstance(entry, list) and len(entry) == 3
-                    and isinstance(entry[0], int) and isinstance(entry[1], int)
-                    and isinstance(entry[2], str) and len(entry[2]) == 64):
+            if (
+                isinstance(entry, list)
+                and len(entry) == 3
+                and isinstance(entry[0], int)
+                and isinstance(entry[1], int)
+                and isinstance(entry[2], str)
+                and len(entry[2]) == 64
+            ):
                 self._entries[key] = tuple(entry)
 
     def sha256(self, path) -> str:
@@ -76,7 +81,12 @@ class FileHashCache:
         with self._lock:
             self._load()
             entry = self._entries.get(key)
-            if self.trust_stat and entry and entry[0] == st.st_size and entry[1] == st.st_mtime_ns:
+            if (
+                self.trust_stat
+                and entry
+                and entry[0] == st.st_size
+                and entry[1] == st.st_mtime_ns
+            ):
                 self.hits += 1
                 return entry[2]
         digest = compute_sha256(path)
@@ -90,7 +100,11 @@ class FileHashCache:
         settled = (time.time_ns() - st.st_mtime_ns) > SETTLE_NS
         with self._lock:
             self.misses += 1
-            if settled and after.st_size == st.st_size and after.st_mtime_ns == st.st_mtime_ns:
+            if (
+                settled
+                and after.st_size == st.st_size
+                and after.st_mtime_ns == st.st_mtime_ns
+            ):
                 self._entries[key] = (st.st_size, st.st_mtime_ns, digest)
                 self._dirty = True
         return digest
@@ -102,7 +116,9 @@ class FileHashCache:
         with self._lock:
             if not self._dirty:
                 return False
-            entries = {k: list(v) for k, v in self._entries.items() if os.path.exists(k)}
+            entries = {
+                k: list(v) for k, v in self._entries.items() if os.path.exists(k)
+            }
         try:
             from write_guard import ProductionWriteBlocked, ensure_writable
         except ImportError:  # pragma: no cover - scripts 경로 밖에서 쓰일 때
@@ -111,8 +127,14 @@ class FileHashCache:
         try:
             if ensure_writable:
                 ensure_writable(self.cache_path, "해시 캐시")
-            tmp.write_text(json.dumps({"version": CACHE_VERSION, "files": entries},
-                                      ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            tmp.write_text(
+                json.dumps(
+                    {"version": CACHE_VERSION, "files": entries},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                encoding="utf-8",
+            )
             os.replace(tmp, self.cache_path)
         except (OSError, ProductionWriteBlocked):
             try:

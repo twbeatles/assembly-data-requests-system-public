@@ -43,9 +43,14 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
         고른 경로를 파서에 그대로 넘긴다. (감사 R4-03)
         """
         from extractors.ledger.discovery import discover_master_excel
+
         chosen, candidates, pinned = discover_master_excel(self.base_dir)
         # 사본이 폴더에 생기면 수정 시각 최신본으로 정본이 조용히 바뀐다. 화면에서도 알린다. (R4 4.3)
-        self._master_candidates = [c.name for c in candidates] if (chosen is not None and not pinned and len(candidates) > 1) else []
+        self._master_candidates = (
+            [c.name for c in candidates]
+            if (chosen is not None and not pinned and len(candidates) > 1)
+            else []
+        )
         if chosen is None:
             return None
         if not pinned and len(candidates) > 1:
@@ -89,7 +94,9 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
     # -------------------------------------------------------------------------
     # 3. Web -> Excel Write Operations
     # -------------------------------------------------------------------------
-    def sync_item_to_excel(self, item: Dict[str, Any], action: str = "insert") -> Dict[str, Any]:
+    def sync_item_to_excel(
+        self, item: Dict[str, Any], action: str = "insert"
+    ) -> Dict[str, Any]:
         """
         Applies an insert, update, or delete operation to the master Excel file.
         If the file is locked, enqueues the operation for deferred application.
@@ -101,7 +108,7 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             return {
                 "excel_synced": False,
                 "pending": False,
-                "message": "마스터 엑셀 파일을 찾을 수 없어 DB에만 반영되었습니다."
+                "message": "마스터 엑셀 파일을 찾을 수 없어 DB에만 반영되었습니다.",
             }
 
         # Check for file lock
@@ -111,7 +118,9 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             return {
                 "excel_synced": False,
                 "pending": saved,
-                "message": "현재 엑셀 파일이 열려 있어 저장 대기 중입니다. 엑셀을 닫으시면 자동 반영됩니다." if saved else "엑셀 파일이 잠겨 있고 대기 큐 저장에도 실패했습니다. 관리자에게 알리세요."
+                "message": "현재 엑셀 파일이 열려 있어 저장 대기 중입니다. 엑셀을 닫으시면 자동 반영됩니다."
+                if saved
+                else "엑셀 파일이 잠겨 있고 대기 큐 저장에도 실패했습니다. 관리자에게 알리세요.",
             }
 
         with self.lock:
@@ -129,7 +138,7 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
                     return {
                         "excel_synced": True,
                         "pending": False,
-                        "message": f"✓ 마스터 엑셀({master_excel.name})에 즉시 반영되었습니다."
+                        "message": f"✓ 마스터 엑셀({master_excel.name})에 즉시 반영되었습니다.",
                     }
                 # 반영하지 못했으면 반영했다고 말하지 않는다. 특히 삭제는 대상 행을
                 # 못 찾아도 과거에는 성공으로 보고돼 사용자가 엑셀이 정리된 줄 알았다.
@@ -146,7 +155,9 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             except ExcelApplyConflict as conflict:
                 # 같은 ID의 행이 다른 항목이다. 덮어쓰지도, 재시도하지도 않는다.
                 self._quarantine_pending_operations(
-                    [self._new_operation(item, action)], QUARANTINE_CONFLICT, str(conflict)
+                    [self._new_operation(item, action)],
+                    QUARANTINE_CONFLICT,
+                    str(conflict),
                 )
                 return {
                     "excel_synced": False,
@@ -158,7 +169,11 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
                     ),
                 }
             except ProductionWriteBlocked as blocked:
-                return {"excel_synced": False, "pending": False, "message": str(blocked)}
+                return {
+                    "excel_synced": False,
+                    "pending": False,
+                    "message": str(blocked),
+                }
             except PermissionError:
                 reason = None
             except Exception as e:
@@ -170,11 +185,17 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             with self._pending_lock:
                 saved = self._enqueue_pending(item, action)
             if reason is None:
-                message = ("엑셀 파일이 사용 중입니다. 닫히는 즉시 자동 반영됩니다." if saved
-                           else "엑셀 파일이 사용 중이고 대기 큐 저장에도 실패했습니다. 관리자에게 알리세요.")
+                message = (
+                    "엑셀 파일이 사용 중입니다. 닫히는 즉시 자동 반영됩니다."
+                    if saved
+                    else "엑셀 파일이 사용 중이고 대기 큐 저장에도 실패했습니다. 관리자에게 알리세요."
+                )
             else:
-                message = (f"{reason} 자동 재시도 대기열에 넣었습니다." if saved
-                           else f"{reason} 대기 큐 저장에도 실패했습니다. 관리자에게 알리세요.")
+                message = (
+                    f"{reason} 자동 재시도 대기열에 넣었습니다."
+                    if saved
+                    else f"{reason} 대기 큐 저장에도 실패했습니다. 관리자에게 알리세요."
+                )
             return {"excel_synced": False, "pending": saved, "message": message}
 
     # 헤더 별칭 표. 파서와 반드시 같은 표를 쓴다(정본: extractors/ledger/dates.py). (감사 R4-04)
@@ -183,6 +204,7 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
     def _save_workbook(self, wb, excel_path: Path):
         """마스터 엑셀을 원자적으로 저장하고 직전 본을 백업한다."""
         from extractors.ledger_parser import save_workbook_atomic
+
         save_workbook_atomic(wb, excel_path, base_dir=self.base_dir)
 
     @staticmethod
@@ -231,7 +253,9 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             for field in ROW_IDENTITY_FIELDS
         }
 
-    def _verify_row_identity(self, wb, located: Tuple[str, int], item: Dict[str, Any], action: str):
+    def _verify_row_identity(
+        self, wb, located: Tuple[str, int], item: Dict[str, Any], action: str
+    ):
         """같은 대장ID로 찾은 엑셀 행이 반영하려는 항목의 행인지 검사한다.
 
         - insert: 같은 ID 행이 이미 있으면 같은 항목(재시도)일 때만 허용한다.
@@ -247,7 +271,10 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
                     f"'{row.get('title') or row.get('requester') or '-'}' 항목에 이미 쓰이고 있습니다"
                 )
             return
-        verdicts = [identity_matches(row, item.get("_expected")), identity_matches(row, item)]
+        verdicts = [
+            identity_matches(row, item.get("_expected")),
+            identity_matches(row, item),
+        ]
         if True in verdicts or all(v is None for v in verdicts):
             return
         raise ExcelApplyConflict(
@@ -279,7 +306,9 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
         print(f"✓ 마스터 엑셀에 신규 연도 시트를 생성했습니다: {year_str}")
         return ws
 
-    def _apply_to_excel(self, excel_path: Path, item: Dict[str, Any], action: str) -> bool:
+    def _apply_to_excel(
+        self, excel_path: Path, item: Dict[str, Any], action: str
+    ) -> bool:
         """Internal worker that loads workbook, modifies target row, and saves.
 
         **호출자는 반드시 `self.lock`을 쥐고 있어야 한다.** openpyxl은 워크북 전체를
@@ -300,8 +329,11 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             except Exception:
                 pass
 
-    def _apply_to_loaded_workbook(self, wb, excel_path: Path, item: Dict[str, Any], action: str) -> bool:
+    def _apply_to_loaded_workbook(
+        self, wb, excel_path: Path, item: Dict[str, Any], action: str
+    ) -> bool:
         from openpyxl.styles import Alignment, Border, Font, Side
+
         """`_apply_to_excel`의 본문. 워크북을 열고 닫는 일은 호출자가 한다."""
         target_seq = str(item.get("seq_no", "")).strip()
         target_title = str(item.get("title", "")).strip()
@@ -330,7 +362,9 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
                 ws.cell(del_row, del_cols["status"], value="[삭제]")
             if del_cols["note"]:
                 old_note = str(ws.cell(del_row, del_cols["note"]).value or "")
-                ws.cell(del_row, del_cols["note"], value=f"{old_note} (웹 삭제됨)".strip())
+                ws.cell(
+                    del_row, del_cols["note"], value=f"{old_note} (웹 삭제됨)".strip()
+                )
             self._save_workbook(wb, excel_path)
             return True
 
@@ -340,7 +374,9 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
         if year_str in wb.sheetnames:
             target_sheet = wb[year_str]
         else:
-            year_sheets = [s for s in wb.sheetnames if re.fullmatch(r"20\d{2}", str(s).strip())]
+            year_sheets = [
+                s for s in wb.sheetnames if re.fullmatch(r"20\d{2}", str(s).strip())
+            ]
             if year_sheets and re.fullmatch(r"20\d{2}", year_str):
                 # 해당 연도 시트가 없으면 다른 연도 시트에 섞어 넣지 않고 새로 만든다.
                 # 과거에는 첫 시트에 기록해 항목의 연도가 그 시트 연도로 바뀌었다.
@@ -356,9 +392,18 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
 
         ws = target_sheet
         cols = self._resolve_columns(ws)
-        c_seq, c_party, c_req, c_aide = cols["seq_no"], cols["party"], cols["requester"], cols["aide"]
+        c_seq, c_party, c_req, c_aide = (
+            cols["seq_no"],
+            cols["party"],
+            cols["requester"],
+            cols["aide"],
+        )
         c_title, c_detail = cols["title"], cols["details"]
-        c_req_date, c_deadline, c_submit_date = cols["request_date"], cols["deadline"], cols["submit_date"]
+        c_req_date, c_deadline, c_submit_date = (
+            cols["request_date"],
+            cols["deadline"],
+            cols["submit_date"],
+        )
         c_dept, c_status, c_note = cols["department"], cols["status"], cols["note"]
         c_type, c_id = cols["request_type"], cols["ledger_id"]
 
@@ -375,7 +420,11 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
 
         # 3. 보조 키 매칭은 ID를 확정할 수 없을 때만 쓴다. ID 열이 있으면 ID가
         #    비어 있는 행만 후보로 삼는다. insert는 ID로 못 찾으면 항상 새 행이다.
-        if target_row is None and move_from is None and (action == "update" or not c_id):
+        if (
+            target_row is None
+            and move_from is None
+            and (action == "update" or not c_id)
+        ):
             for r in range(2, ws.max_row + 1):
                 if c_id and str(ws.cell(r, c_id).value or "").strip():
                     continue
@@ -387,15 +436,20 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
                     curr_title = str(ws.cell(r, c_title).value or "").strip()
                     if curr_title == target_title:
                         if c_req and target_requester:
-                            if str(ws.cell(r, c_req).value or "").strip() == target_requester:
+                            if (
+                                str(ws.cell(r, c_req).value or "").strip()
+                                == target_requester
+                            ):
                                 target_row = r
                                 break
                         else:
                             target_row = r
                             break
 
-        thin_side = Side(style='thin', color='D3D3D3')
-        cell_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+        thin_side = Side(style="thin", color="D3D3D3")
+        cell_border = Border(
+            left=thin_side, right=thin_side, top=thin_side, bottom=thin_side
+        )
         regular_font = Font(name="맑은 고딕", size=10)
 
         if action in ("insert", "update"):
@@ -404,7 +458,10 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
                 # Insert at bottom
                 target_row = ws.max_row + 1
                 # If row is empty, ensure correct row index
-                while target_row > 2 and not any(ws.cell(target_row - 1, col).value for col in range(1, ws.max_column + 1)):
+                while target_row > 2 and not any(
+                    ws.cell(target_row - 1, col).value
+                    for col in range(1, ws.max_column + 1)
+                ):
                     target_row -= 1
 
             # Auto-calculate sequence number if not given
@@ -426,7 +483,9 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
                 c = ws.cell(row=target_row, column=col_idx, value=str(val))
                 c.font = regular_font
                 c.border = cell_border
-                c.alignment = Alignment(horizontal=align, vertical="center", wrap_text=(align == "left"))
+                c.alignment = Alignment(
+                    horizontal=align, vertical="center", wrap_text=(align == "left")
+                )
 
             field_cols = [
                 ("seq_no", c_seq, seq_val, "center"),
@@ -449,7 +508,11 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             # 의원·제목 칸이 빈 행이 되고, 다음 Excel→DB 동기화가 그 빈 값으로
             # DB의 요구자명을 지워 버린다.
             changed = item.get("_changed_fields")
-            allowed = set(changed) if (action == "update" and changed and not is_new_row) else None
+            allowed = (
+                set(changed)
+                if (action == "update" and changed and not is_new_row)
+                else None
+            )
             for field, col, value, align in field_cols:
                 if allowed is not None and field not in allowed:
                     continue
@@ -462,9 +525,13 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             if move_from is not None:
                 try:
                     wb[move_from[0]].delete_rows(move_from[1])
-                    print(f"✓ 관리대장 항목을 {move_from[0]} → {ws.title} 시트로 이동했습니다: {target_ledger_id}")
+                    print(
+                        f"✓ 관리대장 항목을 {move_from[0]} → {ws.title} 시트로 이동했습니다: {target_ledger_id}"
+                    )
                 except Exception as e:
-                    print(f"[관리대장 이동 경고] 원래 행({move_from[0]}!{move_from[1]}) 제거 실패: {e}")
+                    print(
+                        f"[관리대장 이동 경고] 원래 행({move_from[0]}!{move_from[1]}) 제거 실패: {e}"
+                    )
 
         self._save_workbook(wb, excel_path)
         return True

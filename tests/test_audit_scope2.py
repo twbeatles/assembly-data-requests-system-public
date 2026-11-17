@@ -42,7 +42,9 @@ class TestAuditScope2(unittest.TestCase):
             DatabaseManager.init_schema(conn)
         finally:
             conn.close()
-        self.service = LedgerService(db_path=self.db_path, json_path=self.json_path, base_dir=self.base)
+        self.service = LedgerService(
+            db_path=self.db_path, json_path=self.json_path, base_dir=self.base
+        )
 
     def tearDown(self):
         LedgerService.wait_last_sync(timeout=2.0)
@@ -57,7 +59,7 @@ class TestAuditScope2(unittest.TestCase):
             DatabaseManager.init_schema(src_conn)
             src_conn.execute(
                 "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES (?,?,?,?)",
-                ("REQ-2026-001", "INSERT", "2026-09-10 10:00:00", "{}")
+                ("REQ-2026-001", "INSERT", "2026-09-10 10:00:00", "{}"),
             )
             src_conn.commit()
         finally:
@@ -68,7 +70,9 @@ class TestAuditScope2(unittest.TestCase):
             DatabaseManager.init_schema(dst_conn)
             copied = DatabaseManager.copy_ledger_history(src, dst_conn)
             dst_conn.commit()
-            count = dst_conn.execute("SELECT COUNT(*) FROM ledger_history").fetchone()[0]
+            count = dst_conn.execute("SELECT COUNT(*) FROM ledger_history").fetchone()[
+                0
+            ]
         finally:
             dst_conn.close()
         self.assertEqual(copied, 1)
@@ -79,7 +83,9 @@ class TestAuditScope2(unittest.TestCase):
         code = (SCRIPTS_DIR / "extract_and_build_db.py").read_text(encoding="utf-8")
         self.assertIn("copy_ledger_history", code)
         self.assertIn("write_json_atomic", code)
-        self.assertLess(code.index("atomic_swap"), code.index("write_json_atomic(JSON_PATH"))
+        self.assertLess(
+            code.index("atomic_swap"), code.index("write_json_atomic(JSON_PATH")
+        )
 
     def test_auto_link_rejects_partial_seq_match(self):
         """연번 1이 문서번호 10/11/100에 붙으면 안 된다."""
@@ -94,8 +100,29 @@ class TestAuditScope2(unittest.TestCase):
                     has_tables, table_count, table_summary, topic_tags, parsed_md_path, original_path,
                     full_markdown, linked_ledger_id
                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                ("DOC-2026-010", "2026", "2026-09-01", "국회", "김의원", "10", "v1", "열번째 자료",
-                 "팀", "", "", "", "", "N", 0, "", "", "a.md", "2026/요구자료(10).hwp", "", "")
+                (
+                    "DOC-2026-010",
+                    "2026",
+                    "2026-09-01",
+                    "국회",
+                    "김의원",
+                    "10",
+                    "v1",
+                    "열번째 자료",
+                    "팀",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "N",
+                    0,
+                    "",
+                    "",
+                    "a.md",
+                    "2026/요구자료(10).hwp",
+                    "",
+                    "",
+                ),
             )
             conn.execute(
                 """INSERT INTO documents (
@@ -104,14 +131,47 @@ class TestAuditScope2(unittest.TestCase):
                     has_tables, table_count, table_summary, topic_tags, parsed_md_path, original_path,
                     full_markdown, linked_ledger_id
                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                ("DOC-2026-001", "2026", "2026-09-01", "국회", "김의원", "1", "v1", "첫번째 자료",
-                 "팀", "", "", "", "", "N", 0, "", "", "b.md", "2026/요구자료(1).hwp", "", "")
+                (
+                    "DOC-2026-001",
+                    "2026",
+                    "2026-09-01",
+                    "국회",
+                    "김의원",
+                    "1",
+                    "v1",
+                    "첫번째 자료",
+                    "팀",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "N",
+                    0,
+                    "",
+                    "",
+                    "b.md",
+                    "2026/요구자료(1).hwp",
+                    "",
+                    "",
+                ),
             )
             conn.commit()
-            item = {"year": "2026", "seq_no": "1", "ledger_id": "REQ-2026-099", "requester": "김의원", "request_date": ""}
+            item = {
+                "year": "2026",
+                "seq_no": "1",
+                "ledger_id": "REQ-2026-099",
+                "requester": "김의원",
+                "request_date": "",
+            }
             linked = auto_link_ledger_to_doc(conn, item)
             self.assertEqual(linked, "DOC-2026-001")
-            item2 = {"year": "2026", "seq_no": "1", "ledger_id": "REQ-2026-100", "requester": "김의원", "request_date": ""}
+            item2 = {
+                "year": "2026",
+                "seq_no": "1",
+                "ledger_id": "REQ-2026-100",
+                "requester": "김의원",
+                "request_date": "",
+            }
             # 연번 10 문서는 연번 1과 연결되면 안 됨
             conn.execute("DELETE FROM documents WHERE doc_id = 'DOC-2026-001'")
             conn.commit()
@@ -133,19 +193,49 @@ class TestAuditScope2(unittest.TestCase):
                         has_tables, table_count, table_summary, topic_tags, parsed_md_path, original_path,
                         full_markdown, linked_ledger_id
                     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (did, "2026", "2026-09-01", "국회", "김의원", "15", "v1", f"자료{i}",
-                     "팀", "", "", "", "", "N", 0, "", "", f"{i}.md", f"2026/요구자료(15)_{i}.hwp", "", "")
+                    (
+                        did,
+                        "2026",
+                        "2026-09-01",
+                        "국회",
+                        "김의원",
+                        "15",
+                        "v1",
+                        f"자료{i}",
+                        "팀",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "N",
+                        0,
+                        "",
+                        "",
+                        f"{i}.md",
+                        f"2026/요구자료(15)_{i}.hwp",
+                        "",
+                        "",
+                    ),
                 )
             conn.commit()
-            linked = auto_link_ledger_to_doc(conn, {
-                "year": "2026", "seq_no": "15", "ledger_id": "REQ-X", "requester": "김의원", "request_date": ""
-            })
+            linked = auto_link_ledger_to_doc(
+                conn,
+                {
+                    "year": "2026",
+                    "seq_no": "15",
+                    "ledger_id": "REQ-X",
+                    "requester": "김의원",
+                    "request_date": "",
+                },
+            )
             self.assertEqual(linked, "")
         finally:
             conn.close()
 
     def test_api_file_rejects_db_and_scripts(self):
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         ok, _, err = handler.resolve_download_target("data_requests.db")
         self.assertFalse(ok)
         self.assertIn("거부", err)
@@ -153,14 +243,18 @@ class TestAuditScope2(unittest.TestCase):
         self.assertFalse(ok2)
 
     def test_static_handler_rejects_sqlite(self):
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         self.assertFalse(handler.is_public_static("/data_requests.db"))
         self.assertFalse(handler.is_public_static("/config.json"))
         self.assertFalse(handler.is_public_static("/scripts/web_server.py"))
         self.assertTrue(handler.is_public_static("/자료요구_통합검색_대시보드.html"))
 
     def test_insert_validation_uses_http_400(self):
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         captured = []
 
         def mock_send(data, status_code=200):
@@ -171,7 +265,11 @@ class TestAuditScope2(unittest.TestCase):
         handler.rfile = type("R", (), {"read": lambda self, n: b"{}"})()
         handler.path = "/api/ledger"
         handler.read_json_body = lambda: {"year": "2026", "requester": "의원"}
-        old_db, old_json, old_base = web_server.DB_PATH, web_server.JSON_PATH, web_server.BASE_DIR
+        old_db, old_json, old_base = (
+            web_server.DB_PATH,
+            web_server.JSON_PATH,
+            web_server.BASE_DIR,
+        )
         try:
             web_server.DB_PATH = self.db_path
             web_server.JSON_PATH = self.json_path
@@ -197,18 +295,23 @@ class TestAuditScope2(unittest.TestCase):
             res = self.service.insert_ledger_item(payload)
             self.assertFalse(res.get("success"), bad)
         for i, text in enumerate(("2026. 3. 5", "2026/03/05")):
-            res = self.service.insert_ledger_item(dict(base, title=f"정규화 {i}", deadline=text))
+            res = self.service.insert_ledger_item(
+                dict(base, title=f"정규화 {i}", deadline=text)
+            )
             self.assertTrue(res.get("success"), res)
             self.assertEqual(res["item"]["deadline"], "2026-03-05")
         ok = self.service.insert_ledger_item(dict(base, deadline="2026-09-30"))
         self.assertTrue(ok.get("success"), ok)
-        empty = self.service.insert_ledger_item(dict(base, title="기한 없음", deadline=""))
+        empty = self.service.insert_ledger_item(
+            dict(base, title="기한 없음", deadline="")
+        )
         self.assertTrue(empty.get("success"), empty)
 
     def test_update_rejects_invalid_dates(self):
         """웹 수정의 날짜 3종도 같은 규칙을 따른다. (ISSUE-004)"""
         lid = self.service.insert_ledger_item(
-            {"title": "수정 시험", "requester": "김의원", "year": "2026"})["item"]["ledger_id"]
+            {"title": "수정 시험", "requester": "김의원", "year": "2026"}
+        )["item"]["ledger_id"]
         bad = self.service.update_ledger_item(lid, {"deadline": "2026-02-30"})
         self.assertFalse(bad.get("success"))
         row = self.service.get_ledger_item(lid)
@@ -224,15 +327,23 @@ class TestAuditScope2(unittest.TestCase):
     def test_get_stats_failure_flag(self):
         bad_path = self.base / "not_a_db_dir"
         bad_path.mkdir()
-        broken = LedgerService(db_path=bad_path, json_path=self.json_path, base_dir=self.base)
+        broken = LedgerService(
+            db_path=bad_path, json_path=self.json_path, base_dir=self.base
+        )
         stats = broken.get_stats()
         self.assertFalse(stats.get("success"))
 
     def test_config_post_rejects_unknown_keys(self):
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         captured = []
-        handler.send_json_response = lambda data, status_code=200: captured.append((status_code, data))
-        handler.send_error_response = lambda code, msg: captured.append((code, {"success": False, "error": msg}))
+        handler.send_json_response = lambda data, status_code=200: captured.append(
+            (status_code, data)
+        )
+        handler.send_error_response = lambda code, msg: captured.append(
+            (code, {"success": False, "error": msg})
+        )
         handler.read_json_body = lambda: {"ledger_patterns": ["*.xls*"], "web_port": 1}
         handler.path = "/api/config"
         handler.do_POST()
@@ -240,9 +351,13 @@ class TestAuditScope2(unittest.TestCase):
 
     def test_oversized_body_reports_413(self):
         """5MB 초과 본문은 413과 용량 안내를 반환해야 한다. (ISSUE-003)"""
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         captured = []
-        handler.send_json_response = lambda data, status_code=200: captured.append((status_code, data))
+        handler.send_json_response = lambda data, status_code=200: captured.append(
+            (status_code, data)
+        )
         handler.headers = {"Content-Length": str(5 * 1024 * 1024 + 1)}
         handler.rfile = type("R", (), {"read": lambda self, n: b"{}"})()
         handler.path = "/api/ledger"
@@ -253,9 +368,13 @@ class TestAuditScope2(unittest.TestCase):
 
     def test_malformed_json_body_reports_detail(self):
         """깨진 JSON 본문은 400과 JSON 형식 안내를 반환해야 한다. (ISSUE-003)"""
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         captured = []
-        handler.send_json_response = lambda data, status_code=200: captured.append((status_code, data))
+        handler.send_json_response = lambda data, status_code=200: captured.append(
+            (status_code, data)
+        )
         body = b"{bad json"
         handler.headers = {"Content-Length": str(len(body))}
         handler.rfile = type("R", (), {"read": lambda self, n: body})()
@@ -273,15 +392,20 @@ class TestAuditScope2(unittest.TestCase):
         payload = ("본문 내용\n" * 4096).encode("utf-8")
         (doc_dir / "테스트_질의서.md").write_bytes(payload)
 
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         sent = {}
         chunks = []
         handler.send_response = lambda code: sent.setdefault("code", code)
         handler.send_header = lambda k, v: sent.setdefault(k, v)
         handler.end_headers = lambda: None
-        handler.wfile = type("W", (), {"write": lambda self, b: chunks.append(bytes(b))})()
+        handler.wfile = type(
+            "W", (), {"write": lambda self, b: chunks.append(bytes(b))}
+        )()
         handler.headers = {}
         from urllib.parse import quote
+
         handler.path = "/api/download?path=" + quote("2026/테스트_질의서.md")
         old_base = web_server.BASE_DIR
         try:
@@ -294,11 +418,27 @@ class TestAuditScope2(unittest.TestCase):
         self.assertEqual(b"".join(chunks), payload)
 
     def test_slim_payload_keeps_full_markdown_for_normal_docs(self):
-        payload = DashboardRenderer.build_slim_payload({
-            "documents": [{"doc_id": "D1", "title": "t", "full_markdown": "# 전문 본문입니다", "answer_full_text": "잘린본문"}],
-            "qa_items": [{"qa_id": "Q1", "doc_id": "D1", "question_title": "질", "answer_markdown": "장문 답변 내용"}],
-            "request_ledger": []
-        })
+        payload = DashboardRenderer.build_slim_payload(
+            {
+                "documents": [
+                    {
+                        "doc_id": "D1",
+                        "title": "t",
+                        "full_markdown": "# 전문 본문입니다",
+                        "answer_full_text": "잘린본문",
+                    }
+                ],
+                "qa_items": [
+                    {
+                        "qa_id": "Q1",
+                        "doc_id": "D1",
+                        "question_title": "질",
+                        "answer_markdown": "장문 답변 내용",
+                    }
+                ],
+                "request_ledger": [],
+            }
+        )
         self.assertEqual(payload["documents"][0]["full_markdown"], "# 전문 본문입니다")
         self.assertFalse(payload["documents"][0].get("body_deferred"))
         self.assertEqual(payload["qa_items"][0]["answer_markdown"], "장문 답변 내용")
@@ -308,23 +448,35 @@ class TestAuditScope2(unittest.TestCase):
         """용량이 커도 대시보드 페이로드에서 문서·Q&A 전문을 빼지 않는다."""
         huge = "가" * 250_000
         qa_long = "답" * 80_000
-        payload = DashboardRenderer.build_slim_payload({
-            "documents": [{
-                "doc_id": "D2", "title": "big", "full_markdown": huge,
-                "parsed_md_path": "_parsed_markdown/x.md"
-            }],
-            "qa_items": [{
-                "qa_id": "Q2", "doc_id": "D2", "question_title": "질",
-                "answer_markdown": qa_long
-            }],
-            "request_ledger": []
-        })
+        payload = DashboardRenderer.build_slim_payload(
+            {
+                "documents": [
+                    {
+                        "doc_id": "D2",
+                        "title": "big",
+                        "full_markdown": huge,
+                        "parsed_md_path": "_parsed_markdown/x.md",
+                    }
+                ],
+                "qa_items": [
+                    {
+                        "qa_id": "Q2",
+                        "doc_id": "D2",
+                        "question_title": "질",
+                        "answer_markdown": qa_long,
+                    }
+                ],
+                "request_ledger": [],
+            }
+        )
         self.assertEqual(payload["documents"][0]["full_markdown"], huge)
         self.assertFalse(payload["documents"][0].get("body_deferred"))
         self.assertEqual(payload["qa_items"][0]["answer_markdown"], qa_long)
 
     def test_modal_prefers_full_markdown_over_truncated_answer(self):
-        tmpl = (SCRIPTS_DIR / "templates" / "dashboard_template.html").read_text(encoding="utf-8")
+        tmpl = (SCRIPTS_DIR / "templates" / "dashboard_template.html").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("doc.full_markdown || doc.answer_full_text", tmpl)
         self.assertNotIn("innerText = doc.answer_full_text || doc.full_markdown", tmpl)
         self.assertIn("body_incomplete", tmpl)
@@ -343,6 +495,7 @@ class TestAuditScope2(unittest.TestCase):
 
     def test_xlsx_fallback_escapes_html(self):
         import openpyxl
+
         xlsx = self.base / "big.xlsx"
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -367,7 +520,9 @@ class TestAuditScope2(unittest.TestCase):
         self.assertNotIn("xlsx' and file_path.stat().st_size > 10 * 1024 * 1024", src)
 
     def test_chart_and_href_use_escapeHtml(self):
-        tmpl = (SCRIPTS_DIR / "templates" / "dashboard_template.html").read_text(encoding="utf-8")
+        tmpl = (SCRIPTS_DIR / "templates" / "dashboard_template.html").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("escapeHtml(req)", tmpl)
         self.assertIn("escapeHtml(top)", tmpl)
         self.assertIn("escapeHtml(doc.parsed_md_path", tmpl)
@@ -382,6 +537,7 @@ class TestAuditScope2(unittest.TestCase):
         out = self.base / "tpl.xlsx"
         create_ledger_template.create_template(out)
         import openpyxl
+
         wb = openpyxl.load_workbook(out)
         names = list(wb.sheetnames)
         ws = wb["2026"] if "2026" in names else wb[names[0]]
@@ -393,7 +549,9 @@ class TestAuditScope2(unittest.TestCase):
 
     def test_sync_service_timeout_clears_flag(self):
         svc = SyncService(scripts_dir=self.base, timeout_seconds=1)
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="py", timeout=1)):
+        with patch(
+            "subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="py", timeout=1)
+        ):
             started, _ = svc.trigger_async_sync()
             self.assertTrue(started)
             for _ in range(20):
@@ -405,13 +563,19 @@ class TestAuditScope2(unittest.TestCase):
             self.assertTrue(st["last_error"])
 
     def test_pending_queue_persisted_to_disk(self):
-        svc = ExcelSyncService(base_dir=self.base, db_path=self.db_path, json_path=self.json_path)
+        svc = ExcelSyncService(
+            base_dir=self.base, db_path=self.db_path, json_path=self.json_path
+        )
         with svc._pending_lock:
-            svc._pending_queue.append({"action": "insert", "item": {"ledger_id": "REQ-1"}, "timestamp": 1})
+            svc._pending_queue.append(
+                {"action": "insert", "item": {"ledger_id": "REQ-1"}, "timestamp": 1}
+            )
             svc._save_pending_queue()
         qfile = self.base / ".excel_pending_queue.json"
         self.assertTrue(qfile.exists())
-        svc2 = ExcelSyncService(base_dir=self.base, db_path=self.db_path, json_path=self.json_path)
+        svc2 = ExcelSyncService(
+            base_dir=self.base, db_path=self.db_path, json_path=self.json_path
+        )
         self.assertEqual(len(svc2._pending_queue), 1)
 
     def test_default_ledger_patterns_are_specific(self):
@@ -420,7 +584,9 @@ class TestAuditScope2(unittest.TestCase):
         self.assertNotIn("*자료요구*.xls*", pats)
 
     def test_universal_config_patterns_are_specific(self):
-        univ = SYSTEM_DIR.parent / "국회자료요구_스마트시스템_범용배포용" / "config.json"
+        univ = (
+            SYSTEM_DIR.parent / "국회자료요구_스마트시스템_범용배포용" / "config.json"
+        )
         if univ.exists():
             cfg = json.loads(univ.read_text(encoding="utf-8"))
             self.assertNotIn("*요구자료*.xls*", cfg.get("ledger_patterns", []))

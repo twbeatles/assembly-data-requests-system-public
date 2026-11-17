@@ -6,10 +6,11 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-cast(Any, sys.stdout).reconfigure(encoding='utf-8')
+cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = SCRIPTS_DIR.parent
+
 
 def create_template(target_path: Path):
     wb = openpyxl.Workbook()
@@ -18,33 +19,55 @@ def create_template(target_path: Path):
     assert default_sheet is not None
 
     headers = [
-        "연번", "접수일자", "소속", "의원", "보좌관",
-        "요구자료", "세부내역", "마감일", "제출일", "제출여부", "요청형태", "비고",
-        "담당부서", "대장ID"
+        "연번",
+        "접수일자",
+        "소속",
+        "의원",
+        "보좌관",
+        "요구자료",
+        "세부내역",
+        "마감일",
+        "제출일",
+        "제출여부",
+        "요청형태",
+        "비고",
+        "담당부서",
+        "대장ID",
     ]
 
     header_font = Font(name="맑은 고딕", size=10, bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="1F4E79", end_color="1F4E79", fill_type="solid"
+    )
     center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
     left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
-    
+
     thin_border = Border(
-        left=Side(style='thin', color="D3D3D3"),
-        right=Side(style='thin', color="D3D3D3"),
-        top=Side(style='thin', color="D3D3D3"),
-        bottom=Side(style='thin', color="D3D3D3")
+        left=Side(style="thin", color="D3D3D3"),
+        right=Side(style="thin", color="D3D3D3"),
+        top=Side(style="thin", color="D3D3D3"),
+        bottom=Side(style="thin", color="D3D3D3"),
     )
 
     sample_row = [
-        "1", "2026-09-01", "과방위", "홍길동", "이몽룡",
+        "1",
+        "2026-09-01",
+        "과방위",
+        "홍길동",
+        "이몽룡",
         "부서별 주요 현안 및 업무 추진실적",
         "1. 최근 3년간 주요 업무 추진 실적\n2. 예산 집행 현황 및 개선 대책\n3. 향후 중점 추진 계획",
-        "2026-09-05", "2026-09-04", "제출", "시스템",
+        "2026-09-05",
+        "2026-09-04",
+        "제출",
+        "시스템",
         "※ 샘플 예시입니다. 본인 부서의 요구자료로 수정하거나 삭제 후 행을 추가하세요.",
-        "자료요구담당부서", "REQ-2026-001"
+        "자료요구담당부서",
+        "REQ-2026-001",
     ]
 
     import datetime
+
     this_year = datetime.datetime.now().year
     year_sheets = [str(y) for y in range(this_year, this_year - 9, -1)]
     sample_years = {"2026", "2025"}
@@ -76,7 +99,7 @@ def create_template(target_path: Path):
 
         # Auto column widths
         col_widths = {
-            1: 8,   # 연번
+            1: 8,  # 연번
             2: 13,  # 접수일자
             3: 12,  # 소속
             4: 12,  # 의원
@@ -85,11 +108,11 @@ def create_template(target_path: Path):
             7: 50,  # 세부내역
             8: 13,  # 마감일
             9: 13,  # 제출일
-            10: 10, # 제출여부
-            11: 10, # 요청형태
+            10: 10,  # 제출여부
+            11: 10,  # 요청형태
             12: 30,  # 비고
             13: 16,  # 담당부서
-            14: 16   # 대장ID
+            14: 16,  # 대장ID
         }
         for col_idx, w in col_widths.items():
             ws.column_dimensions[get_column_letter(col_idx)].width = w
@@ -97,6 +120,7 @@ def create_template(target_path: Path):
     wb.remove(default_sheet)
     wb.save(str(target_path))
     print(f"✓ 관리대장 템플릿 생성 완료: {target_path.name}")
+
 
 if __name__ == "__main__":
     out_file = SYSTEM_DIR / "(양식)국회_요구자료_목록_대장_템플릿.xlsx"

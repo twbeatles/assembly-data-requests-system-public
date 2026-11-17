@@ -21,7 +21,12 @@ from services.excel_sync.pending import PendingQueueMixin
 from services.excel_sync.watcher import ExcelWatcherMixin
 
 
-class ExcelSyncService(PendingQueueMixin, ExcelApplyMixin, ExcelToDbMixin, ExcelWatcherMixin):  # pyright: ignore[reportGeneralTypeIssues]  # static-only cycle; runtime base is object
+class ExcelSyncService(
+    PendingQueueMixin,  # pyright: ignore[reportGeneralTypeIssues]  # static-only cycle; runtime base is object
+    ExcelApplyMixin,  # pyright: ignore[reportGeneralTypeIssues]  # static-only cycle; runtime base is object
+    ExcelToDbMixin,  # pyright: ignore[reportGeneralTypeIssues]  # static-only cycle; runtime base is object
+    ExcelWatcherMixin,  # pyright: ignore[reportGeneralTypeIssues]  # static-only cycle; runtime base is object
+):
     """Manages two-way sync between Excel ledgers and SQLite database."""
 
     _instance = None
@@ -31,7 +36,7 @@ class ExcelSyncService(PendingQueueMixin, ExcelApplyMixin, ExcelToDbMixin, Excel
         self,
         base_dir: Optional[Path] = None,
         db_path: Optional[Path] = None,
-        json_path: Optional[Path] = None
+        json_path: Optional[Path] = None,
     ):
         # base_dir를 생략하면 DB가 있는 폴더를 쓴다. 운영 폴더를 기본값으로 두면 테스트가
         # 운영 마스터 엑셀과 보류 큐에 쓴다. (감사 R3-01)
@@ -41,8 +46,12 @@ class ExcelSyncService(PendingQueueMixin, ExcelApplyMixin, ExcelToDbMixin, Excel
             self.base_dir = Path(db_path).resolve().parent
         else:
             self.base_dir = DEFAULT_SYSTEM_DIR
-        self.db_path = Path(db_path) if db_path else (self.base_dir / "data_requests.db")
-        self.json_path = Path(json_path) if json_path else (self.base_dir / "data_requests.json")
+        self.db_path = (
+            Path(db_path) if db_path else (self.base_dir / "data_requests.db")
+        )
+        self.json_path = (
+            Path(json_path) if json_path else (self.base_dir / "data_requests.json")
+        )
         self.lock = threading.Lock()
         self._flush_lock = threading.Lock()
         self._missing_delete_ids = set()
@@ -72,7 +81,10 @@ class ExcelSyncService(PendingQueueMixin, ExcelApplyMixin, ExcelToDbMixin, Excel
     @classmethod
     def get_instance(cls, base_dir: Optional[Path] = None):
         with cls._instance_lock:
-            if cls._instance is None or (base_dir and cls._instance.base_dir.resolve() != Path(base_dir).resolve()):
+            if cls._instance is None or (
+                base_dir
+                and cls._instance.base_dir.resolve() != Path(base_dir).resolve()
+            ):
                 previous = cls._instance
                 if previous is not None:
                     # 교체되는 인스턴스의 watcher가 고아 스레드로 남지 않게 한다.

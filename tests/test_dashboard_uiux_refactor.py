@@ -4,6 +4,7 @@
 브라우저에서 재현한 흐름 문제를 다시 만들지 않게 한다. 소스 grep이 아니라
 shell.html은 HTML 파서로, JS는 Node에서 실제로 실행해 확인한다. 운영 데이터는 건드리지 않는다.
 """
+
 import json
 import shutil
 import subprocess
@@ -18,7 +19,9 @@ DASH = REPO / "scripts" / "templates" / "dashboard"
 SHELL = DASH / "shell.html"
 JS_DIR = DASH / "js"
 NODE = shutil.which("node")
-needs_node = pytest.mark.skipif(not NODE, reason="node가 없어 대시보드 JS 실행 테스트를 건너뜁니다")
+needs_node = pytest.mark.skipif(
+    not NODE, reason="node가 없어 대시보드 JS 실행 테스트를 건너뜁니다"
+)
 
 
 class _Scan(HTMLParser):
@@ -58,14 +61,23 @@ def _scan():
 
 def test_shell_has_refactor_hooks():
     scan = _scan()
-    needed = {"btn-mark-submitted", "ledger-detail-due", "select-all-wrap", "search-clear",
-              "empty-clear-filters", "link-excel-db", "search-scope-hint"}
+    needed = {
+        "btn-mark-submitted",
+        "ledger-detail-due",
+        "select-all-wrap",
+        "search-clear",
+        "empty-clear-filters",
+        "link-excel-db",
+        "search-scope-hint",
+    }
     assert not (needed - scan.ids), sorted(needed - scan.ids)
 
 
 def test_shell_has_no_inline_styling():
     scan = _scan()
-    assert scan.inline_styles == [], f"shell.html에 인라인 style이 남아 있다: {scan.inline_styles[:5]}"
+    assert scan.inline_styles == [], (
+        f"shell.html에 인라인 style이 남아 있다: {scan.inline_styles[:5]}"
+    )
 
 
 def test_modal_tabs_are_keyed_by_data_tab():
@@ -87,8 +99,13 @@ def test_sort_options_match_mode_table():
 @needs_node
 def test_status_label_and_question_count_sort():
     res = run_node(
-        ["LEDGER_DONE_STATUSES", "LEDGER_PROGRESS_STATUSES", "ledgerStatusLabel", "ledgerStatusClass",
-         "sortSearchResults"],
+        [
+            "LEDGER_DONE_STATUSES",
+            "LEDGER_PROGRESS_STATUSES",
+            "ledgerStatusLabel",
+            "ledgerStatusClass",
+            "sortSearchResults",
+        ],
         """
 const DOC_QAS_MAP = { A: [1], B: [1, 2, 3], C: [1, 2] };
 activeFilters.sort = 'qa-count';
@@ -100,7 +117,8 @@ console.log(JSON.stringify({
   empty: ledgerStatusLabel(''),
   cls: ['', '제출', '업무설명', '검토중', '해당없음', '미제출'].map(ledgerStatusClass),
 }));
-""")
+""",
+    )
     # 예전에는 표 개수(table_count)로 정렬해 A, C, B가 나왔다.
     assert res["sorted"] == ["B", "C", "A"]
     # 빈 진행 상태는 엑셀 규칙(불변조건 24)과 같이 '미제출'이다. 예전 화면은 '제출'로 보여 줬다.
@@ -110,10 +128,13 @@ console.log(JSON.stringify({
 
 @needs_node
 def test_card_preview_strips_markdown_only_for_preview():
-    res = run_node(["cardPreviewText"], r"""
+    res = run_node(
+        ["cardPreviewText"],
+        r"""
 const md = '<!-- source: a.hwp -->\n# 답변서\n\n## 1. 현황\n\n| 연도 | 건수 |\n| --- | --- |\n| 2024 | **10** |\n';
 console.log(JSON.stringify({ out: cardPreviewText(md), same: md.includes('| --- |') }));
-""")
+""",
+    )
     assert res["out"] == "답변서 1. 현황 연도 건수 2024 10"
     assert res["same"] is True, "원문 문자열은 바꾸지 않는다(전문 보존)"
 
@@ -137,12 +158,21 @@ def test_saved_form_closes_without_discard_prompt(tmp_path):
         "const afterUserClose = [g.__confirms, g.__closed];\n"
         "g.closeAddLedgerModal(true);\n"
         "console.log(JSON.stringify({ afterUserClose, afterSavedClose: [g.__confirms, g.__closed] }));\n",
-        encoding="utf-8")
-    run = subprocess.run([NODE, str(driver), str(JS_DIR / "15_ux.js")], stdin=subprocess.DEVNULL,
-                         capture_output=True, text=True, encoding="utf-8", timeout=30)
+        encoding="utf-8",
+    )
+    run = subprocess.run(
+        [NODE, str(driver), str(JS_DIR / "15_ux.js")],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+    )
     assert run.returncode == 0, run.stderr[:800]
     out = json.loads(run.stdout.strip().splitlines()[-1])
-    assert out["afterUserClose"] == [1, 0], "적어 둔 내용이 있으면 사용자가 닫을 때는 물어야 한다"
+    assert out["afterUserClose"] == [1, 0], (
+        "적어 둔 내용이 있으면 사용자가 닫을 때는 물어야 한다"
+    )
     assert out["afterSavedClose"] == [1, 1], "저장 뒤(true)에는 묻지 않고 닫아야 한다"
 
 
@@ -155,8 +185,16 @@ def test_doc_modal_does_not_assign_location_hash():
 
 def test_app_config_json_carries_excel_filename():
     import sys
+
     sys.path.insert(0, str(REPO / "scripts"))
     from template_renderer import DashboardRenderer
-    cfg = json.loads(DashboardRenderer.app_config_json(
-        {"department_name": "부서", "excel_filename": "국회_기관_자료요구_통합DB.xlsx"}))
+
+    cfg = json.loads(
+        DashboardRenderer.app_config_json(
+            {
+                "department_name": "부서",
+                "excel_filename": "국회_기관_자료요구_통합DB.xlsx",
+            }
+        )
+    )
     assert cfg["excel_filename"] == "국회_기관_자료요구_통합DB.xlsx"

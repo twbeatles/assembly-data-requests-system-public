@@ -52,15 +52,33 @@ class TestAuditRemediations(unittest.TestCase):
         output.mkdir(parents=True)
         orphan = output / "only-in-package.pdf.md"
         orphan.write_text("# 전문 sentinel", encoding="utf-8")
-        self.assertEqual(parse_all.prune_orphan_markdowns(self.tmp, output.parent, preserve_missing_sources=True), 0)
+        self.assertEqual(
+            parse_all.prune_orphan_markdowns(
+                self.tmp, output.parent, preserve_missing_sources=True
+            ),
+            0,
+        )
         self.assertTrue(orphan.exists())
-        self.assertEqual(parse_all.prune_orphan_markdowns(self.tmp, output.parent, preserve_missing_sources=False), 1)
+        self.assertEqual(
+            parse_all.prune_orphan_markdowns(
+                self.tmp, output.parent, preserve_missing_sources=False
+            ),
+            1,
+        )
         self.assertFalse(orphan.exists())
 
     def test_deleted_excel_tombstone_does_not_resurrect(self):
         self._ledger_excel()
         ledger = LedgerService(self.db, self.json_path, self.tmp)
-        inserted = ledger.insert_ledger_item({"ledger_id": "REQ-2026-001", "year": "2026", "requester": "김의원", "title": "삭제 재발 방지", "request_type": "일반"})
+        inserted = ledger.insert_ledger_item(
+            {
+                "ledger_id": "REQ-2026-001",
+                "year": "2026",
+                "requester": "김의원",
+                "title": "삭제 재발 방지",
+                "request_type": "일반",
+            }
+        )
         self.assertTrue(inserted["success"])
         self.assertTrue(ledger.delete_ledger_item("REQ-2026-001")["success"])
 
@@ -69,7 +87,13 @@ class TestAuditRemediations(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertIsNone(ledger.get_ledger_item("REQ-2026-001"))
         conn = sqlite3.connect(str(self.db))
-        self.assertEqual(conn.execute("SELECT status FROM request_ledger WHERE ledger_id = ?", ("REQ-2026-001",)).fetchone()[0], "[삭제]")
+        self.assertEqual(
+            conn.execute(
+                "SELECT status FROM request_ledger WHERE ledger_id = ?",
+                ("REQ-2026-001",),
+            ).fetchone()[0],
+            "[삭제]",
+        )
         conn.close()
 
     def test_queue_failure_preserves_failed_operation_and_tail(self):
@@ -79,19 +103,38 @@ class TestAuditRemediations(unittest.TestCase):
         sync.find_master_excel = lambda: excel
         sync.is_file_locked = lambda _: False
         sync._pending_queue = [
-            {"operation_id": str(i), "action": "insert", "item": {"ledger_id": f"REQ-{i}"}, "timestamp": 0, "attempts": 0}
+            {
+                "operation_id": str(i),
+                "action": "insert",
+                "item": {"ledger_id": f"REQ-{i}"},
+                "timestamp": 0,
+                "attempts": 0,
+            }
             for i in range(3)
         ]
-        sync._apply_to_excel = lambda *_: (_ for _ in ()).throw(RuntimeError("locked mid-flush"))
+        sync._apply_to_excel = lambda *_: (_ for _ in ()).throw(
+            RuntimeError("locked mid-flush")
+        )
         self.assertEqual(sync.flush_pending_queue(), 0)
-        self.assertEqual([op["operation_id"] for op in sync._pending_queue], ["0", "1", "2"])
-        persisted = json.loads((self.tmp / ".excel_pending_queue.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            [op["operation_id"] for op in sync._pending_queue], ["0", "1", "2"]
+        )
+        persisted = json.loads(
+            (self.tmp / ".excel_pending_queue.json").read_text(encoding="utf-8")
+        )
         self.assertEqual([op["operation_id"] for op in persisted], ["0", "1", "2"])
 
     def test_excel_insert_replay_is_idempotent(self):
         path = self._ledger_excel()
         sync = ExcelSyncService(self.tmp, self.db, self.json_path)
-        item = {"ledger_id": "REQ-2026-002", "year": "2026", "seq_no": "2", "requester": "박의원", "title": "재시도 안전 등록", "status": "작성중"}
+        item = {
+            "ledger_id": "REQ-2026-002",
+            "year": "2026",
+            "seq_no": "2",
+            "requester": "박의원",
+            "title": "재시도 안전 등록",
+            "status": "작성중",
+        }
         self.assertTrue(sync._apply_to_excel(path, item, "insert"))
         self.assertTrue(sync._apply_to_excel(path, item, "insert"))
         wb = openpyxl.load_workbook(path, data_only=True)
@@ -108,7 +151,9 @@ class TestAuditRemediations(unittest.TestCase):
 
         def worker(n):
             gate.wait()
-            res = service.insert_ledger_item({"year": "2026", "requester": f"의원{n}", "title": f"동시 등록 {n}"})
+            res = service.insert_ledger_item(
+                {"year": "2026", "requester": f"의원{n}", "title": f"동시 등록 {n}"}
+            )
             with result_lock:
                 results.append(res)
 
@@ -132,7 +177,10 @@ class TestAuditRemediations(unittest.TestCase):
             ws.append([f"REQ-{year}-001", "1", "김의원", f"{year} 자료"])
         wb.save(path)
         wb.close()
-        ids = {item["ledger_id"] for item in load_request_ledger(self.tmp, [], merge_db_records=False)}
+        ids = {
+            item["ledger_id"]
+            for item in load_request_ledger(self.tmp, [], merge_db_records=False)
+        }
         self.assertEqual(ids, {"REQ-2026-001", "REQ-2027-001"})
 
 

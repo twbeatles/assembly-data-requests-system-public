@@ -27,7 +27,6 @@ from services.ledger_service import LedgerService
 
 
 class TestExcelBidirectionalSync(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp(prefix="test_excel_sync_")
         self.base_dir = Path(self.temp_dir)
@@ -40,40 +39,85 @@ class TestExcelBidirectionalSync(unittest.TestCase):
         conn.close()
 
         # Create dummy master Excel ledger with 2026 sheet
-        self.excel_path = self.base_dir / "260904 국회 요구자료 목록(테스트)_스마트검색.xlsx"
+        self.excel_path = (
+            self.base_dir / "260904 국회 요구자료 목록(테스트)_스마트검색.xlsx"
+        )
         wb = openpyxl.Workbook()
         ws = wb.active
         assert ws is not None
         ws.title = "2026"
         headers = [
-            "연번", "소속", "의원", "보좌관", "요구자료", "세부내역",
-            "요구일", "마감일", "제출일", "부서", "제출", "비고", "요청형태"
+            "연번",
+            "소속",
+            "의원",
+            "보좌관",
+            "요구자료",
+            "세부내역",
+            "요구일",
+            "마감일",
+            "제출일",
+            "부서",
+            "제출",
+            "비고",
+            "요청형태",
         ]
         ws.append(headers)
-        ws.append([
-            "1", "과학기술정보상급감독기관", "김의원", "이보좌관", "기존 엑셀 요구자료",
-            "세부내역 1", "2026-09-01", "2026-09-03", "2026-09-03", "기획예산팀", "완료", "", "시스템"
-        ])
+        ws.append(
+            [
+                "1",
+                "과학기술정보상급감독기관",
+                "김의원",
+                "이보좌관",
+                "기존 엑셀 요구자료",
+                "세부내역 1",
+                "2026-09-01",
+                "2026-09-03",
+                "2026-09-03",
+                "기획예산팀",
+                "완료",
+                "",
+                "시스템",
+            ]
+        )
         wb.save(str(self.excel_path))
         wb.close()
 
         # Seed initial record in DB corresponding to Excel row 1
         conn = sqlite3.connect(str(self.db_path))
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO request_ledger (
                 ledger_id, year, seq_no, party, requester, aide,
                 title, details, request_date, deadline, submit_date,
                 department, status, note, request_type, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            "REQ-2026-001", "2026", "1", "과학기술정보상급감독기관", "김의원", "이보좌관",
-            "기존 엑셀 요구자료", "세부내역 1", "2026-09-01", "2026-09-03", "2026-09-03",
-            "기획예산팀", "완료", "", "시스템", "2026-09-01 10:00:00", "2026-09-01 10:00:00"
-        ))
+        """,
+            (
+                "REQ-2026-001",
+                "2026",
+                "1",
+                "과학기술정보상급감독기관",
+                "김의원",
+                "이보좌관",
+                "기존 엑셀 요구자료",
+                "세부내역 1",
+                "2026-09-01",
+                "2026-09-03",
+                "2026-09-03",
+                "기획예산팀",
+                "완료",
+                "",
+                "시스템",
+                "2026-09-01 10:00:00",
+                "2026-09-01 10:00:00",
+            ),
+        )
         conn.commit()
         conn.close()
 
-        self.service = LedgerService(db_path=self.db_path, json_path=self.json_path, base_dir=self.base_dir)
+        self.service = LedgerService(
+            db_path=self.db_path, json_path=self.json_path, base_dir=self.base_dir
+        )
         self.sync_service = ExcelSyncService.get_instance(base_dir=self.base_dir)
         self.sync_service.db_path = self.db_path
         self.sync_service.json_path = self.json_path
@@ -103,7 +147,7 @@ class TestExcelBidirectionalSync(unittest.TestCase):
             "department": "기획예산팀",
             "status": "작성중",
             "note": "웹 등록 테스트",
-            "request_type": "일반"
+            "request_type": "일반",
         }
 
         res = self.service.insert_ledger_item(new_item_data)
@@ -113,7 +157,7 @@ class TestExcelBidirectionalSync(unittest.TestCase):
         # Verify in Excel file
         wb = openpyxl.load_workbook(str(self.excel_path), data_only=True)
         ws = wb["2026"]
-        self.assertEqual(ws.max_row, 3) # Header + 2 data rows
+        self.assertEqual(ws.max_row, 3)  # Header + 2 data rows
         last_row_vals = [ws.cell(3, c).value for c in range(1, ws.max_column + 1)]
         wb.close()
 
@@ -127,7 +171,7 @@ class TestExcelBidirectionalSync(unittest.TestCase):
         update_data = {
             "title": "기존 엑셀 요구자료(웹에서 수정됨)",
             "status": "제출완료",
-            "note": "비고 수정"
+            "note": "비고 수정",
         }
         res = self.service.update_ledger_item("REQ-2026-001", update_data)
         self.assertTrue(res["success"])
@@ -150,7 +194,9 @@ class TestExcelBidirectionalSync(unittest.TestCase):
 
         wb = openpyxl.load_workbook(str(self.excel_path), data_only=True)
         ws = wb["2026"]
-        row2_vals = [str(ws.cell(2, c).value or "") for c in range(1, ws.max_column + 1)]
+        row2_vals = [
+            str(ws.cell(2, c).value or "") for c in range(1, ws.max_column + 1)
+        ]
         wb.close()
 
         self.assertTrue(any("[삭제]" in v for v in row2_vals))
@@ -159,10 +205,23 @@ class TestExcelBidirectionalSync(unittest.TestCase):
         # Simulate user opening Excel manually and adding a 2nd row
         wb = openpyxl.load_workbook(str(self.excel_path))
         ws = wb["2026"]
-        ws.append([
-            "2", "과방위", "이의원", "정보좌관", "엑셀 수기 추가 자료",
-            "수기 상세내역", "2026-09-05", "2026-09-08", "", "기획예산팀", "작성중", "수기작성", "공문"
-        ])
+        ws.append(
+            [
+                "2",
+                "과방위",
+                "이의원",
+                "정보좌관",
+                "엑셀 수기 추가 자료",
+                "수기 상세내역",
+                "2026-09-05",
+                "2026-09-08",
+                "",
+                "기획예산팀",
+                "작성중",
+                "수기작성",
+                "공문",
+            ]
+        )
         wb.save(str(self.excel_path))
         wb.close()
 
@@ -174,7 +233,9 @@ class TestExcelBidirectionalSync(unittest.TestCase):
         # Check DB has the new record
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM request_ledger WHERE title = '엑셀 수기 추가 자료'").fetchone()
+        row = conn.execute(
+            "SELECT * FROM request_ledger WHERE title = '엑셀 수기 추가 자료'"
+        ).fetchone()
         conn.close()
 
         self.assertIsNotNone(row)
@@ -199,7 +260,9 @@ class TestExcelBidirectionalSync(unittest.TestCase):
         # Verify DB reflects manual edit
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM request_ledger WHERE ledger_id = 'REQ-2026-001'").fetchone()
+        row = conn.execute(
+            "SELECT * FROM request_ledger WHERE ledger_id = 'REQ-2026-001'"
+        ).fetchone()
         conn.close()
 
         self.assertEqual(row["title"], "기존 요구자료 (엑셀에서 수기 수정)")
@@ -215,7 +278,7 @@ class TestExcelBidirectionalSync(unittest.TestCase):
                 "party": "행안위",
                 "requester": "정의원",
                 "title": "잠금 중 등록된 자료",
-                "details": "잠금 테스트"
+                "details": "잠금 테스트",
             }
             res = self.service.insert_ledger_item(new_item)
             self.assertTrue(res["success"])
@@ -247,5 +310,5 @@ class TestExcelBidirectionalSync(unittest.TestCase):
         self.assertGreaterEqual(self.sync_service.get_version(), 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

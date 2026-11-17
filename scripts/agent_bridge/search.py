@@ -69,12 +69,19 @@ def locate_snippet(body, query, max_chars=policy.MAX_SNIPPET_CHARS):
         return excerpt, None, truncated
     start = max(0, hit - 60)
     end = min(len(text), hit + len(token) + 60)
-    excerpt = (("…" if start > 0 else "") + text[start:end].strip()
-               + ("…" if end < len(text) else ""))
+    excerpt = (
+        ("…" if start > 0 else "")
+        + text[start:end].strip()
+        + ("…" if end < len(text) else "")
+    )
     if len(excerpt) > max_chars:
         excerpt = excerpt[:max_chars] + "…"
         return excerpt, None, True
-    return excerpt, {"start": start, "end": min(end, start + len(excerpt))}, end < len(text)
+    return (
+        excerpt,
+        {"start": start, "end": min(end, start + len(excerpt))},
+        end < len(text),
+    )
 
 
 def shape_item(kind, row, query, max_chars=policy.MAX_SNIPPET_CHARS):
@@ -106,6 +113,6 @@ def paginate(items, limit, cursor):
         offset = max(0, int(cursor)) if cursor not in (None, "") else 0
     except (TypeError, ValueError):
         offset = 0
-    page = items[offset:offset + limit]
+    page = items[offset : offset + limit]
     rest = offset + len(page)
     return page, (str(rest) if rest < len(items) else None)

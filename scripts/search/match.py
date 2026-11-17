@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """파이썬 대체 검색 평가(SRP: 행 매칭·배점)."""
+
 import re
 
 from search.lang import (
@@ -13,7 +14,11 @@ from search.parse import _expand_terms
 
 def _nospace_lower(text) -> str:
     return re.sub(r"\s+", "", str(text or "")).lower()
-def _term_matches(term: str, blob_nospace: str, choseong_blob: str, use_synonyms: bool = False) -> bool:
+
+
+def _term_matches(
+    term: str, blob_nospace: str, choseong_blob: str, use_synonyms: bool = False
+) -> bool:
     lower = term.lower()
     if re.fullmatch(r"[ㄱ-ㅎ]+", lower):
         return lower in choseong_blob
@@ -21,6 +26,8 @@ def _term_matches(term: str, blob_nospace: str, choseong_blob: str, use_synonyms
     if use_synonyms:
         variants.update(_expand_terms(lower, True))
     return any(v and _nospace_lower(v) in blob_nospace for v in variants)
+
+
 def fields_match(plan: dict, row) -> bool:
     """`필드:값` 한정자를 한 행에 적용한다 (제안서 S6).
 
@@ -59,7 +66,11 @@ def fields_match(plan: dict, row) -> bool:
         if date_to and actual > date_to:
             return False
     return True
-def row_matches(plan: dict, texts, choseong_texts=(), use_synonyms: bool = False) -> bool:
+
+
+def row_matches(
+    plan: dict, texts, choseong_texts=(), use_synonyms: bool = False
+) -> bool:
     """검색 계획을 파이썬으로 평가한다. 띄어쓰기 무시·조사 분리·초성 검색을 지원한다.
 
     texts: 본문 등 전체 비교 대상 문자열들. choseong_texts: 초성 비교에 쓸 짧은 필드(제목·요구자).
@@ -107,7 +118,9 @@ def row_matches(plan: dict, texts, choseong_texts=(), use_synonyms: bool = False
         lower = term.lower()
         if re.fullmatch(r"[ㄱ-ㅎ]+", lower):
             if choseong_blob is None:
-                choseong_blob = _nospace_lower(" ".join(get_choseong(c) for c in choseong_texts))
+                choseong_blob = _nospace_lower(
+                    " ".join(get_choseong(c) for c in choseong_texts)
+                )
             return lower in choseong_blob
         variants = {lower, strip_particle(lower)}
         if use_synonyms:
@@ -115,6 +128,8 @@ def row_matches(plan: dict, texts, choseong_texts=(), use_synonyms: bool = False
         return any(_any_field_has(_nospace_lower(v)) for v in variants if v)
 
     return any(all(_term_hit(t) for t in terms) for terms in plan["groups"])
+
+
 def score_row(plan: dict, weighted_texts, use_synonyms: bool = False) -> int:
     """대체 경로에도 관련도 점수를 준다 (제안서 S7).
 
@@ -146,6 +161,8 @@ def score_row(plan: dict, weighted_texts, use_synonyms: bool = False) -> int:
                 if _term_matches(t, blob_nospace, cho, use_synonyms):
                     score += weight
     return score
+
+
 def plan_is_empty(plan: dict) -> bool:
     """검색어가 실질적으로 비어 있는가(필드 한정자만 있는 경우 포함)."""
     return not plan["groups"] and not plan["phrases"] and not plan["neg"]

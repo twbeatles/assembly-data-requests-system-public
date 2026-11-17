@@ -23,7 +23,10 @@ def db_counts(db_path: Path) -> dict:
         return {"available": False, "error": "SQLite DB 파일이 없습니다."}
     conn = sqlite3.connect(str(db_path))
     try:
-        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
         required = {"documents", "qa_items", "request_ledger"}
         if not required.issubset(tables):
             return {"available": False, "error": "SQLite 스키마가 완전하지 않습니다."}
@@ -31,8 +34,12 @@ def db_counts(db_path: Path) -> dict:
             "available": True,
             "documents": conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0],
             "qa_items": conn.execute("SELECT COUNT(*) FROM qa_items").fetchone()[0],
-            "request_ledger": conn.execute("SELECT COUNT(*) FROM request_ledger WHERE COALESCE(status, '') != '[삭제]'").fetchone()[0],
-            "tombstones": conn.execute("SELECT COUNT(*) FROM request_ledger WHERE status = '[삭제]'").fetchone()[0],
+            "request_ledger": conn.execute(
+                "SELECT COUNT(*) FROM request_ledger WHERE COALESCE(status, '') != '[삭제]'"
+            ).fetchone()[0],
+            "tombstones": conn.execute(
+                "SELECT COUNT(*) FROM request_ledger WHERE status = '[삭제]'"
+            ).fetchone()[0],
         }
     finally:
         conn.close()
@@ -75,6 +82,7 @@ def excel_report(db_path: Path) -> dict:
         return {"available": False, "error": "SQLite DB 파일이 없습니다."}
     try:
         from extractors.ledger_parser import load_request_ledger
+
         parsed = load_request_ledger(SYSTEM_DIR, [], merge_db_records=False)
     except Exception as exc:
         return {"available": False, "error": f"엑셀 대장 파싱 실패: {exc}"}
@@ -84,7 +92,9 @@ def excel_report(db_path: Path) -> dict:
     try:
         rows = {
             r[0]: (str(r[1] or ""), str(r[2] or ""))
-            for r in conn.execute("SELECT ledger_id, status, request_type FROM request_ledger")
+            for r in conn.execute(
+                "SELECT ledger_id, status, request_type FROM request_ledger"
+            )
         }
     finally:
         conn.close()
@@ -96,7 +106,9 @@ def excel_report(db_path: Path) -> dict:
         "excel_rows": len(excel_ids),
         "db_active": len(active),
         "only_in_excel": sorted(excel_ids - set(rows)),
-        "only_in_db": sorted(lid for lid in (active - excel_ids) if rows[lid][1] != "시스템"),
+        "only_in_db": sorted(
+            lid for lid in (active - excel_ids) if rows[lid][1] != "시스템"
+        ),
         "excel_rows_tombstoned_in_db": sorted(excel_ids & tombstoned),
         "ghost_rows": ghost_excel_rows(),
     }
@@ -178,7 +190,11 @@ def main(argv=None) -> int:
                     f"{', '.join(excel['ghost_rows'][:10])}\n"
                     "  파서가 무시하는 행입니다. 엑셀에서 직접 삭제하세요."
                 )
-            if excel["only_in_excel"] or excel["only_in_db"] or excel["excel_rows_tombstoned_in_db"]:
+            if (
+                excel["only_in_excel"]
+                or excel["only_in_db"]
+                or excel["excel_rows_tombstoned_in_db"]
+            ):
                 print(
                     "⚠ SQLite와 마스터 엑셀의 대장 항목이 일치하지 않습니다. "
                     "웹 화면에서 해당 항목을 확인하거나, 엑셀을 닫고 POST /api/sync/excel 로 재동기화하세요."
@@ -191,7 +207,8 @@ def main(argv=None) -> int:
         return 1
 
     mismatch = (not cached.get("available")) or any(
-        db[key] != cached.get(key) for key in ("documents", "qa_items", "request_ledger")
+        db[key] != cached.get(key)
+        for key in ("documents", "qa_items", "request_ledger")
     )
     if not mismatch:
         print("✓ SQLite와 JSON 캐시의 레코드 수가 일치합니다.")
@@ -200,9 +217,14 @@ def main(argv=None) -> int:
         print("⚠ 불일치 감지. JSON만 재생성하려면 --write를 사용하세요.")
         return 1
 
-    LedgerService(db_path=db_path, json_path=json_path, base_dir=SYSTEM_DIR).sync_json_file(async_mode=False)
+    LedgerService(
+        db_path=db_path, json_path=json_path, base_dir=SYSTEM_DIR
+    ).sync_json_file(async_mode=False)
     repaired = json_counts(json_path)
-    if repaired.get("available") and all(db[key] == repaired.get(key) for key in ("documents", "qa_items", "request_ledger")):
+    if repaired.get("available") and all(
+        db[key] == repaired.get(key)
+        for key in ("documents", "qa_items", "request_ledger")
+    ):
         print("✓ JSON 캐시를 SQLite 기준으로 원자적으로 재생성했습니다.")
         return 0
     print("✗ JSON 재생성 뒤에도 불일치가 남았습니다. DB/Excel을 확인하세요.")

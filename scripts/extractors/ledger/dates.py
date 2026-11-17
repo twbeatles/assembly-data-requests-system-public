@@ -10,6 +10,7 @@ DEFAULT_DB_PATH = DEFAULT_SYSTEM_DIR / "data_requests.db"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
+
 def _valid_date(y: int, m: int, d: int) -> bool:
     try:
         datetime.date(y, m, d)
@@ -19,8 +20,8 @@ def _valid_date(y: int, m: int, d: int) -> bool:
 
 
 # `(수)`, `(월요일)` 같은 요일 꼬리. 날짜 판정에는 쓰지 않고 떼어 낸다.
-_WEEKDAY_SUFFIX = r'(?:\(\s*[월화수목금토일](?:요일)?\s*\))?'
-_ISO_DATE_RE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})$')
+_WEEKDAY_SUFFIX = r"(?:\(\s*[월화수목금토일](?:요일)?\s*\))?"
+_ISO_DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 
 
 def coerce_ledger_date(val, year_str: str = ""):
@@ -52,21 +53,33 @@ def normalize_ledger_date(val, year_str: str) -> str:
     if not val:
         return ""
     s = str(val).strip()
-    m_dt = re.match(r'^(\d{4})-(\d{2})-(\d{2})', s)
+    m_dt = re.match(r"^(\d{4})-(\d{2})-(\d{2})", s)
     if m_dt:
         return f"{m_dt.group(1)}-{m_dt.group(2)}-{m_dt.group(3)}"
     # 공문서 표기 `2026.9.10`, `2026. 9. 10.`, `2026년 9월 10일`, `2026/9/10(수)`.
     # 예전에는 이 표기를 원문 그대로 남겨, 웹 수정의 날짜 검증이 사용자가 건드리지 않은
     # 이 값 때문에 수정 전체를 거절했다. (감사 7회차 ISSUE-003)
-    m_ymd = re.match(r'^(\d{4})\s*[\.\-\/년]\s*(\d{1,2})\s*[\.\-\/월]\s*(\d{1,2})\s*[\.일]?\s*' + _WEEKDAY_SUFFIX + r'$', s)
+    m_ymd = re.match(
+        r"^(\d{4})\s*[\.\-\/년]\s*(\d{1,2})\s*[\.\-\/월]\s*(\d{1,2})\s*[\.일]?\s*"
+        + _WEEKDAY_SUFFIX
+        + r"$",
+        s,
+    )
     if m_ymd:
         y, m, d = int(m_ymd.group(1)), int(m_ymd.group(2)), int(m_ymd.group(3))
         if _valid_date(y, m, d):
             return f"{y:04d}-{m:02d}-{d:02d}"
         return s
-    m_yymd = re.match(r'^(\d{2})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*' + _WEEKDAY_SUFFIX + r'$', s)
+    m_yymd = re.match(
+        r"^(\d{2})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*" + _WEEKDAY_SUFFIX + r"$",
+        s,
+    )
     if m_yymd:
-        y, m, d = 2000 + int(m_yymd.group(1)), int(m_yymd.group(2)), int(m_yymd.group(3))
+        y, m, d = (
+            2000 + int(m_yymd.group(1)),
+            int(m_yymd.group(2)),
+            int(m_yymd.group(3)),
+        )
         if 2010 <= y <= datetime.date.today().year + 1 and _valid_date(y, m, d):
             return f"{y:04d}-{m:02d}-{d:02d}"
         return s
@@ -74,12 +87,14 @@ def normalize_ledger_date(val, year_str: str) -> str:
         sheet_year = int(str(year_str).strip())
     except (TypeError, ValueError):
         sheet_year = None
-    m_md = re.match(r'^(\d{1,2})\s*[\.\/]\s*(\d{1,2})\s*\.?\s*' + _WEEKDAY_SUFFIX + r'$', s)
+    m_md = re.match(
+        r"^(\d{1,2})\s*[\.\/]\s*(\d{1,2})\s*\.?\s*" + _WEEKDAY_SUFFIX + r"$", s
+    )
     if m_md:
         m, d = int(m_md.group(1)), int(m_md.group(2))
         if sheet_year and _valid_date(sheet_year, m, d):
             return f"{year_str}-{m:02d}-{d:02d}"
-    digits = re.sub(r'\D', '', s)
+    digits = re.sub(r"\D", "", s)
     if len(digits) == 4:
         m, d = int(digits[:2]), int(digits[2:])
         if sheet_year and _valid_date(sheet_year, m, d):
@@ -94,7 +109,8 @@ def normalize_ledger_date(val, year_str: str) -> str:
             return f"{y:04d}-{m:02d}-{d:02d}"
     return s
 
-LEDGER_ID_RE = re.compile(r'^REQ-\d{4}-\d+$')
+
+LEDGER_ID_RE = re.compile(r"^REQ-\d{4}-\d+$")
 
 # 대장 엑셀 헤더 별칭의 단일 정본. 파서(load.py)·ID 스탬핑(ids.py)·웹→엑셀 반영기
 # (services/excel_sync/apply.py)가 모두 이 표를 쓴다. 예전에는 반영기가 별칭을 따로 들고 있어
@@ -125,8 +141,20 @@ TITLE_HEADER_NAMES = LEDGER_COLUMN_ALIAS_MAP["title"]
 DETAIL_HEADER_NAMES = LEDGER_COLUMN_ALIAS_MAP["details"]
 REQUESTER_HEADER_NAMES = LEDGER_COLUMN_ALIAS_MAP["requester"]
 LEDGER_VALUE_FIELDS = (
-    "year", "seq_no", "party", "requester", "aide", "title", "details", "request_date",
-    "deadline", "submit_date", "department", "status", "note", "request_type",
+    "year",
+    "seq_no",
+    "party",
+    "requester",
+    "aide",
+    "title",
+    "details",
+    "request_date",
+    "deadline",
+    "submit_date",
+    "department",
+    "status",
+    "note",
+    "request_type",
 )
 
 
@@ -166,10 +194,11 @@ def cell_text(ws, row: int, header_map: dict, names) -> str:
 
 def is_ledger_data_row(ws, row: int, header_map: dict) -> bool:
     """대장 본문 행 판정. 파서와 ID 스탬핑이 같은 기준을 공유해야 한다."""
-    return any([
-        cell_text(ws, row, header_map, SEQ_HEADER_NAMES),
-        cell_text(ws, row, header_map, TITLE_HEADER_NAMES),
-        cell_text(ws, row, header_map, DETAIL_HEADER_NAMES),
-        cell_text(ws, row, header_map, REQUESTER_HEADER_NAMES),
-    ])
-
+    return any(
+        [
+            cell_text(ws, row, header_map, SEQ_HEADER_NAMES),
+            cell_text(ws, row, header_map, TITLE_HEADER_NAMES),
+            cell_text(ws, row, header_map, DETAIL_HEADER_NAMES),
+            cell_text(ws, row, header_map, REQUESTER_HEADER_NAMES),
+        ]
+    )

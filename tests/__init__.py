@@ -46,9 +46,14 @@ def _install_guard():
     def guarded_connect(database, *args, **kwargs):
         try:
             raw = database if isinstance(database, str) else os.fspath(database)
-            if _normalized_target(database) in PRODUCTION_DB_PATHS and "immutable=1" not in raw:
+            if (
+                _normalized_target(database) in PRODUCTION_DB_PATHS
+                and "immutable=1" not in raw
+            ):
                 frames = _traceback.extract_stack(limit=8)[:-1]
-                where = " <- ".join(f"{_Path(f.filename).name}:{f.lineno}" for f in reversed(frames))
+                where = " <- ".join(
+                    f"{_Path(f.filename).name}:{f.lineno}" for f in reversed(frames)
+                )
                 PRODUCTION_DB_OPENS.append(where)
         except Exception:
             pass

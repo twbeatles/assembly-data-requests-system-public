@@ -53,6 +53,7 @@ def _history_actor() -> str:
     누가 고쳤는지 아무 흔적도 없는 것보다는 낫고, 개인정보 수집도 아니다.
     """
     import getpass
+
     try:
         return getpass.getuser()[:60]
     except Exception:
@@ -79,7 +80,6 @@ def _now_str() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
-
 JSON_LOCK = threading.Lock()
 LAST_SYNC_THREAD = None
 _JSON_STATE_LOCK = threading.Lock()
@@ -90,12 +90,15 @@ _SCHEMA_READY = {}
 _SEARCH_LOG_PRUNE_LOCK = threading.Lock()
 _LAST_SEARCH_LOG_PRUNE = {}
 _SEARCH_LOG_PRUNE_INTERVAL_SECONDS = 24 * 3600
+
+
 def _db_file_identity(db_path):
     try:
         st = Path(db_path).stat()
     except OSError:
         return None
     return (st.st_ino, st.st_dev, getattr(st, "st_birthtime", st.st_ctime))
+
 
 class LedgerService:
     """Encapsulates all database queries and business logic for the Request Ledger system."""
@@ -116,8 +119,12 @@ class LedgerService:
             self.base_dir = Path(db_path).resolve().parent
         else:
             self.base_dir = DEFAULT_BASE_DIR
-        self.db_path = Path(db_path) if db_path else (self.base_dir / "data_requests.db")
-        self.json_path = Path(json_path) if json_path else (self.base_dir / "data_requests.json")
+        self.db_path = (
+            Path(db_path) if db_path else (self.base_dir / "data_requests.db")
+        )
+        self.json_path = (
+            Path(json_path) if json_path else (self.base_dir / "data_requests.json")
+        )
         # read_only: agent CLI/MCP 같은 조회 전용 진입점용. 스키마 준비·마이그레이션·
         # 검색 로그를 포함한 모든 쓰기를 막는다. 스키마 확인은 호출자(Facade)가 먼저 한다.
         # (감사 ISSUE-002)
@@ -132,6 +139,7 @@ class LedgerService:
         if (readonly or self._read_only) and Path(self.db_path).exists():
             try:
                 from extractors.ledger.workbook import connect_readonly as _ro
+
                 # -wal이 없으면 immutable로 열어 사이드카 생성 자체를 막는다.
                 # (Facade._readonly_conn과 같은 규칙. 감사 ISSUE-002)
                 wal_path = Path(str(self.db_path) + "-wal")
@@ -139,8 +147,7 @@ class LedgerService:
                     has_wal = wal_path.exists()
                 except OSError:
                     has_wal = True
-                conn = _ro(self.db_path,
-                           immutable=self._immutable or not has_wal)
+                conn = _ro(self.db_path, immutable=self._immutable or not has_wal)
                 conn.row_factory = sqlite3.Row
                 conn.execute("PRAGMA busy_timeout = 5000;")
                 conn.execute("PRAGMA cache_size = -32000;")
@@ -175,6 +182,7 @@ class LedgerService:
         if self._read_only:
             return
         from db.database_manager import DatabaseManager
+
         key = str(Path(self.db_path).resolve())
         ident = _db_file_identity(self.db_path)
         if ident is not None and _SCHEMA_READY.get(key) == ident:
@@ -216,6 +224,7 @@ class LedgerService:
                 conn = None
                 try:
                     from db.json_export import export_combined_json
+
                     conn = self.get_conn(readonly=True)
                     conn.execute("BEGIN")
                     export_combined_json(conn, self.json_path)
@@ -286,12 +295,18 @@ class LedgerService:
                     "success": True,
                     "documents": doc_count,
                     "qa_items": qa_count,
-                    "request_ledger": ledger_count
+                    "request_ledger": ledger_count,
                 }
             finally:
                 conn.close()
         except Exception as e:
-            return {"success": False, "documents": 0, "qa_items": 0, "request_ledger": 0, "error": str(e)}
+            return {
+                "success": False,
+                "documents": 0,
+                "qa_items": 0,
+                "request_ledger": 0,
+                "error": str(e),
+            }
 
     # 검색 대상별 설정. FTS 컬럼·가중치는 fts_spec이 정본이고, 여기서는 나머지만 정한다.
     # 예전에는 이 표의 text_fields에 FTS에 없는 컬럼(doc_number·seq_no)이 섞여 있어
@@ -303,8 +318,14 @@ class LedgerService:
             "where": "COALESCE(l.status, '') != '[삭제]'",
             "order": "l.year DESC, l.request_date DESC, l.seq_no DESC",
             # (컬럼, 관련도 가중치). 대시보드 클라이언트 검색과 같은 배점이다.
-            "weights": (("title", 50), ("details", 35), ("requester", 25),
-                        ("party", 25), ("seq_no", 10), ("note", 10)),
+            "weights": (
+                ("title", 50),
+                ("details", 35),
+                ("requester", 25),
+                ("party", 25),
+                ("seq_no", 10),
+                ("note", 10),
+            ),
             "snippet_field": "details",
         },
         "docs": {
@@ -312,8 +333,13 @@ class LedgerService:
             "fts": "documents_fts",
             "where": "1=1",
             "order": "l.year DESC, l.request_date DESC, l.doc_id ASC",
-            "weights": (("title", 50), ("requester", 25), ("doc_number", 10),
-                        ("question_list", 20), ("full_markdown", 10)),
+            "weights": (
+                ("title", 50),
+                ("requester", 25),
+                ("doc_number", 10),
+                ("question_list", 20),
+                ("full_markdown", 10),
+            ),
             "snippet_field": "full_markdown",
         },
         "qa": {
@@ -321,12 +347,21 @@ class LedgerService:
             "fts": "qa_items_fts",
             "where": "1=1",
             "order": "l.year DESC, l.request_date DESC, l.qa_id ASC",
-            "weights": (("question_title", 50), ("requester", 25), ("answer_markdown", 10)),
+            "weights": (
+                ("question_title", 50),
+                ("requester", 25),
+                ("answer_markdown", 10),
+            ),
             "snippet_field": "answer_markdown",
         },
     }
     # /api/search 목록 응답에서 뺄 대용량 필드. 전문은 /api/documents/<id>로 받는다. (감사 R3-16)
-    _HEAVY_FIELDS = ("full_markdown", "answer_full_text", "answer_markdown", "answer_full")
+    _HEAVY_FIELDS = (
+        "full_markdown",
+        "answer_full_text",
+        "answer_markdown",
+        "answer_full",
+    )
     # 스니펫 길이(제안서 S5). 목록 카드에 들어갈 만큼만 자른다.
     _SNIPPET_RADIUS = 60
 
@@ -385,7 +420,11 @@ class LedgerService:
         start = max(0, hit - self._SNIPPET_RADIUS)
         end = min(len(body), hit + self._SNIPPET_RADIUS)
         out = body[start:end].strip()
-        return ("\u2026" if start > 0 else "") + out + ("\u2026" if end < len(body) else "")
+        return (
+            ("\u2026" if start > 0 else "")
+            + out
+            + ("\u2026" if end < len(body) else "")
+        )
 
     def _log_search(self, kind, kw, count, elapsed_ms, used_fts):
         """검색 로그(제안서 S9). 0건으로 끝난 질의를 알아야 동의어 사전을 고칠 수 있다.
@@ -403,8 +442,14 @@ class LedgerService:
                 conn.execute(
                     "INSERT INTO search_log (query, mode, result_count, elapsed_ms, used_fts, searched_at) "
                     "VALUES (?, ?, ?, ?, ?, ?)",
-                    (str(kw)[:300], kind, int(count), int(elapsed_ms),
-                     1 if used_fts else 0, datetime.datetime.now().isoformat(timespec="seconds")),
+                    (
+                        str(kw)[:300],
+                        kind,
+                        int(count),
+                        int(elapsed_ms),
+                        1 if used_fts else 0,
+                        datetime.datetime.now().isoformat(timespec="seconds"),
+                    ),
                 )
                 conn.commit()
             finally:
@@ -427,11 +472,15 @@ class LedgerService:
             return
         now = time.time()
         with _SEARCH_LOG_PRUNE_LOCK:
-            if now - _LAST_SEARCH_LOG_PRUNE.get(key, 0) < _SEARCH_LOG_PRUNE_INTERVAL_SECONDS:
+            if (
+                now - _LAST_SEARCH_LOG_PRUNE.get(key, 0)
+                < _SEARCH_LOG_PRUNE_INTERVAL_SECONDS
+            ):
                 return
             _LAST_SEARCH_LOG_PRUNE[key] = now
         try:
             from db.database_manager import DatabaseManager
+
             conn = self.get_conn()
             try:
                 deleted = DatabaseManager.prune_search_log(conn)
@@ -442,7 +491,15 @@ class LedgerService:
         except Exception:
             pass
 
-    def _search(self, kind, year=None, kw=None, slim=False, use_synonyms=True, with_snippet=False):
+    def _search(
+        self,
+        kind,
+        year=None,
+        kw=None,
+        slim=False,
+        use_synonyms=True,
+        with_snippet=False,
+    ):
         spec, fts_table, text_fields, cho_fields = self._spec(kind)
         table_sql, base_where, order_by = spec["table"], spec["where"], spec["order"]
         weights = fts_spec.weights_sql(fts_table)
@@ -453,10 +510,10 @@ class LedgerService:
         conn = self.get_conn(readonly=True)
         try:
             cur = conn.cursor()
-            kw = (kw or '').strip()
+            kw = (kw or "").strip()
             year_filter = ""
             params = []
-            if year and year != 'ALL':
+            if year and year != "ALL":
                 year_filter = " AND l.year = ?"
                 params.append(str(year))
 
@@ -465,12 +522,17 @@ class LedgerService:
             read_slim = slim and not with_snippet
             if kw and plan is not None and not plan_is_empty(plan):
                 fts_exists = cur.execute(
-                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (fts_table,)
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                    (fts_table,),
                 ).fetchone()
-                fts_kw = build_fts_match(kw, use_synonyms=use_synonyms) if fts_exists else ""
+                fts_kw = (
+                    build_fts_match(kw, use_synonyms=use_synonyms) if fts_exists else ""
+                )
                 if fts_kw:
                     try:
-                        sel = self._select_columns(cur, fts_spec.FTS_SPECS[fts_table][0], read_slim)
+                        sel = self._select_columns(
+                            cur, fts_spec.FTS_SPECS[fts_table][0], read_slim
+                        )
                         fts_sql = f"""
                             SELECT {sel}, bm25({fts_table}, {weights}) AS rank
                             FROM {table_sql}
@@ -478,7 +540,10 @@ class LedgerService:
                             WHERE {fts_table} MATCH ? AND {base_where} {year_filter}
                             ORDER BY rank ASC, {order_by}
                         """
-                        rows = [dict(r) for r in cur.execute(fts_sql, [fts_kw] + params).fetchall()]
+                        rows = [
+                            dict(r)
+                            for r in cur.execute(fts_sql, [fts_kw] + params).fetchall()
+                        ]
                         used_fts = bool(rows)
                     except sqlite3.Error:
                         rows = []
@@ -487,7 +552,9 @@ class LedgerService:
                 # 못 찾으면 파이썬으로 평가한다. 예전에는 검색어 전체를 LIKE 한 덩어리로
                 # 비교해 OR·제외어·초성 검색이 결과 0건이었다. (감사 R3-03)
                 if not rows:
-                    rows = self._fallback_search(cur, kind, kw, year_filter, params, use_synonyms, read_slim)
+                    rows = self._fallback_search(
+                        cur, kind, kw, year_filter, params, use_synonyms, read_slim
+                    )
             else:
                 sel = self._select_columns(cur, table_sql.split()[0], read_slim)
                 sql = f"SELECT {sel}, 0 AS rank FROM {table_sql} WHERE {base_where} {year_filter} ORDER BY {order_by}"
@@ -499,7 +566,9 @@ class LedgerService:
 
             if with_snippet and plan is not None:
                 for rec in rows:
-                    rec["snippet"] = self._make_snippet(plan, rec.get(spec["snippet_field"]), use_synonyms)
+                    rec["snippet"] = self._make_snippet(
+                        plan, rec.get(spec["snippet_field"]), use_synonyms
+                    )
 
             if slim:
                 for rec in rows:
@@ -508,11 +577,15 @@ class LedgerService:
             return rows
         finally:
             conn.close()
-            self._log_search(kind, kw, len(rows), (time.time() - started) * 1000, used_fts)
+            self._log_search(
+                kind, kw, len(rows), (time.time() - started) * 1000, used_fts
+            )
 
     _FALLBACK_FETCH_CHUNK = 500
 
-    def _fallback_search(self, cur, kind, kw, year_filter, params, use_synonyms=True, slim=False):
+    def _fallback_search(
+        self, cur, kind, kw, year_filter, params, use_synonyms=True, slim=False
+    ):
         """FTS로 못 찾거나 표현할 수 없는 질의를 파이썬으로 평가한다.
 
         예전에는 SELECT l.* 로 전문(full_markdown 포함)을 전 행 읽었다. 이제 비교에 필요한 열만
@@ -527,13 +600,23 @@ class LedgerService:
         table_sql, base_where, order_by = spec["table"], spec["where"], spec["order"]
         plan = parse_query(kw)
         jamo_only = (
-            not plan["phrases"] and not plan["neg"] and plan["groups"]
-            and all(re.fullmatch(r"[ㄱ-ㅎ]+", t) for terms in plan["groups"] for t in terms)
+            not plan["phrases"]
+            and not plan["neg"]
+            and plan["groups"]
+            and all(
+                re.fullmatch(r"[ㄱ-ㅎ]+", t) for terms in plan["groups"] for t in terms
+            )
         )
-        scan_fields = list(dict.fromkeys(cho_fields if jamo_only else (list(text_fields) + list(cho_fields))))
+        scan_fields = list(
+            dict.fromkeys(
+                cho_fields if jamo_only else (list(text_fields) + list(cho_fields))
+            )
+        )
 
         cols = ", ".join("l." + f for f in scan_fields)
-        prefilter_where, prefilter_params = self._build_prefilter(plan, jamo_only, use_synonyms)
+        prefilter_where, prefilter_params = self._build_prefilter(
+            plan, jamo_only, use_synonyms
+        )
         if prefilter_where:
             # 정규화 블롭을 행당 한 번만 만들고(MATERIALIZED), 그 위에서 후보를 고른다.
             # CTE 안에서 base_where·year_filter를 이미 걸었으므로 바깥에서 다시 걸지 않는다.
@@ -558,7 +641,9 @@ class LedgerService:
         scores = {}
         weight_map = dict(spec["weights"])
         body_fields = {spec["snippet_field"]}
-        score_fields = [f for f in scan_fields if f in weight_map and f not in body_fields]
+        score_fields = [
+            f for f in scan_fields if f in weight_map and f not in body_fields
+        ]
         for r in cur.execute(scan_sql, scan_params):
             texts = [] if jamo_only else [r[f] for f in text_fields]
             if row_matches(plan, texts, [r[f] for f in cho_fields], use_synonyms):
@@ -581,7 +666,7 @@ class LedgerService:
         by_rid = {}
         refetch_cols = self._select_columns(cur, table_sql.split()[0], slim)
         for start in range(0, len(matched), self._FALLBACK_FETCH_CHUNK):
-            chunk = matched[start:start + self._FALLBACK_FETCH_CHUNK]
+            chunk = matched[start : start + self._FALLBACK_FETCH_CHUNK]
             placeholders = ",".join("?" * len(chunk))
             for r in cur.execute(
                 f"SELECT l.rowid AS _rid, {refetch_cols} FROM {table_sql} "
@@ -660,16 +745,31 @@ class LedgerService:
                 variants = {v for v in variants if v}
                 if len(variants) > LedgerService._PREFILTER_MAX_VARIANTS:
                     return "", []
-                term_clauses.append("(" + " OR ".join(["_n LIKE ?"] * len(variants)) + ")")
+                term_clauses.append(
+                    "(" + " OR ".join(["_n LIKE ?"] * len(variants)) + ")"
+                )
                 sql_params.extend("%" + v + "%" for v in sorted(variants))
             group_clauses.append("(" + " AND ".join(term_clauses) + ")")
         return "(" + " OR ".join(group_clauses) + ")", sql_params
 
-    def query_ledger(self, year=None, kw=None, status=None, due=None, today=None,
-                     use_synonyms=True, with_snippet=False):
+    def query_ledger(
+        self,
+        year=None,
+        kw=None,
+        status=None,
+        due=None,
+        today=None,
+        use_synonyms=True,
+        with_snippet=False,
+    ):
         """관리대장 조회. `status`: 진행상태 값, `due`: soon(7일 이내) / overdue(기한 경과) / open(미제출)."""
-        rows = self._search("ledger", year=year, kw=kw,
-                            use_synonyms=use_synonyms, with_snippet=with_snippet)
+        rows = self._search(
+            "ledger",
+            year=year,
+            kw=kw,
+            use_synonyms=use_synonyms,
+            with_snippet=with_snippet,
+        )
         status = str(status or "").strip()
         if status and status != "ALL":
             rows = [r for r in rows if str(r.get("status") or "").strip() == status]
@@ -701,14 +801,16 @@ class LedgerService:
             total = 0
             for row in cur.execute(
                 f"SELECT COALESCE(NULLIF(TRIM(status), ''), '(없음)') AS st, COUNT(*) AS c "
-                f"FROM request_ledger WHERE {where} GROUP BY st", params
+                f"FROM request_ledger WHERE {where} GROUP BY st",
+                params,
             ):
                 by_status[row["st"]] = row["c"]
                 total += row["c"]
 
             due = {"overdue": 0, "soon": 0, "open": 0}
             for row in cur.execute(
-                f"SELECT status, deadline, submit_date FROM request_ledger WHERE {where}", params
+                f"SELECT status, deadline, submit_date FROM request_ledger WHERE {where}",
+                params,
             ):
                 state, _ = ledger_due_state(dict(row), today)
                 if state == "overdue":
@@ -721,26 +823,49 @@ class LedgerService:
             conn.close()
         return {"success": True, "total": total, "by_status": by_status, "due": due}
 
-    def query_documents(self, year=None, kw=None, slim=False, use_synonyms=True, with_snippet=False):
-        return self._search("docs", year=year, kw=kw, slim=slim,
-                            use_synonyms=use_synonyms, with_snippet=with_snippet)
+    def query_documents(
+        self, year=None, kw=None, slim=False, use_synonyms=True, with_snippet=False
+    ):
+        return self._search(
+            "docs",
+            year=year,
+            kw=kw,
+            slim=slim,
+            use_synonyms=use_synonyms,
+            with_snippet=with_snippet,
+        )
 
-    def query_qa_items(self, year=None, kw=None, slim=False, use_synonyms=True, with_snippet=False):
-        return self._search("qa", year=year, kw=kw, slim=slim,
-                            use_synonyms=use_synonyms, with_snippet=with_snippet)
+    def query_qa_items(
+        self, year=None, kw=None, slim=False, use_synonyms=True, with_snippet=False
+    ):
+        return self._search(
+            "qa",
+            year=year,
+            kw=kw,
+            slim=slim,
+            use_synonyms=use_synonyms,
+            with_snippet=with_snippet,
+        )
 
-    def search_all(self, kw='', year=None, search_type='all', slim=False,
-                   use_synonyms=True, with_snippet=False):
+    def search_all(
+        self,
+        kw="",
+        year=None,
+        search_type="all",
+        slim=False,
+        use_synonyms=True,
+        with_snippet=False,
+    ):
         ledger_res = []
         docs_res = []
         qa_res = []
 
         opts = {"use_synonyms": use_synonyms, "with_snippet": with_snippet}
-        if search_type in ('all', 'ledger'):
+        if search_type in ("all", "ledger"):
             ledger_res = self.query_ledger(year=year, kw=kw, **opts)
-        if search_type in ('all', 'docs'):
+        if search_type in ("all", "docs"):
             docs_res = self.query_documents(year=year, kw=kw, slim=slim, **opts)
-        if search_type in ('all', 'qa'):
+        if search_type in ("all", "qa"):
             qa_res = self.query_qa_items(year=year, kw=kw, slim=slim, **opts)
 
         return {
@@ -750,11 +875,11 @@ class LedgerService:
                 "ledger": len(ledger_res),
                 "docs": len(docs_res),
                 "qa": len(qa_res),
-                "total": len(ledger_res) + len(docs_res) + len(qa_res)
+                "total": len(ledger_res) + len(docs_res) + len(qa_res),
             },
             "ledger": ledger_res,
             "documents": docs_res,
-            "qa_items": qa_res
+            "qa_items": qa_res,
         }
 
     def suggest(self, prefix, limit=10):
@@ -799,29 +924,47 @@ class LedgerService:
             conn.close()
         out = sorted(seen.values(), key=lambda x: (-x["count"], x["value"]))
         # 접두사 일치를 부분 일치보다 앞세운다.
-        out.sort(key=lambda x: 0 if x["value"].lower().startswith(prefix.lower()) else 1)
+        out.sort(
+            key=lambda x: 0 if x["value"].lower().startswith(prefix.lower()) else 1
+        )
         return out[: int(limit)]
 
     def search_insights(self, limit=20, days=90):
         """검색 로그 요약(제안서 S9). 0건으로 끝난 질의와 느린 질의를 보여준다."""
         self._ensure_schema()
-        since = (datetime.datetime.now() - datetime.timedelta(days=int(days))).isoformat(timespec="seconds")
+        since = (
+            datetime.datetime.now() - datetime.timedelta(days=int(days))
+        ).isoformat(timespec="seconds")
         conn = self.get_conn(readonly=True)
         try:
             cur = conn.cursor()
             try:
-                zero = [dict(r) for r in cur.execute(
-                    "SELECT query, COUNT(*) AS hits, MAX(searched_at) AS last_at FROM search_log "
-                    "WHERE result_count = 0 AND searched_at >= ? "
-                    "GROUP BY query ORDER BY hits DESC, last_at DESC LIMIT ?", (since, int(limit)))]
-                popular = [dict(r) for r in cur.execute(
-                    "SELECT query, COUNT(*) AS hits FROM search_log WHERE searched_at >= ? "
-                    "GROUP BY query ORDER BY hits DESC LIMIT ?", (since, int(limit)))]
-                slow = [dict(r) for r in cur.execute(
-                    "SELECT query, MAX(elapsed_ms) AS worst_ms, AVG(elapsed_ms) AS avg_ms, "
-                    "SUM(used_fts) AS fts_hits, COUNT(*) AS hits FROM search_log "
-                    "WHERE searched_at >= ? GROUP BY query ORDER BY worst_ms DESC LIMIT ?",
-                    (since, int(limit)))]
+                zero = [
+                    dict(r)
+                    for r in cur.execute(
+                        "SELECT query, COUNT(*) AS hits, MAX(searched_at) AS last_at FROM search_log "
+                        "WHERE result_count = 0 AND searched_at >= ? "
+                        "GROUP BY query ORDER BY hits DESC, last_at DESC LIMIT ?",
+                        (since, int(limit)),
+                    )
+                ]
+                popular = [
+                    dict(r)
+                    for r in cur.execute(
+                        "SELECT query, COUNT(*) AS hits FROM search_log WHERE searched_at >= ? "
+                        "GROUP BY query ORDER BY hits DESC LIMIT ?",
+                        (since, int(limit)),
+                    )
+                ]
+                slow = [
+                    dict(r)
+                    for r in cur.execute(
+                        "SELECT query, MAX(elapsed_ms) AS worst_ms, AVG(elapsed_ms) AS avg_ms, "
+                        "SUM(used_fts) AS fts_hits, COUNT(*) AS hits FROM search_log "
+                        "WHERE searched_at >= ? GROUP BY query ORDER BY worst_ms DESC LIMIT ?",
+                        (since, int(limit)),
+                    )
+                ]
             except sqlite3.Error:
                 return {"success": True, "zero_result": [], "popular": [], "slow": []}
         finally:
@@ -833,7 +976,10 @@ class LedgerService:
         conn = self.get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT * FROM request_ledger WHERE ledger_id = ? AND COALESCE(status, '') != '[삭제]'", (ledger_id,))
+            cur.execute(
+                "SELECT * FROM request_ledger WHERE ledger_id = ? AND COALESCE(status, '') != '[삭제]'",
+                (ledger_id,),
+            )
             row = cur.fetchone()
             return dict(row) if row else None
         finally:
@@ -860,13 +1006,18 @@ class LedgerService:
     def _reject_if_pipeline_running(self):
         guard = PipelineGuard(self.base_dir)
         if guard.is_locked() and not guard.is_mine():
-            return {"success": False, "code": "pipeline_busy", "error": "문서 동기화 파이프라인이 실행 중입니다. 완료 후 다시 시도해주세요."}
+            return {
+                "success": False,
+                "code": "pipeline_busy",
+                "error": "문서 동기화 파이프라인이 실행 중입니다. 완료 후 다시 시도해주세요.",
+            }
         return None
 
     def _bump_live_version(self):
         """Notify other dashboard tabs even when no master Excel is configured."""
         try:
             from services.excel_sync_service import ExcelSyncService
+
             ExcelSyncService.get_instance(self.base_dir).bump_version()
         except Exception:
             pass
@@ -879,14 +1030,17 @@ class LedgerService:
             return {"success": False, "error": "요청 본문은 JSON 객체여야 합니다."}
         self._guard_db_write()
         self._ensure_schema()
-        title = _clean(data.get('title'))
-        requester = _clean(data.get('requester'))
+        title = _clean(data.get("title"))
+        requester = _clean(data.get("requester"))
         if not title:
-            return {"success": False, "error": "요구자료명(제목)은 필수 입력 항목입니다."}
+            return {
+                "success": False,
+                "error": "요구자료명(제목)은 필수 입력 항목입니다.",
+            }
         if not requester:
             return {"success": False, "error": "요구자(의원실)는 필수 입력 항목입니다."}
-        year = _clean(data.get('year')) or str(datetime.datetime.now().year)
-        if not re.fullmatch(r'\d{4}', year):
+        year = _clean(data.get("year")) or str(datetime.datetime.now().year)
+        if not re.fullmatch(r"\d{4}", year):
             # ledger_id(REQ-YYYY-NNN)가 4자리 연도를 전제한다.
             return {"success": False, "error": "연도는 4자리 숫자여야 합니다."}
         # 엑셀 파서와 같은 표기(`2026.9.10` 등)를 받아 `YYYY-MM-DD`로 저장한다.
@@ -894,21 +1048,32 @@ class LedgerService:
         for _date_field in self._DATE_FIELDS:
             coerced = coerce_ledger_date(data.get(_date_field), year)
             if coerced is None:
-                return {"success": False, "error": f"날짜는 YYYY-MM-DD 형식이어야 합니다: {_date_field}"}
+                return {
+                    "success": False,
+                    "error": f"날짜는 YYYY-MM-DD 형식이어야 합니다: {_date_field}",
+                }
             dates[_date_field] = coerced
         now_str = _now_str()
         curr_cfg = system_config.get_config(self.base_dir)
         default_dept = curr_cfg.get("department_name", "자료요구담당부서")
-        requested_id = _clean(data.get('ledger_id'))
+        requested_id = _clean(data.get("ledger_id"))
         # 자동 채번이 ID 접두사(REQ-YYYY-)의 번호로 다음 번호를 구하므로
         # 사용자가 지정한 ID도 REQ-YYYY-NNN 형식을 지켜야 한다.
-        if requested_id and not re.fullmatch(r'REQ-\d{4}-\d+', requested_id):
-            return {"success": False, "error": f"관리번호는 REQ-연도-번호 형식이어야 합니다 (예: REQ-{year}-001): {requested_id}"}
+        if requested_id and not re.fullmatch(r"REQ-\d{4}-\d+", requested_id):
+            return {
+                "success": False,
+                "error": f"관리번호는 REQ-연도-번호 형식이어야 합니다 (예: REQ-{year}-001): {requested_id}",
+            }
         request_key = _clean(data.get("idempotency_key"))
         if len(request_key) > 200:
             return {"success": False, "error": "등록 요청 키가 너무 깁니다."}
-        fingerprint = hashlib.sha256(json.dumps({k: v for k, v in data.items() if k != "idempotency_key"},
-                                                sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                {k: v for k, v in data.items() if k != "idempotency_key"},
+                sort_keys=True,
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()
         item = None
         last_error = None
         # BEGIN IMMEDIATE makes the number lookup and INSERT one serialized write unit.
@@ -919,63 +1084,120 @@ class LedgerService:
                 cur = conn.cursor()
                 self._begin_immediate(cur)
                 if request_key:
-                    receipt = cur.execute("SELECT fingerprint, ledger_id FROM ledger_receipts WHERE request_key=?", (request_key,)).fetchone()
+                    receipt = cur.execute(
+                        "SELECT fingerprint, ledger_id FROM ledger_receipts WHERE request_key=?",
+                        (request_key,),
+                    ).fetchone()
                     if receipt:
                         if receipt[0] != fingerprint:
-                            return {"success": False, "code": "conflict", "error": "같은 등록 요청 키의 내용이 다릅니다."}
-                        saved = cur.execute("SELECT * FROM request_ledger WHERE ledger_id=?", (receipt[1],)).fetchone()
+                            return {
+                                "success": False,
+                                "code": "conflict",
+                                "error": "같은 등록 요청 키의 내용이 다릅니다.",
+                            }
+                        saved = cur.execute(
+                            "SELECT * FROM request_ledger WHERE ledger_id=?",
+                            (receipt[1],),
+                        ).fetchone()
                         if saved is None or saved["status"] == "[삭제]":
-                            return {"success": False, "code": "conflict",
-                                    "error": "이미 처리된 등록 항목이 삭제되었습니다. 목록을 확인하세요."}
-                        return {"success": True, "replayed": True, "db_saved": True, "sync_state": "check_status", "item": dict(saved),
-                                "message": "이미 저장된 등록 요청입니다.",
-                                "excel_message": "기존 등록을 확인했습니다. 엑셀 반영 상태는 동기화 배너에서 확인하세요."}
+                            return {
+                                "success": False,
+                                "code": "conflict",
+                                "error": "이미 처리된 등록 항목이 삭제되었습니다. 목록을 확인하세요.",
+                            }
+                        return {
+                            "success": True,
+                            "replayed": True,
+                            "db_saved": True,
+                            "sync_state": "check_status",
+                            "item": dict(saved),
+                            "message": "이미 저장된 등록 요청입니다.",
+                            "excel_message": "기존 등록을 확인했습니다. 엑셀 반영 상태는 동기화 배너에서 확인하세요.",
+                        }
                 ledger_id = requested_id or next_ledger_id(cur, year)
                 item = {
-                    "ledger_id": ledger_id, "year": year,
-                    "seq_no": _clean(data.get('seq_no')), "party": _clean(data.get('party')),
-                    "requester": mask_pii(requester), "aide": mask_pii(_clean(data.get('aide'))),
+                    "ledger_id": ledger_id,
+                    "year": year,
+                    "seq_no": _clean(data.get("seq_no")),
+                    "party": _clean(data.get("party")),
+                    "requester": mask_pii(requester),
+                    "aide": mask_pii(_clean(data.get("aide"))),
                     "title": mask_pii(title),
-                    "details": mask_pii(_clean(data.get('details'))),
-                    "request_date": dates["request_date"], "deadline": dates["deadline"],
+                    "details": mask_pii(_clean(data.get("details"))),
+                    "request_date": dates["request_date"],
+                    "deadline": dates["deadline"],
                     "submit_date": dates["submit_date"],
-                    "department": _clean(data.get('department')) or default_dept,
-                    "status": _clean(data.get('status')) or "작성중", "note": mask_pii(_clean(data.get('note'))),
-                    "request_type": _clean(data.get('request_type')) if data.get('request_type') is not None else "시스템",
-                    "linked_doc_id": _clean(data.get('linked_doc_id')), "created_at": now_str, "updated_at": now_str,
+                    "department": _clean(data.get("department")) or default_dept,
+                    "status": _clean(data.get("status")) or "작성중",
+                    "note": mask_pii(_clean(data.get("note"))),
+                    "request_type": _clean(data.get("request_type"))
+                    if data.get("request_type") is not None
+                    else "시스템",
+                    "linked_doc_id": _clean(data.get("linked_doc_id")),
+                    "created_at": now_str,
+                    "updated_at": now_str,
                 }
                 auto_link_ledger_to_doc(conn, item)
-                cur.execute("""
+                cur.execute(
+                    """
                 INSERT INTO request_ledger (
                     ledger_id, year, seq_no, party, requester, aide,
                     title, details, request_date, deadline, submit_date,
                     department, status, note, request_type, linked_doc_id,
                     created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                item["ledger_id"], item["year"], item["seq_no"], item["party"], item["requester"], item["aide"],
-                item["title"], item["details"], item["request_date"], item["deadline"], item["submit_date"],
-                item["department"], item["status"], item["note"], item["request_type"], item["linked_doc_id"],
-                item["created_at"], item["updated_at"]
-            ))
+            """,
+                    (
+                        item["ledger_id"],
+                        item["year"],
+                        item["seq_no"],
+                        item["party"],
+                        item["requester"],
+                        item["aide"],
+                        item["title"],
+                        item["details"],
+                        item["request_date"],
+                        item["deadline"],
+                        item["submit_date"],
+                        item["department"],
+                        item["status"],
+                        item["note"],
+                        item["request_type"],
+                        item["linked_doc_id"],
+                        item["created_at"],
+                        item["updated_at"],
+                    ),
+                )
                 try:
                     cur.execute(
-                    "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot, changed_fields, actor) VALUES (?, ?, ?, ?, ?, ?)",
-                    (item["ledger_id"], "INSERT", now_str, json.dumps(item, ensure_ascii=False),
-                     "", _history_actor())
-                )
+                        "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot, changed_fields, actor) VALUES (?, ?, ?, ?, ?, ?)",
+                        (
+                            item["ledger_id"],
+                            "INSERT",
+                            now_str,
+                            json.dumps(item, ensure_ascii=False),
+                            "",
+                            _history_actor(),
+                        ),
+                    )
                 except Exception:
                     pass
                 enqueue_excel(conn, item, "insert")
                 if request_key:
-                    conn.execute("INSERT INTO ledger_receipts VALUES (?, ?, ?)", (request_key, fingerprint, ledger_id))
+                    conn.execute(
+                        "INSERT INTO ledger_receipts VALUES (?, ?, ?)",
+                        (request_key, fingerprint, ledger_id),
+                    )
                 conn.commit()
                 break
             except sqlite3.IntegrityError as e:
                 conn.rollback()
                 last_error = e
                 if requested_id:
-                    return {"success": False, "error": f"이미 사용 중인 관리번호입니다: {requested_id}"}
+                    return {
+                        "success": False,
+                        "error": f"이미 사용 중인 관리번호입니다: {requested_id}",
+                    }
                 continue
             except Exception as e:
                 conn.rollback()
@@ -983,7 +1205,10 @@ class LedgerService:
             finally:
                 conn.close()
         else:
-            return {"success": False, "error": f"DB 등록 실패: {str(last_error or '관리번호 발급 충돌')}"}
+            return {
+                "success": False,
+                "error": f"DB 등록 실패: {str(last_error or '관리번호 발급 충돌')}",
+            }
 
         # Trigger background JSON update
         self.sync_json_file(async_mode=True)
@@ -993,12 +1218,19 @@ class LedgerService:
         excel_res = {}
         try:
             from services.excel_sync_service import ExcelSyncService
+
             sync_svc = ExcelSyncService.get_instance(self.base_dir)
             excel_res = sync_svc.sync_item_to_excel(item, action="insert")
         except Exception as ex_err:
-            excel_res = {"excel_synced": False, "pending": True, "message": "DB 저장 완료, 엑셀 자동 재시도 대기: " + str(ex_err)}
+            excel_res = {
+                "excel_synced": False,
+                "pending": True,
+                "message": "DB 저장 완료, 엑셀 자동 재시도 대기: " + str(ex_err),
+            }
 
-        print(f"✓ 신규 요구자료 DB 등록 성공: {item['ledger_id']} ({item['requester']} - {item['title']})")
+        print(
+            f"✓ 신규 요구자료 DB 등록 성공: {item['ledger_id']} ({item['requester']} - {item['title']})"
+        )
         ret_msg = "성공적으로 등록되었습니다."
         if excel_res.get("message"):
             ret_msg += f" ({excel_res['message']})"
@@ -1007,17 +1239,37 @@ class LedgerService:
             "message": ret_msg,
             "item": item,
             "db_saved": True,
-            "sync_state": ("applied" if excel_res.get("excel_synced") else
-                           "quarantined" if excel_res.get("quarantined") else
-                           "pending" if excel_res.get("pending") else "db_only"),
+            "sync_state": (
+                "applied"
+                if excel_res.get("excel_synced")
+                else "quarantined"
+                if excel_res.get("quarantined")
+                else "pending"
+                if excel_res.get("pending")
+                else "db_only"
+            ),
             "excel_synced": excel_res.get("excel_synced", False),
             "excel_pending": excel_res.get("pending", False),
-            "excel_message": excel_res.get("message", "")
+            "excel_message": excel_res.get("message", ""),
         }
 
-    _UPDATE_FIELDS = ("year", "seq_no", "party", "requester", "aide", "title", "details",
-                      "request_date", "deadline", "submit_date", "department",
-                      "status", "note", "request_type", "linked_doc_id")
+    _UPDATE_FIELDS = (
+        "year",
+        "seq_no",
+        "party",
+        "requester",
+        "aide",
+        "title",
+        "details",
+        "request_date",
+        "deadline",
+        "submit_date",
+        "department",
+        "status",
+        "note",
+        "request_type",
+        "linked_doc_id",
+    )
     _DATE_FIELDS = ("request_date", "deadline", "submit_date")
     # 엑셀에 열이 없는 DB 전용 칸. 이것만 바뀐 수정은 엑셀 반영을 하지 않는다.
     _DB_ONLY_FIELDS = frozenset({"linked_doc_id"})
@@ -1031,7 +1283,9 @@ class LedgerService:
         """
         new_doc_id, old_doc_id = _clean(new_doc_id), _clean(old_doc_id)
         if new_doc_id:
-            if not cur.execute("SELECT 1 FROM documents WHERE doc_id = ?", (new_doc_id,)).fetchone():
+            if not cur.execute(
+                "SELECT 1 FROM documents WHERE doc_id = ?", (new_doc_id,)
+            ).fetchone():
                 return f"연결할 문서를 찾을 수 없습니다: {new_doc_id}"
         if old_doc_id and old_doc_id != new_doc_id:
             cur.execute(
@@ -1039,7 +1293,10 @@ class LedgerService:
                 (old_doc_id, ledger_id),
             )
         if new_doc_id:
-            cur.execute("UPDATE documents SET linked_ledger_id = ? WHERE doc_id = ?", (ledger_id, new_doc_id))
+            cur.execute(
+                "UPDATE documents SET linked_ledger_id = ? WHERE doc_id = ?",
+                (ledger_id, new_doc_id),
+            )
         return None
 
     @classmethod
@@ -1085,11 +1342,11 @@ class LedgerService:
             return {"success": False, "error": "요청 본문은 JSON 객체여야 합니다."}
         self._guard_db_write()
         self._ensure_schema()
-        if 'title' in data and not _clean(data['title']):
+        if "title" in data and not _clean(data["title"]):
             return {"success": False, "error": "요구자료명(제목)은 비워둘 수 없습니다."}
-        if 'requester' in data and not _clean(data['requester']):
+        if "requester" in data and not _clean(data["requester"]):
             return {"success": False, "error": "요구자(의원실)는 비워둘 수 없습니다."}
-        if 'year' in data and not re.fullmatch(r'\d{4}', _clean(data['year'])):
+        if "year" in data and not re.fullmatch(r"\d{4}", _clean(data["year"])):
             return {"success": False, "error": "연도는 4자리 숫자여야 합니다."}
         # 날짜 형식은 기존 값과 비교해 **바뀐 필드만** 아래 트랜잭션 안에서 검사한다. 편집 폼은
         # 모든 필드를 다시 보내므로, 엑셀에서 들어온 `2026.9.10` 같은 값을 여기서 거절하면
@@ -1103,11 +1360,18 @@ class LedgerService:
         try:
             # 확인과 갱신 사이에 다른 쓰기가 끼지 않게 쓰기 트랜잭션으로 묶는다.
             self._begin_immediate(cur)
-            cur.execute("SELECT * FROM request_ledger WHERE ledger_id = ? AND COALESCE(status, '') != '[삭제]'", (ledger_id,))
+            cur.execute(
+                "SELECT * FROM request_ledger WHERE ledger_id = ? AND COALESCE(status, '') != '[삭제]'",
+                (ledger_id,),
+            )
             existing = cur.fetchone()
             if not existing:
                 conn.rollback()
-                return {"success": False, "code": "not_found", "error": "해당 항목을 찾을 수 없습니다."}
+                return {
+                    "success": False,
+                    "code": "not_found",
+                    "error": "해당 항목을 찾을 수 없습니다.",
+                }
 
             # 낙관적 잠금. 화면이 읽어 간 시점의 updated_at을 보내면, 그사이 다른 사용자나 엑셀
             # 동기화가 고친 항목을 조용히 덮어쓰지 않는다. 보내지 않는 기존 호출자는 예전처럼 동작한다.
@@ -1126,18 +1390,22 @@ class LedgerService:
                     }
 
             # Auto-link if linked_doc_id not set in data or existing
-            if not data.get('linked_doc_id') and not existing['linked_doc_id']:
+            if not data.get("linked_doc_id") and not existing["linked_doc_id"]:
                 temp_item = dict(existing)
                 temp_item.update(data)
                 auto_link_ledger_to_doc(conn, temp_item)
-                if temp_item.get('linked_doc_id'):
-                    data['linked_doc_id'] = temp_item['linked_doc_id']
+                if temp_item.get("linked_doc_id"):
+                    data["linked_doc_id"] = temp_item["linked_doc_id"]
 
             clean_data, field_error = self._changed_update_fields(existing, data)
             if not field_error and "linked_doc_id" in clean_data:
                 # 답변서 수동 연결·변경·해제. 문서 쪽 역참조도 같은 트랜잭션에서 맞춘다.
-                field_error = self._apply_doc_link(cur, ledger_id, existing["linked_doc_id"],
-                                                   clean_data["linked_doc_id"])
+                field_error = self._apply_doc_link(
+                    cur,
+                    ledger_id,
+                    existing["linked_doc_id"],
+                    clean_data["linked_doc_id"],
+                )
             if field_error:
                 conn.rollback()
                 return {"success": False, "code": "invalid", "error": field_error}
@@ -1169,15 +1437,24 @@ class LedgerService:
             try:
                 cur.execute(
                     "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot, changed_fields, actor) VALUES (?, ?, ?, ?, ?, ?)",
-                    (ledger_id, "UPDATE", now_str, json.dumps(dict(existing), ensure_ascii=False),
-                     ",".join(sorted(changed_field_names)), _history_actor())
+                    (
+                        ledger_id,
+                        "UPDATE",
+                        now_str,
+                        json.dumps(dict(existing), ensure_ascii=False),
+                        ",".join(sorted(changed_field_names)),
+                        _history_actor(),
+                    ),
                 )
             except Exception as e:
                 # 이력 기록 실패를 삼키면 바뀐 건 있는데 흔적은 없음이 된다.
                 # 본문 UPDATE는 계속하되 실패를 알린다. (감사 R6 정리)
                 print(f"[대장 이력 경고] ledger_history 기록 실패: {e}")
 
-            cur.execute(f"UPDATE request_ledger SET {', '.join(set_clauses)} WHERE ledger_id = ?", params)
+            cur.execute(
+                f"UPDATE request_ledger SET {', '.join(set_clauses)} WHERE ledger_id = ?",
+                params,
+            )
             updated_item = dict(existing)
             updated_item.update(clean_data)
             updated_item["_changed_fields"] = list(clean_data)
@@ -1215,10 +1492,15 @@ class LedgerService:
         excel_res = {}
         try:
             from services.excel_sync_service import ExcelSyncService
+
             sync_svc = ExcelSyncService.get_instance(self.base_dir)
             excel_res = sync_svc.sync_item_to_excel(updated_item, action="update")
         except Exception as ex_err:
-            excel_res = {"excel_synced": False, "pending": True, "message": "DB 저장 완료, 엑셀 자동 재시도 대기: " + str(ex_err)}
+            excel_res = {
+                "excel_synced": False,
+                "pending": True,
+                "message": "DB 저장 완료, 엑셀 자동 재시도 대기: " + str(ex_err),
+            }
 
         print(f"✓ 요구자료 수정 성공: {ledger_id}")
         ret_msg = "성공적으로 수정되었습니다."
@@ -1232,12 +1514,18 @@ class LedgerService:
             # 실제로 저장한 값(날짜 정규화·마스킹 후). 화면이 입력값 대신 이 값을 반영한다.
             "changes": clean_data,
             "db_saved": True,
-            "sync_state": ("applied" if excel_res.get("excel_synced") else
-                           "quarantined" if excel_res.get("quarantined") else
-                           "pending" if excel_res.get("pending") else "db_only"),
+            "sync_state": (
+                "applied"
+                if excel_res.get("excel_synced")
+                else "quarantined"
+                if excel_res.get("quarantined")
+                else "pending"
+                if excel_res.get("pending")
+                else "db_only"
+            ),
             "excel_synced": excel_res.get("excel_synced", False),
             "excel_pending": excel_res.get("pending", False),
-            "excel_message": excel_res.get("message", "")
+            "excel_message": excel_res.get("message", ""),
         }
 
     def delete_ledger_item(self, ledger_id):
@@ -1253,24 +1541,40 @@ class LedgerService:
 
         try:
             self._begin_immediate(cur)
-            cur.execute("SELECT * FROM request_ledger WHERE ledger_id = ? AND COALESCE(status, '') != '[삭제]'", (ledger_id,))
+            cur.execute(
+                "SELECT * FROM request_ledger WHERE ledger_id = ? AND COALESCE(status, '') != '[삭제]'",
+                (ledger_id,),
+            )
             existing = cur.fetchone()
             if not existing:
-                return {"success": False, "code": "not_found", "error": "해당 항목을 찾을 수 없습니다."}
+                return {
+                    "success": False,
+                    "code": "not_found",
+                    "error": "해당 항목을 찾을 수 없습니다.",
+                }
             deleted_item = dict(existing)
 
             try:
                 cur.execute(
                     "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot, changed_fields, actor) VALUES (?, ?, ?, ?, ?, ?)",
-                    (ledger_id, "DELETE", now_str, json.dumps(deleted_item, ensure_ascii=False),
-                     "", _history_actor())
+                    (
+                        ledger_id,
+                        "DELETE",
+                        now_str,
+                        json.dumps(deleted_item, ensure_ascii=False),
+                        "",
+                        _history_actor(),
+                    ),
                 )
             except Exception:
                 pass
 
             # Retain a tombstone so Excel's soft-delete row cannot resurrect the
             # record during startup/watcher/manual synchronization.
-            cur.execute("UPDATE request_ledger SET status = ?, updated_at = ? WHERE ledger_id = ?", ("[삭제]", now_str, ledger_id))
+            cur.execute(
+                "UPDATE request_ledger SET status = ?, updated_at = ? WHERE ledger_id = ?",
+                ("[삭제]", now_str, ledger_id),
+            )
             delete_op = dict(deleted_item)
             delete_op["_expected"] = row_fingerprint(deleted_item)
             enqueue_excel(conn, delete_op, "delete")
@@ -1291,10 +1595,15 @@ class LedgerService:
         excel_res = {}
         try:
             from services.excel_sync_service import ExcelSyncService
+
             sync_svc = ExcelSyncService.get_instance(self.base_dir)
             excel_res = sync_svc.sync_item_to_excel(delete_op, action="delete")
         except Exception as ex_err:
-            excel_res = {"excel_synced": False, "pending": True, "message": "DB 저장 완료, 엑셀 자동 재시도 대기: " + str(ex_err)}
+            excel_res = {
+                "excel_synced": False,
+                "pending": True,
+                "message": "DB 저장 완료, 엑셀 자동 재시도 대기: " + str(ex_err),
+            }
 
         print(f"✓ 요구자료 삭제 성공: {ledger_id}")
         ret_msg = "삭제되었습니다."
@@ -1304,12 +1613,18 @@ class LedgerService:
             "success": True,
             "message": ret_msg,
             "db_saved": True,
-            "sync_state": ("applied" if excel_res.get("excel_synced") else
-                           "quarantined" if excel_res.get("quarantined") else
-                           "pending" if excel_res.get("pending") else "db_only"),
+            "sync_state": (
+                "applied"
+                if excel_res.get("excel_synced")
+                else "quarantined"
+                if excel_res.get("quarantined")
+                else "pending"
+                if excel_res.get("pending")
+                else "db_only"
+            ),
             "excel_synced": excel_res.get("excel_synced", False),
             "excel_pending": excel_res.get("pending", False),
-            "excel_message": excel_res.get("message", "")
+            "excel_message": excel_res.get("message", ""),
         }
 
     def get_ledger_history(self, ledger_id=None, limit=100):
@@ -1324,12 +1639,12 @@ class LedgerService:
             if ledger_id:
                 cur.execute(
                     "SELECT * FROM ledger_history WHERE ledger_id = ? ORDER BY history_id DESC LIMIT ?",
-                    (ledger_id, limit)
+                    (ledger_id, limit),
                 )
             else:
                 cur.execute(
                     "SELECT * FROM ledger_history ORDER BY history_id DESC LIMIT ?",
-                    (limit,)
+                    (limit,),
                 )
             rows = [dict(r) for r in cur.fetchall()]
             result = {"success": True, "history": rows}
@@ -1338,7 +1653,9 @@ class LedgerService:
                 current = cur.execute(
                     "SELECT * FROM request_ledger WHERE ledger_id = ?", (ledger_id,)
                 ).fetchone()
-                result["timeline"] = build_ledger_timeline(rows, dict(current) if current else None, limit=limit)
+                result["timeline"] = build_ledger_timeline(
+                    rows, dict(current) if current else None, limit=limit
+                )
             return result
         finally:
             conn.close()
@@ -1361,25 +1678,42 @@ class LedgerService:
         now_str = _now_str()
         try:
             self._begin_immediate(cur)
-            row = cur.execute("SELECT * FROM request_ledger WHERE ledger_id = ?", (ledger_id,)).fetchone()
+            row = cur.execute(
+                "SELECT * FROM request_ledger WHERE ledger_id = ?", (ledger_id,)
+            ).fetchone()
             if not row:
                 conn.rollback()
-                return {"success": False, "code": "not_found", "error": "해당 항목을 찾을 수 없습니다."}
+                return {
+                    "success": False,
+                    "code": "not_found",
+                    "error": "해당 항목을 찾을 수 없습니다.",
+                }
             if _clean(row["status"]) != "[삭제]":
                 conn.rollback()
-                return {"success": False, "code": "invalid", "error": "삭제된 항목이 아니라 되살릴 것이 없습니다."}
+                return {
+                    "success": False,
+                    "code": "invalid",
+                    "error": "삭제된 항목이 아니라 되살릴 것이 없습니다.",
+                }
             hist = cur.execute(
                 "SELECT snapshot FROM ledger_history WHERE ledger_id = ? AND action = 'DELETE' "
-                "ORDER BY history_id DESC LIMIT 1", (ledger_id,)
+                "ORDER BY history_id DESC LIMIT 1",
+                (ledger_id,),
             ).fetchone()
             try:
                 before = json.loads(hist["snapshot"]) if hist else {}
             except (TypeError, ValueError):
                 before = {}
-            if not isinstance(before, dict) or _clean(before.get("status")) in ("", "[삭제]"):
+            if not isinstance(before, dict) or _clean(before.get("status")) in (
+                "",
+                "[삭제]",
+            ):
                 conn.rollback()
-                return {"success": False, "code": "invalid",
-                        "error": "삭제 직전 상태 기록이 없어 되살릴 수 없습니다. 엑셀에서 직접 고쳐 주세요."}
+                return {
+                    "success": False,
+                    "code": "invalid",
+                    "error": "삭제 직전 상태 기록이 없어 되살릴 수 없습니다. 엑셀에서 직접 고쳐 주세요.",
+                }
             tombstone = dict(row)
             restored = dict(row)
             restored["status"] = _clean(before.get("status"))
@@ -1391,8 +1725,14 @@ class LedgerService:
             )
             cur.execute(
                 "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot, changed_fields, actor) VALUES (?, ?, ?, ?, ?, ?)",
-                (ledger_id, "RESTORE", now_str, json.dumps(restored, ensure_ascii=False),
-                 "note,status,updated_at", _history_actor()),
+                (
+                    ledger_id,
+                    "RESTORE",
+                    now_str,
+                    json.dumps(restored, ensure_ascii=False),
+                    "note,status,updated_at",
+                    _history_actor(),
+                ),
             )
             op = dict(restored)
             op["_changed_fields"] = ["status", "note"]
@@ -1414,10 +1754,15 @@ class LedgerService:
         excel_res = {}
         try:
             from services.excel_sync_service import ExcelSyncService
+
             sync_svc = ExcelSyncService.get_instance(self.base_dir)
             excel_res = sync_svc.sync_item_to_excel(op, action="update")
         except Exception as ex_err:
-            excel_res = {"excel_synced": False, "pending": True, "message": "DB 저장 완료, 엑셀 자동 재시도 대기: " + str(ex_err)}
+            excel_res = {
+                "excel_synced": False,
+                "pending": True,
+                "message": "DB 저장 완료, 엑셀 자동 재시도 대기: " + str(ex_err),
+            }
 
         msg = "삭제를 취소하고 항목을 되살렸습니다."
         if excel_res.get("message"):
@@ -1428,9 +1773,15 @@ class LedgerService:
             "item": restored,
             "updated_at": now_str,
             "db_saved": True,
-            "sync_state": ("applied" if excel_res.get("excel_synced") else
-                           "quarantined" if excel_res.get("quarantined") else
-                           "pending" if excel_res.get("pending") else "db_only"),
+            "sync_state": (
+                "applied"
+                if excel_res.get("excel_synced")
+                else "quarantined"
+                if excel_res.get("quarantined")
+                else "pending"
+                if excel_res.get("pending")
+                else "db_only"
+            ),
             "excel_synced": excel_res.get("excel_synced", False),
             "excel_pending": excel_res.get("pending", False),
             "excel_message": excel_res.get("message", ""),

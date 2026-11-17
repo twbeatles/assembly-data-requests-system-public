@@ -62,12 +62,16 @@ class TestAuditScope3(unittest.TestCase):
         fake = self.base / "이름만있는공문.hwp"
         fake.write_text("dummy", encoding="utf-8")
         os.utime(fake, None)
-        meta = extract_metadata(fake.name, filename=fake.name, md_text="", full_file_path=fake)
+        meta = extract_metadata(
+            fake.name, filename=fake.name, md_text="", full_file_path=fake
+        )
         self.assertEqual(meta.get("request_date") or "", "")
         self.assertFalse(bool(meta.get("year")))
 
     def test_month_assembly_pattern_does_not_hardcode_2026(self):
-        src = (SCRIPTS_DIR / "extractors" / "text_extractor.py").read_text(encoding="utf-8")
+        src = (SCRIPTS_DIR / "extractors" / "text_extractor.py").read_text(
+            encoding="utf-8"
+        )
         self.assertNotIn('year or "2026"', src)
         self.assertNotIn('"year": year or "2026"', src)
         self.assertIn("datetime.date.today().year", src)
@@ -81,8 +85,12 @@ class TestAuditScope3(unittest.TestCase):
         """
         self.assertIn('"시정요구"', build_fts_match("시정요구"))
         self.assertIn("AND", build_fts_match("딥페이크 시정요구"))
-        self.assertEqual(build_fts_match("현황"), "", "2글자는 trigram으로 표현할 수 없다")
-        self.assertEqual(build_fts_match("딥페이크 피해"), "", "2글자가 섞이면 전체를 대체 경로로")
+        self.assertEqual(
+            build_fts_match("현황"), "", "2글자는 trigram으로 표현할 수 없다"
+        )
+        self.assertEqual(
+            build_fts_match("딥페이크 피해"), "", "2글자가 섞이면 전체를 대체 경로로"
+        )
         self.assertEqual(build_fts_match("가"), "")
 
     def test_ledger_service_blocks_during_pipeline(self):
@@ -102,9 +110,9 @@ class TestAuditScope3(unittest.TestCase):
         try:
             guard.path.write_text(str(holder.pid), encoding="utf-8")
             svc = LedgerService(db_path=db, json_path=js, base_dir=self.base)
-            res = svc.insert_ledger_item({
-                "year": "2026", "requester": "의원", "title": "파이프라인 중 등록"
-            })
+            res = svc.insert_ledger_item(
+                {"year": "2026", "requester": "의원", "title": "파이프라인 중 등록"}
+            )
             self.assertFalse(res["success"])
             self.assertIn("파이프라인", res["error"])
         finally:
@@ -123,9 +131,26 @@ class TestAuditScope3(unittest.TestCase):
                     request_date, deadline, submit_date, department, status, note,
                     request_type, linked_doc_id, created_at, updated_at
                 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                ("REQ-2026-009", "2026", "9", "", "의원", "", "웹에서 추가", "",
-                 "", "", "", "", "작성중", "", "시스템", "",
-                 "2026-09-10 12:00:00", "2026-09-10 12:00:00")
+                (
+                    "REQ-2026-009",
+                    "2026",
+                    "9",
+                    "",
+                    "의원",
+                    "",
+                    "웹에서 추가",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "작성중",
+                    "",
+                    "시스템",
+                    "",
+                    "2026-09-10 12:00:00",
+                    "2026-09-10 12:00:00",
+                ),
             )
             conn.commit()
         finally:
@@ -159,7 +184,9 @@ class TestAuditScope3(unittest.TestCase):
 
     def test_bat_02_checks_errorlevel(self):
         self.assertIn("ERROR_EXIT", write_all_bats.SYSTEM_BAT_02)
-        self.assertIn("if %errorlevel% neq 0 goto ERROR_EXIT", write_all_bats.SYSTEM_BAT_02)
+        self.assertIn(
+            "if %errorlevel% neq 0 goto ERROR_EXIT", write_all_bats.SYSTEM_BAT_02
+        )
 
     def test_package_exe_resolver_prefers_newer(self):
         self.assertTrue(callable(package_distribution.resolve_exe_src))
@@ -173,9 +200,13 @@ class TestAuditScope3(unittest.TestCase):
         예전 테스트는 HTTP 모드가 /api/search를 쓰는지 확인했는데, 그 경로가 초성·OR·제외어 검색을
         무력화한 원인이었다. 실제 검색 동작은 test_audit_phase10_dashboard가 Node로 실행해 검증한다.
         """
-        tmpl = (SCRIPTS_DIR / "templates" / "dashboard_template.html").read_text(encoding="utf-8")
+        tmpl = (SCRIPTS_DIR / "templates" / "dashboard_template.html").read_text(
+            encoding="utf-8"
+        )
         start = tmpl.index("async function render()")
-        render_head = tmpl[start:tmpl.index("document.getElementById('count-filtered')", start)]
+        render_head = tmpl[
+            start : tmpl.index("document.getElementById('count-filtered')", start)
+        ]
         self.assertIn("filterItems()", render_head)
         self.assertNotIn("/api/search", render_head)
         self.assertIn("search-scope-hint", tmpl)

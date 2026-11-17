@@ -34,9 +34,21 @@ class TestAuditPhase3(unittest.TestCase):
     def test_1_smart_add_master_ledger_classification(self):
         """Verify individual answer excels are NOT misclassified as master ledgers"""
         # True master ledgers
-        self.assertTrue(add_documents_smart.is_master_ledger_file(Path("2026년_국회_요구자료_관리대장.xlsx")))
-        self.assertTrue(add_documents_smart.is_master_ledger_file(Path("(양식)국회_요구자료_목록_대장_템플릿.xlsx")))
-        self.assertTrue(add_documents_smart.is_master_ledger_file(Path("국회_자료요구_목록_마스터대장.xlsm")))
+        self.assertTrue(
+            add_documents_smart.is_master_ledger_file(
+                Path("2026년_국회_요구자료_관리대장.xlsx")
+            )
+        )
+        self.assertTrue(
+            add_documents_smart.is_master_ledger_file(
+                Path("(양식)국회_요구자료_목록_대장_템플릿.xlsx")
+            )
+        )
+        self.assertTrue(
+            add_documents_smart.is_master_ledger_file(
+                Path("국회_자료요구_목록_마스터대장.xlsm")
+            )
+        )
 
         # Individual answer documents containing '요구자료' or '자료요구'
         answer_doc_1 = Path("250213 대외기관 요구자료_월별 통계.xlsx")
@@ -51,7 +63,9 @@ class TestAuditPhase3(unittest.TestCase):
             original_root = add_documents_smart.ROOT_DIR
             try:
                 add_documents_smart.ROOT_DIR = Path(tmp_dir)
-                target_folder = add_documents_smart.determine_target_folder(answer_doc_1)
+                target_folder = add_documents_smart.determine_target_folder(
+                    answer_doc_1
+                )
                 self.assertEqual(target_folder.name, "2025")
             finally:
                 add_documents_smart.ROOT_DIR = original_root
@@ -59,6 +73,7 @@ class TestAuditPhase3(unittest.TestCase):
     def test_2_ledger_multi_header_synonym_lookups(self):
         """Verify load_request_ledger extracts data using template synonym headers (접수일자, 제출여부)"""
         import openpyxl
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_p = Path(tmp_dir)
             test_excel = tmp_p / "(양식)국회_요구자료_목록_대장_템플릿.xlsx"
@@ -68,11 +83,37 @@ class TestAuditPhase3(unittest.TestCase):
             assert ws is not None
             ws.title = "2026"
             # Use official template headers with '접수일자' and '제출여부'
-            headers = ["연번", "접수일자", "소속", "의원", "보좌관", "요구자료", "세부내역", "마감일", "제출일", "제출여부", "요청형태", "비고"]
+            headers = [
+                "연번",
+                "접수일자",
+                "소속",
+                "의원",
+                "보좌관",
+                "요구자료",
+                "세부내역",
+                "마감일",
+                "제출일",
+                "제출여부",
+                "요청형태",
+                "비고",
+            ]
             for col_idx, h in enumerate(headers, start=1):
                 ws.cell(1, col_idx, h)
 
-            sample_row = ["1", "2026-08-15", "과방위", "이순신", "나대용", "디지털 성범죄 대응 현황", "상세 내역", "2026-08-20", "2026-08-19", "제출완료", "전자문서", "특이사항 없음"]
+            sample_row = [
+                "1",
+                "2026-08-15",
+                "과방위",
+                "이순신",
+                "나대용",
+                "디지털 성범죄 대응 현황",
+                "상세 내역",
+                "2026-08-20",
+                "2026-08-19",
+                "제출완료",
+                "전자문서",
+                "특이사항 없음",
+            ]
             for col_idx, val in enumerate(sample_row, start=1):
                 ws.cell(2, col_idx, val)
 
@@ -81,8 +122,11 @@ class TestAuditPhase3(unittest.TestCase):
             # Test loading via load_request_ledger
             # DB·설정 폴더를 명시한다. 생략하면 예전에는 운영 DB가 병합됐다. (감사 R4-01/R4-02)
             items = extract_and_build_db.load_request_ledger(
-                tmp_p, [], db_path=tmp_p / "data_requests.db", system_dir=tmp_p)
-            matched = [it for it in items if it.get("title") == "디지털 성범죄 대응 현황"]
+                tmp_p, [], db_path=tmp_p / "data_requests.db", system_dir=tmp_p
+            )
+            matched = [
+                it for it in items if it.get("title") == "디지털 성범죄 대응 현황"
+            ]
             self.assertEqual(len(matched), 1)
             item = matched[0]
             self.assertEqual(item["seq_no"], "1")
@@ -105,7 +149,9 @@ class TestAuditPhase3(unittest.TestCase):
         if tpl_path.exists():
             template_text = tpl_path.read_text(encoding="utf-8")
         else:
-            template_text = (SCRIPTS_DIR / "generate_web_dashboard.py").read_text(encoding="utf-8")
+            template_text = (SCRIPTS_DIR / "generate_web_dashboard.py").read_text(
+                encoding="utf-8"
+            )
         # 감사 R3-15: 정규식 치환 대신 허용 목록으로 태그를 다시 조립한다.
         # 우회 벡터 실행 검증은 test_audit_phase10_dashboard.TestDashboardSanitizer(Node)가 한다.
         self.assertIn("function rebuildTag", template_text)
@@ -116,7 +162,7 @@ class TestAuditPhase3(unittest.TestCase):
         """Verify web_server uses ThreadingHTTPServer and limits body size to 5MB"""
         # ThreadingHTTPServer verification
         self.assertTrue(issubclass(ThreadingHTTPServer, object))
-        
+
         # Test read_json_body size limit
         class DummyHandler(web_server.RequestLedgerHandler):
             def __init__(self):
@@ -125,11 +171,11 @@ class TestAuditPhase3(unittest.TestCase):
 
         handler = DummyHandler()
         # > 5MB should be rejected immediately
-        handler.headers = {'Content-Length': str(6 * 1024 * 1024)}
+        handler.headers = {"Content-Length": str(6 * 1024 * 1024)}
         self.assertIsNone(handler.read_json_body())
 
         # Negative or 0 should return None
-        handler.headers = {'Content-Length': '0'}
+        handler.headers = {"Content-Length": "0"}
         self.assertIsNone(handler.read_json_body())
 
     def test_6_dynamic_year_loading_in_gui(self):
@@ -153,7 +199,7 @@ class TestAuditPhase3(unittest.TestCase):
             years = [r[0] for r in c.fetchall() if r[0]]
             conn.close()
 
-            self.assertEqual(years, ['2026', '2025', '2024', '2023', '2022'])
+            self.assertEqual(years, ["2026", "2025", "2024", "2023", "2022"])
 
     def test_7_atomic_config_saving_and_web_port(self):
         """Verify system_config saves atomically and includes web_port default"""
@@ -174,6 +220,7 @@ class TestAuditPhase3(unittest.TestCase):
             self.assertEqual(reloaded["web_port"], 8090)
             # Ensure no leftover temp files
             self.assertFalse((tmp_base / "config.tmp.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

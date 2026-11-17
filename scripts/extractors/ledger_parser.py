@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """호환 진입점. 구현은 extractors.ledger."""
+
 from extractors.ledger.dates import (  # noqa: F401 # compat re-export shim
     DETAIL_HEADER_NAMES,
     ID_HEADER_NAMES,

@@ -53,7 +53,10 @@ def protected_workspace(root=None):
     if parent == root:
         return None
     try:
-        if any(child.is_dir() and re.fullmatch(r"20[1-3]\d", child.name) for child in parent.iterdir()):
+        if any(
+            child.is_dir() and re.fullmatch(r"20[1-3]\d", child.name)
+            for child in parent.iterdir()
+        ):
             return parent
     except OSError:
         return None

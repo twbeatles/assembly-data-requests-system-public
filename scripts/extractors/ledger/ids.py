@@ -26,7 +26,7 @@ from extractors.ledger.workbook import save_workbook_atomic
 
 
 def _id_year_and_number(ledger_id: str):
-    m = re.match(r'^REQ-(\w+)-(\d+)$', str(ledger_id or "").strip())
+    m = re.match(r"^REQ-(\w+)-(\d+)$", str(ledger_id or "").strip())
     return (m.group(1), int(m.group(2))) if m else None
 
 
@@ -42,7 +42,7 @@ def plan_ledger_ids(wb_vals, db_records=None):
     db_by_content = {}
     tombstones = set()
     max_num = {}
-    for rec in (db_records or []):
+    for rec in db_records or []:
         lid = str(rec.get("ledger_id") or "").strip()
         if not lid:
             continue
@@ -78,7 +78,9 @@ def plan_ledger_ids(wb_vals, db_records=None):
         header_map = build_header_map(ws)
         if find_id_column(header_map) is None:
             sheets_without_id_column.add(sheet)
-        data_rows = [r for r in range(2, ws.max_row + 1) if is_ledger_data_row(ws, r, header_map)]
+        data_rows = [
+            r for r in range(2, ws.max_row + 1) if is_ledger_data_row(ws, r, header_map)
+        ]
         explicit_rows = set()
         for r in data_rows:
             raw = cell_text(ws, r, header_map, ID_HEADER_NAMES)
@@ -187,12 +189,26 @@ def stamp_ledger_ids(excel_path, db_records=None, base_dir=None) -> int:
             pass
 
     if missing_cols:
-        print(f"✓ 마스터 엑셀에 '대장ID' 열을 추가했습니다: {', '.join(sorted(missing_cols))}")
+        print(
+            f"✓ 마스터 엑셀에 '대장ID' 열을 추가했습니다: {', '.join(sorted(missing_cols))}"
+        )
     print(f"✓ 관리대장 ID 고정(스탬핑) 완료: {len(assignments)}건")
     return len(assignments)
 
 
 LEDGER_VALUE_FIELDS = (
-    "year", "seq_no", "party", "requester", "aide", "title", "details", "request_date",
-    "deadline", "submit_date", "department", "status", "note", "request_type",
+    "year",
+    "seq_no",
+    "party",
+    "requester",
+    "aide",
+    "title",
+    "details",
+    "request_date",
+    "deadline",
+    "submit_date",
+    "department",
+    "status",
+    "note",
+    "request_type",
 )

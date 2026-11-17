@@ -84,7 +84,10 @@ class LedgerSyncFixtureMixin:
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         try:
-            return {r["ledger_id"]: dict(r) for r in conn.execute("SELECT * FROM request_ledger")}
+            return {
+                r["ledger_id"]: dict(r)
+                for r in conn.execute("SELECT * FROM request_ledger")
+            }
         finally:
             conn.close()
 
@@ -92,13 +95,17 @@ class LedgerSyncFixtureMixin:
         wb = openpyxl.load_workbook(path, data_only=True)
         try:
             ws = wb[sheet]
-            header = [str(ws.cell(1, c).value or "") for c in range(1, ws.max_column + 1)]
+            header = [
+                str(ws.cell(1, c).value or "") for c in range(1, ws.max_column + 1)
+            ]
             out = []
             for r in range(2, ws.max_row + 1):
-                out.append({
-                    header[c - 1]: ws.cell(r, c).value
-                    for c in range(1, ws.max_column + 1)
-                })
+                out.append(
+                    {
+                        header[c - 1]: ws.cell(r, c).value
+                        for c in range(1, ws.max_column + 1)
+                    }
+                )
             return out
         finally:
             wb.close()
@@ -112,20 +119,26 @@ class TestStartupAndWatcherOrdering(LedgerSyncFixtureMixin, unittest.TestCase):
     """ISSUE-001 / ISSUE-004: 보류 큐와 Excel→DB 동기화의 순서."""
 
     def test_restart_keeps_web_insert_and_update_and_absorbs_manual_edit(self):
-        excel = self.make_excel([
-            ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""],
-            ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
-            ["REQ-2026-003", "3", "박의원", "자료C", "작성중", "일반", ""],
-        ])
+        excel = self.make_excel(
+            [
+                ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""],
+                ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
+                ["REQ-2026-003", "3", "박의원", "자료C", "작성중", "일반", ""],
+            ]
+        )
         self.sync_service().sync_excel_to_db()
         ledger = self.ledger_service()
 
         # 엑셀이 열려 있는 동안의 웹 등록/수정은 보류 큐로 간다.
         with mock.patch.object(ExcelSyncService, "is_file_locked", return_value=True):
-            inserted = ledger.insert_ledger_item({
-                "year": "2026", "requester": "최의원",
-                "title": "자료D(웹등록)", "request_type": "메일",
-            })
+            inserted = ledger.insert_ledger_item(
+                {
+                    "year": "2026",
+                    "requester": "최의원",
+                    "title": "자료D(웹등록)",
+                    "request_type": "메일",
+                }
+            )
             updated = ledger.update_ledger_item("REQ-2026-001", {"status": "제출"})
         LedgerService.wait_last_sync(3)
         self.assertTrue(inserted["success"])
@@ -148,9 +161,19 @@ class TestStartupAndWatcherOrdering(LedgerSyncFixtureMixin, unittest.TestCase):
 
         rows = self.db_rows()
         self.assertIn(new_id, rows)
-        self.assertNotEqual(rows[new_id]["status"], "[삭제]", "웹 등록 항목이 삭제 처리되면 안 된다")
-        self.assertEqual(rows["REQ-2026-001"]["status"], "제출", "웹 수정이 엑셀 구값으로 되돌아가면 안 된다")
-        self.assertEqual(rows["REQ-2026-003"]["note"], "수기 메모", "엑셀 수기 수정은 DB에 반영돼야 한다")
+        self.assertNotEqual(
+            rows[new_id]["status"], "[삭제]", "웹 등록 항목이 삭제 처리되면 안 된다"
+        )
+        self.assertEqual(
+            rows["REQ-2026-001"]["status"],
+            "제출",
+            "웹 수정이 엑셀 구값으로 되돌아가면 안 된다",
+        )
+        self.assertEqual(
+            rows["REQ-2026-003"]["note"],
+            "수기 메모",
+            "엑셀 수기 수정은 DB에 반영돼야 한다",
+        )
 
         excel_by_id = {str(r.get("대장ID") or ""): r for r in self.excel_rows(excel)}
         self.assertIn(new_id, excel_by_id, "보류 큐의 등록이 엑셀에도 기록돼야 한다")
@@ -158,10 +181,12 @@ class TestStartupAndWatcherOrdering(LedgerSyncFixtureMixin, unittest.TestCase):
         self.assertEqual(restarted.pending_count(), 0)
 
     def test_watcher_syncs_manual_edit_before_flushing_queue(self):
-        excel = self.make_excel([
-            ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""],
-            ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
-        ])
+        excel = self.make_excel(
+            [
+                ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""],
+                ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
+            ]
+        )
         svc = self.sync_service()
         svc.sync_excel_to_db()
         ledger = self.ledger_service()
@@ -180,19 +205,28 @@ class TestStartupAndWatcherOrdering(LedgerSyncFixtureMixin, unittest.TestCase):
         svc.start_file_watcher(poll_interval=0.3)
         deadline = time.time() + 8
         while time.time() < deadline:
-            if svc.pending_count() == 0 and self.db_rows()["REQ-2026-002"]["status"] == "검토중":
+            if (
+                svc.pending_count() == 0
+                and self.db_rows()["REQ-2026-002"]["status"] == "검토중"
+            ):
                 break
             time.sleep(0.3)
         svc.stop_file_watcher()
 
         rows = self.db_rows()
-        self.assertEqual(rows["REQ-2026-002"]["status"], "검토중", "수기 수정이 flush에 가려지면 안 된다")
+        self.assertEqual(
+            rows["REQ-2026-002"]["status"],
+            "검토중",
+            "수기 수정이 flush에 가려지면 안 된다",
+        )
         self.assertEqual(rows["REQ-2026-001"]["status"], "제출")
         excel_by_id = {str(r.get("대장ID") or ""): r for r in self.excel_rows(excel)}
         self.assertEqual(excel_by_id["REQ-2026-001"]["제출"], "제출")
 
     def test_pipeline_lock_defers_excel_sync(self):
-        excel = self.make_excel([["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]])
+        excel = self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]]
+        )
         svc = self.sync_service()
         svc.sync_excel_to_db()
 
@@ -214,7 +248,11 @@ class TestStartupAndWatcherOrdering(LedgerSyncFixtureMixin, unittest.TestCase):
             res = svc.sync_excel_to_db()
             self.assertFalse(res.get("success"))
             self.assertTrue(res.get("skipped"))
-            self.assertEqual(svc._last_known_excel_mtime, before, "건너뛴 경우 mtime을 갱신하면 안 된다")
+            self.assertEqual(
+                svc._last_known_excel_mtime,
+                before,
+                "건너뛴 경우 mtime을 갱신하면 안 된다",
+            )
             self.assertEqual(self.db_rows()["REQ-2026-001"]["status"], "작성중")
         finally:
             holder.kill()
@@ -230,17 +268,32 @@ class TestExcelRowMatching(LedgerSyncFixtureMixin, unittest.TestCase):
     """ISSUE-002: 행 매칭은 ledger_id를 우선한다."""
 
     def test_insert_with_same_requester_and_title_appends_new_row(self):
-        excel = self.make_excel([
-            ["REQ-2026-001", "1", "김의원", "딥페이크 시정요구 현황", "제출", "일반", "1분기"],
-            ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
-        ])
+        excel = self.make_excel(
+            [
+                [
+                    "REQ-2026-001",
+                    "1",
+                    "김의원",
+                    "딥페이크 시정요구 현황",
+                    "제출",
+                    "일반",
+                    "1분기",
+                ],
+                ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
+            ]
+        )
         self.sync_service().sync_excel_to_db()
         ledger = self.ledger_service()
 
-        res = ledger.insert_ledger_item({
-            "year": "2026", "requester": "김의원",
-            "title": "딥페이크 시정요구 현황", "note": "2분기", "request_type": "메일",
-        })
+        res = ledger.insert_ledger_item(
+            {
+                "year": "2026",
+                "requester": "김의원",
+                "title": "딥페이크 시정요구 현황",
+                "note": "2분기",
+                "request_type": "메일",
+            }
+        )
         LedgerService.wait_last_sync(3)
         self.assertTrue(res["success"])
         new_id = res["item"]["ledger_id"]
@@ -248,7 +301,9 @@ class TestExcelRowMatching(LedgerSyncFixtureMixin, unittest.TestCase):
         rows = self.excel_rows(excel)
         self.assertEqual(len(rows), 3, "기존 행을 덮어쓰지 않고 새 행을 추가해야 한다")
         by_id = {str(r.get("대장ID") or ""): r for r in rows}
-        self.assertEqual(by_id["REQ-2026-001"]["비고"], "1분기", "기존 행 내용이 유지돼야 한다")
+        self.assertEqual(
+            by_id["REQ-2026-001"]["비고"], "1분기", "기존 행 내용이 유지돼야 한다"
+        )
         self.assertEqual(by_id[new_id]["비고"], "2분기")
 
         self.sync_service().sync_excel_to_db()
@@ -257,14 +312,26 @@ class TestExcelRowMatching(LedgerSyncFixtureMixin, unittest.TestCase):
         self.assertNotEqual(db[new_id]["status"], "[삭제]")
 
     def test_update_matches_id_even_when_another_row_shares_seq_no(self):
-        excel = self.make_excel([
-            ["REQ-2026-001", "5", "김의원", "자료A", "작성중", "일반", "건드리지 말 것"],
-            ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
-        ])
+        excel = self.make_excel(
+            [
+                [
+                    "REQ-2026-001",
+                    "5",
+                    "김의원",
+                    "자료A",
+                    "작성중",
+                    "일반",
+                    "건드리지 말 것",
+                ],
+                ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
+            ]
+        )
         self.sync_service().sync_excel_to_db()
         ledger = self.ledger_service()
 
-        res = ledger.update_ledger_item("REQ-2026-002", {"seq_no": "5", "status": "제출"})
+        res = ledger.update_ledger_item(
+            "REQ-2026-002", {"seq_no": "5", "status": "제출"}
+        )
         LedgerService.wait_last_sync(3)
         self.assertTrue(res["success"])
 
@@ -274,9 +341,11 @@ class TestExcelRowMatching(LedgerSyncFixtureMixin, unittest.TestCase):
         self.assertEqual(by_id["REQ-2026-002"]["제출"], "제출")
 
     def test_update_only_writes_changed_fields(self):
-        excel = self.make_excel([
-            ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", "원래 비고"],
-        ])
+        excel = self.make_excel(
+            [
+                ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", "원래 비고"],
+            ]
+        )
         self.sync_service().sync_excel_to_db()
         ledger = self.ledger_service()
 
@@ -293,19 +362,26 @@ class TestExcelRowMatching(LedgerSyncFixtureMixin, unittest.TestCase):
         self.sync_service().flush_pending_queue()
         row = self.excel_rows(excel)[0]
         self.assertEqual(row["제출"], "제출")
-        self.assertEqual(row["비고"], "사용자 수기 비고", "바뀌지 않은 필드를 옛 스냅숏으로 덮어써선 안 된다")
+        self.assertEqual(
+            row["비고"],
+            "사용자 수기 비고",
+            "바뀌지 않은 필드를 옛 스냅숏으로 덮어써선 안 된다",
+        )
 
 
 class TestLedgerIdStamping(LedgerSyncFixtureMixin, unittest.TestCase):
     """ISSUE-003: 위치 기반 ID를 고정해 행 이동에 안전하게 만든다."""
 
     def test_row_delete_without_id_column_keeps_active_items(self):
-        excel = self.make_excel([
-            ["1", "김의원", "자료A", "작성중", "일반", ""],
-            ["2", "이의원", "자료B", "작성중", "일반", ""],
-            ["3", "박의원", "자료C", "작성중", "일반", ""],
-            ["4", "최의원", "자료D", "작성중", "일반", ""],
-        ], with_id=False)
+        excel = self.make_excel(
+            [
+                ["1", "김의원", "자료A", "작성중", "일반", ""],
+                ["2", "이의원", "자료B", "작성중", "일반", ""],
+                ["3", "박의원", "자료C", "작성중", "일반", ""],
+                ["4", "최의원", "자료D", "작성중", "일반", ""],
+            ],
+            with_id=False,
+        )
         svc = self.sync_service()
         svc.sync_excel_to_db()
 
@@ -325,34 +401,63 @@ class TestLedgerIdStamping(LedgerSyncFixtureMixin, unittest.TestCase):
         self.touch_future(excel)
 
         svc.sync_excel_to_db()
-        active = {r["title"] for r in self.db_rows().values() if r["status"] != "[삭제]"}
-        self.assertEqual(active, {"자료C", "자료D"}, "행 삭제로 다른 항목이 사라지면 안 된다")
+        active = {
+            r["title"] for r in self.db_rows().values() if r["status"] != "[삭제]"
+        }
+        self.assertEqual(
+            active, {"자료C", "자료D"}, "행 삭제로 다른 항목이 사라지면 안 된다"
+        )
 
     def test_stamping_reassigns_duplicated_ids(self):
-        excel = self.make_excel([
-            ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""],
-            ["REQ-2026-001", "2", "이의원", "복사된 행", "작성중", "일반", ""],
-        ])
-        written = stamp_ledger_ids(excel, [{"ledger_id": "REQ-2026-001", "year": "2026",
-                                            "title": "자료A", "requester": "김의원"}])
+        excel = self.make_excel(
+            [
+                ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""],
+                ["REQ-2026-001", "2", "이의원", "복사된 행", "작성중", "일반", ""],
+            ]
+        )
+        written = stamp_ledger_ids(
+            excel,
+            [
+                {
+                    "ledger_id": "REQ-2026-001",
+                    "year": "2026",
+                    "title": "자료A",
+                    "requester": "김의원",
+                }
+            ],
+        )
         self.assertEqual(written, 1)
         ids = [str(r.get("대장ID") or "") for r in self.excel_rows(excel)]
         self.assertEqual(len(set(ids)), 2, "중복 ID는 새 ID로 분리돼야 한다")
         self.assertIn("REQ-2026-001", ids)
 
     def test_parser_skips_blank_id_row_in_stamped_sheet(self):
-        excel = self.make_excel([
-            ["REQ-2026-005", "1", "김의원", "자료A", "작성중", "일반", ""],
-            ["", "2", "이의원", "ID 없는 신규 행", "작성중", "일반", ""],
-        ])
+        excel = self.make_excel(
+            [
+                ["REQ-2026-005", "1", "김의원", "자료A", "작성중", "일반", ""],
+                ["", "2", "이의원", "ID 없는 신규 행", "작성중", "일반", ""],
+            ]
+        )
         items = load_request_ledger(self.tmp, [], merge_db_records=False)
         ids = {item["ledger_id"] for item in items}
-        self.assertEqual(ids, {"REQ-2026-005"},
-                         "스탬핑 전 빈 ID 행에 위치 기반 ID를 매겨 기존 ID와 충돌시키면 안 된다")
+        self.assertEqual(
+            ids,
+            {"REQ-2026-005"},
+            "스탬핑 전 빈 ID 행에 위치 기반 ID를 매겨 기존 ID와 충돌시키면 안 된다",
+        )
 
         # 스탬핑하면 새 ID를 받아 정상 반영된다.
-        stamp_ledger_ids(excel, [{"ledger_id": "REQ-2026-005", "year": "2026",
-                                  "title": "자료A", "requester": "김의원"}])
+        stamp_ledger_ids(
+            excel,
+            [
+                {
+                    "ledger_id": "REQ-2026-005",
+                    "year": "2026",
+                    "title": "자료A",
+                    "requester": "김의원",
+                }
+            ],
+        )
         items2 = load_request_ledger(self.tmp, [], merge_db_records=False)
         self.assertEqual(len(items2), 2)
         self.assertEqual(len({i["ledger_id"] for i in items2}), 2)
@@ -369,9 +474,14 @@ class TestYearSheetCreation(LedgerSyncFixtureMixin, unittest.TestCase):
         self.sync_service().sync_excel_to_db()
         ledger = self.ledger_service()
 
-        res = ledger.insert_ledger_item({
-            "year": "2027", "requester": "이의원", "title": "2027 신규", "request_type": "메일",
-        })
+        res = ledger.insert_ledger_item(
+            {
+                "year": "2027",
+                "requester": "이의원",
+                "title": "2027 신규",
+                "request_type": "메일",
+            }
+        )
         LedgerService.wait_last_sync(3)
         self.assertTrue(res["success"])
         new_id = res["item"]["ledger_id"]
@@ -386,8 +496,13 @@ class TestYearSheetCreation(LedgerSyncFixtureMixin, unittest.TestCase):
         rows_2027 = [str(r.get("대장ID") or "") for r in self.excel_rows(excel, "2027")]
         self.assertIn(new_id, rows_2027)
 
-        years = {i["ledger_id"]: i["year"] for i in load_request_ledger(self.tmp, [], merge_db_records=False)}
-        self.assertEqual(years[new_id], "2027", "파이프라인 재빌드에서도 연도가 유지돼야 한다")
+        years = {
+            i["ledger_id"]: i["year"]
+            for i in load_request_ledger(self.tmp, [], merge_db_records=False)
+        }
+        self.assertEqual(
+            years[new_id], "2027", "파이프라인 재빌드에서도 연도가 유지돼야 한다"
+        )
 
 
 class TestValidationAndGuards(LedgerSyncFixtureMixin, unittest.TestCase):
@@ -397,16 +512,22 @@ class TestValidationAndGuards(LedgerSyncFixtureMixin, unittest.TestCase):
         ledger = self.ledger_service()
         self.assertFalse(ledger.insert_ledger_item([1, 2])["success"])
         self.assertFalse(ledger.update_ledger_item("REQ-2026-001", "문자열")["success"])
-        bad_year = ledger.insert_ledger_item({"year": "26년", "requester": "김의원", "title": "연도 오류"})
+        bad_year = ledger.insert_ledger_item(
+            {"year": "26년", "requester": "김의원", "title": "연도 오류"}
+        )
         self.assertFalse(bad_year["success"])
         self.assertIn("연도", bad_year["error"])
 
     def test_handler_rejects_foreign_host_and_non_dict_json(self):
         import web_server
 
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         sent = []
-        handler.send_json_response = lambda data, status_code=200: sent.append((status_code, data))
+        handler.send_json_response = lambda data, status_code=200: sent.append(
+            (status_code, data)
+        )
 
         handler.headers = {"Host": "attacker.example.com"}
         handler.path = "/api/sync"
@@ -422,7 +543,9 @@ class TestValidationAndGuards(LedgerSyncFixtureMixin, unittest.TestCase):
     def test_trusted_write_origin_requires_same_port(self):
         import web_server
 
-        handler: Any = web_server.RequestLedgerHandler.__new__(web_server.RequestLedgerHandler)
+        handler: Any = web_server.RequestLedgerHandler.__new__(
+            web_server.RequestLedgerHandler
+        )
         handler.server = mock.Mock()
         handler.server.server_address = ("127.0.0.1", 8080)
 
@@ -437,37 +560,58 @@ class TestValidationAndGuards(LedgerSyncFixtureMixin, unittest.TestCase):
         import generate_web_dashboard as gwd
 
         payload = {"documents": [], "qa_items": [], "request_ledger": []}
-        self.json_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        with mock.patch.object(gwd, "JSON_PATH", self.json_path), \
-             mock.patch.object(gwd._renderer, "save_atomic", return_value=False):
+        self.json_path.write_text(
+            json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+        )
+        with (
+            mock.patch.object(gwd, "JSON_PATH", self.json_path),
+            mock.patch.object(gwd._renderer, "save_atomic", return_value=False),
+        ):
             result = gwd.main()
         self.assertIsInstance(result, dict)
-        self.assertFalse(result["success"], "HTML 저장 실패를 성공으로 보고하면 안 된다")
+        self.assertFalse(
+            result["success"], "HTML 저장 실패를 성공으로 보고하면 안 된다"
+        )
 
     def test_gui_reports_pipeline_failure(self):
         code = (SCRIPTS_DIR / "launcher_gui.py").read_text(encoding="utf-8")
-        self.assertIn('result_data.get("success", True)', code,
-                      "GUI가 파이프라인 success 값을 확인해야 한다")
+        self.assertIn(
+            'result_data.get("success", True)',
+            code,
+            "GUI가 파이프라인 success 값을 확인해야 한다",
+        )
         # 문자열만 확인하면 그 코드가 실행 불가능해도 통과한다. 실제로 ISSUE-005
         # (nonlocal 누락 → UnboundLocalError)가 이 테스트 아래에서 오래 가려져 있었다.
         # 실행 기반 검증은 tests/test_audit_phase9_fixes.py
         # TestLauncherGuiCompletionHandler 에 있다.
-        self.assertIn("nonlocal err_msg", code,
-                      "err_msg에 대입하려면 nonlocal 선언이 있어야 UnboundLocalError를 피한다")
+        self.assertIn(
+            "nonlocal err_msg",
+            code,
+            "err_msg에 대입하려면 nonlocal 선언이 있어야 UnboundLocalError를 피한다",
+        )
 
     def test_reconcile_reports_db_excel_divergence(self):
         import reconcile_storage
 
-        excel = self.make_excel([["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]])
+        excel = self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]]
+        )
         self.assertTrue(excel.exists())
         with mock.patch.object(reconcile_storage, "SYSTEM_DIR", self.tmp):
             self.sync_service().sync_excel_to_db()
             ledger = self.ledger_service()
-            with mock.patch.object(ExcelSyncService, "find_master_excel", return_value=None):
+            with mock.patch.object(
+                ExcelSyncService, "find_master_excel", return_value=None
+            ):
                 # 엑셀에 기록되지 않은 웹 등록 1건을 만든다.
-                res = ledger.insert_ledger_item({
-                    "year": "2026", "requester": "이의원", "title": "엑셀 미반영", "request_type": "메일",
-                })
+                res = ledger.insert_ledger_item(
+                    {
+                        "year": "2026",
+                        "requester": "이의원",
+                        "title": "엑셀 미반영",
+                        "request_type": "메일",
+                    }
+                )
             LedgerService.wait_last_sync(3)
             report = reconcile_storage.excel_report(self.db_path)
 

@@ -35,7 +35,10 @@ def _windows_pid_is_alive(pid: int) -> bool:
     kernel32 = ctypes.windll.kernel32
     kernel32.OpenProcess.restype = ctypes.c_void_p
     kernel32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
-    kernel32.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+    kernel32.GetExitCodeProcess.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_ulong),
+    ]
     kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
     PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
     STILL_ACTIVE = 259
@@ -84,12 +87,16 @@ class PipelineGuard:
             try:
                 if os.name == "nt":
                     import msvcrt
+
                     msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
                 else:
                     import fcntl
+
                     fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError as exc:
-                raise RuntimeError("파이프라인 락 확인 중입니다. 잠시 후 다시 시도하세요.") from exc
+                raise RuntimeError(
+                    "파이프라인 락 확인 중입니다. 잠시 후 다시 시도하세요."
+                ) from exc
             try:
                 yield
             finally:
@@ -117,8 +124,11 @@ class PipelineGuard:
 
     def is_mine(self) -> bool:
         owner = _OWNERS.get(self._key)
-        return bool(owner and owner[0] == threading.get_ident()
-                    and self._lock_pid() == os.getpid())
+        return bool(
+            owner
+            and owner[0] == threading.get_ident()
+            and self._lock_pid() == os.getpid()
+        )
 
     def is_locked(self) -> bool:
         if not self.path.exists():
@@ -137,7 +147,9 @@ class PipelineGuard:
                 elif allow_reentrant and self.is_mine():
                     return False
                 else:
-                    raise RuntimeError("문서 동기화 파이프라인이 실행 중입니다. 완료 후 다시 시도해주세요.")
+                    raise RuntimeError(
+                        "문서 동기화 파이프라인이 실행 중입니다. 완료 후 다시 시도해주세요."
+                    )
             fd = os.open(str(self.path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
                 stream.write(str(os.getpid()))
@@ -151,8 +163,11 @@ class PipelineGuard:
         if self._identity is None:
             return
         with self._metadata_lock():
-            if (self.path.exists() and self._signature() == self._identity
-                    and self._lock_pid() == os.getpid()):
+            if (
+                self.path.exists()
+                and self._signature() == self._identity
+                and self._lock_pid() == os.getpid()
+            ):
                 self.path.unlink()
             if _OWNERS.get(self._key) == (threading.get_ident(), self._identity):
                 _OWNERS.pop(self._key, None)

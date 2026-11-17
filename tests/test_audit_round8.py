@@ -1,4 +1,5 @@
 """Regression scenarios use disposable workbooks/DBs and real client functions."""
+
 import json
 import os
 import shutil
@@ -24,7 +25,9 @@ from test_audit_phase8_fixes import LedgerSyncFixtureMixin
 
 class TestDurableEdits(LedgerSyncFixtureMixin, unittest.TestCase):
     def test_delete_restore_survive_failed_queue_storage_in_order(self):
-        excel = self.make_excel([["REQ-2026-001", "1", "김의원", "자료", "작성중", "일반", "원본"]])
+        excel = self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료", "작성중", "일반", "원본"]]
+        )
         sync = self.sync_service()
         sync.sync_excel_to_db()
         ledger = self.ledger_service()
@@ -40,11 +43,15 @@ class TestDurableEdits(LedgerSyncFixtureMixin, unittest.TestCase):
         assert restarted.pending_count() == 0
 
     def test_queue_disk_failure_restart_preserves_edit_and_replays(self):
-        excel = self.make_excel([["REQ-2026-001", "1", "김의원", "자료", "작성중", "일반", "원본"]])
+        excel = self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료", "작성중", "일반", "원본"]]
+        )
         sync = self.sync_service()
         sync.sync_excel_to_db()
         with mock.patch.object(sync, "_save_pending_queue", return_value=False):
-            result = self.ledger_service().update_ledger_item("REQ-2026-001", {"note": "웹 수정"})
+            result = self.ledger_service().update_ledger_item(
+                "REQ-2026-001", {"note": "웹 수정"}
+            )
         LedgerService.wait_last_sync(3)
         assert result["success"] and result["excel_pending"]
         assert len(read_operations(self.db_path)) == 1
@@ -58,16 +65,28 @@ class TestDurableEdits(LedgerSyncFixtureMixin, unittest.TestCase):
         assert restarted.pending_count() == 0
 
     def test_outbox_insert_failure_rolls_back_db_edit(self):
-        self.make_excel([["REQ-2026-001", "1", "김의원", "자료", "작성중", "일반", "원본"]])
+        self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료", "작성중", "일반", "원본"]]
+        )
         self.sync_service().sync_excel_to_db()
-        with mock.patch("services.ledger.service.enqueue_excel", side_effect=sqlite3.OperationalError("disk full")):
-            result = self.ledger_service().update_ledger_item("REQ-2026-001", {"note": "유실되면 안 됨"})
+        with mock.patch(
+            "services.ledger.service.enqueue_excel",
+            side_effect=sqlite3.OperationalError("disk full"),
+        ):
+            result = self.ledger_service().update_ledger_item(
+                "REQ-2026-001", {"note": "유실되면 안 됨"}
+            )
         assert not result["success"]
         assert self.db_rows()["REQ-2026-001"]["note"] == "원본"
 
     def test_duplicate_registration_after_lost_response_has_one_row(self):
         ledger = self.ledger_service()
-        data = dict(year="2026", requester="김의원", title="멱등 등록", idempotency_key="retry-1")
+        data = dict(
+            year="2026",
+            requester="김의원",
+            title="멱등 등록",
+            idempotency_key="retry-1",
+        )
         one = ledger.insert_ledger_item(data)
         two = ledger.insert_ledger_item(data)
         LedgerService.wait_last_sync(3)
@@ -80,18 +99,23 @@ class TestDurableEdits(LedgerSyncFixtureMixin, unittest.TestCase):
     def test_rebuild_copies_pending_intent_and_registration_receipt(self):
         sync = self.sync_service()
         with mock.patch.object(sync, "_save_pending_queue", return_value=False):
-            result = self.ledger_service().insert_ledger_item(dict(year="2026", requester="의원", title="보관", idempotency_key="k"))
+            result = self.ledger_service().insert_ledger_item(
+                dict(year="2026", requester="의원", title="보관", idempotency_key="k")
+            )
         LedgerService.wait_last_sync(3)
         assert result["success"]
         with sqlite3.connect(":memory:") as dest:
             DatabaseManager.ensure_schema(dest)
             copy_delivery_state(self.db_path, dest)
             assert dest.execute("SELECT COUNT(*) FROM ledger_outbox").fetchone()[0] == 1
-            assert dest.execute("SELECT COUNT(*) FROM ledger_receipts").fetchone()[0] == 1
+            assert (
+                dest.execute("SELECT COUNT(*) FROM ledger_receipts").fetchone()[0] == 1
+            )
 
 
 def test_future_schema_rebuild_refuses_before_any_processing(tmp_path, monkeypatch):
     import extract_and_build_db as builder
+
     db = tmp_path / "future.db"
     with sqlite3.connect(db) as conn:
         conn.execute(f"PRAGMA user_version={SCHEMA_VERSION + 1}")
@@ -107,7 +131,9 @@ def test_future_schema_rebuild_refuses_before_any_processing(tmp_path, monkeypat
     with sqlite3.connect(db) as conn:
         with pytest.raises(SchemaTooNewError):
             DatabaseManager.ensure_schema(conn)
-        assert conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall() == [("future_only",)]
+        assert conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall() == [("future_only",)]
     with pytest.raises(SchemaTooNewError):
         LedgerService(db_path=db, base_dir=tmp_path)._ensure_schema()
     assert db.read_bytes() == original
@@ -150,21 +176,37 @@ def test_lock_rejects_other_thread_and_process_then_recovers(tmp_path):
     guard = PipelineGuard(tmp_path)
     assert guard.acquire()
     result = []
+
     def competitor():
         try:
             PipelineGuard(tmp_path).acquire()
         except RuntimeError:
             result.append("blocked")
+
     thread = threading.Thread(target=competitor)
     thread.start()
     thread.join(5)
     assert result == ["blocked"]
     code = "from pipeline_guard import PipelineGuard; import sys; g=PipelineGuard(sys.argv[1]); g.acquire(False)"
-    env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "scripts"))
-    child = subprocess.run([sys.executable, "-c", code, str(tmp_path)], env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=10)
+    env = dict(
+        os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "scripts")
+    )
+    child = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path)],
+        env=env,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        timeout=10,
+    )
     assert child.returncode != 0
     guard.release()
-    child = subprocess.run([sys.executable, "-c", code, str(tmp_path)], env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=10)
+    child = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path)],
+        env=env,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        timeout=10,
+    )
     assert child.returncode == 0
     recovered = PipelineGuard(tmp_path)
     assert recovered.acquire(False)
@@ -180,9 +222,16 @@ with g._metadata_lock():
     print('ready',flush=True)
     time.sleep(30)
 """
-    env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "scripts"))
-    child = subprocess.Popen([sys.executable, "-c", code, str(tmp_path)], env=env,
-                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    env = dict(
+        os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "scripts")
+    )
+    child = subprocess.Popen(
+        [sys.executable, "-c", code, str(tmp_path)],
+        env=env,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     try:
         assert child.stdout is not None
         assert child.stdout.readline().strip() == b"ready"
@@ -201,6 +250,7 @@ with g._metadata_lock():
 
 def test_migration_retry_does_not_duplicate_conflict(tmp_path):
     from migrate_existing_install import migrate_markdown
+
     source, dest = tmp_path / "old", tmp_path / "new"
     for root, text in ((source, "old body"), (dest, "new body")):
         folder = root / "_parsed_markdown"
@@ -216,8 +266,10 @@ def test_client_edit_keeps_original_version_and_empty_list_clears(tmp_path):
     node = shutil.which("node")
     assert node is not None
     root = Path(__file__).resolve().parents[1]
-    src = (root / "scripts/templates/dashboard/js/10_ledger_crud.js").read_text(encoding="utf-8")
-    harness = r'''
+    src = (root / "scripts/templates/dashboard/js/10_ledger_crud.js").read_text(
+        encoding="utf-8"
+    )
+    harness = r"""
 const assert = require('assert');
 const nodes = {};
 const document = {getElementById(id) { return nodes[id] ||= {value:'',innerText:'',classList:{add(){},remove(){}},querySelectorAll(){return []},options:[]}; }};
@@ -243,12 +295,25 @@ setSelectPreservingValue = () => {};
  assert.deepEqual(REQUEST_LEDGER.map(x=>x.ledger_id),['LOCAL-kept']);
  console.log('ok');
 })().catch(e=>{console.error(e);process.exit(1)});
-'''
+"""
     js = tmp_path / "client.js"
     from test_audit_phase10_dashboard import extract_js
-    boot = (root / "scripts/templates/dashboard/js/00_boot.js").read_text(encoding="utf-8")
-    js.write_text(extract_js(boot, "applyServerLedger") + "\n" + src + "\n" + harness, encoding="utf-8")
-    run = subprocess.run([node, str(js)], stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", timeout=20)
+
+    boot = (root / "scripts/templates/dashboard/js/00_boot.js").read_text(
+        encoding="utf-8"
+    )
+    js.write_text(
+        extract_js(boot, "applyServerLedger") + "\n" + src + "\n" + harness,
+        encoding="utf-8",
+    )
+    run = subprocess.run(
+        [node, str(js)],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=20,
+    )
     assert run.returncode == 0, run.stderr
 
 
@@ -258,8 +323,11 @@ def test_http_boot_empty_authority_and_network_fallback(tmp_path, api_ok):
     node = shutil.which("node")
     assert node is not None
     from template_renderer import DashboardRenderer
+
     root = Path(__file__).resolve().parents[1]
-    boot = (root / "scripts/templates/dashboard/js/00_boot.js").read_text(encoding="utf-8")
+    boot = (root / "scripts/templates/dashboard/js/00_boot.js").read_text(
+        encoding="utf-8"
+    )
     raw = dict(documents=[], qa_items=[], request_ledger=[dict(ledger_id="REQ-old")])
     b64 = DashboardRenderer.compress_payload(raw)
     code = f"""
@@ -274,11 +342,17 @@ const fetch = async()=>({{ok:{json.dumps(api_ok)},json:async()=>({{success:true,
 {boot}
 (async()=>{{
  await loadAndDecompressDatabase();
- assert.deepEqual(REQUEST_LEDGER.map(x=>x.ledger_id),{json.dumps(['LOCAL-kept'] if api_ok else ['REQ-old', 'LOCAL-kept'])});
+ assert.deepEqual(REQUEST_LEDGER.map(x=>x.ledger_id),{json.dumps(["LOCAL-kept"] if api_ok else ["REQ-old", "LOCAL-kept"])});
 }})().catch(e=>{{console.error(e);process.exit(1)}});
 """
     path = tmp_path / "boot.js"
     path.write_text(code, encoding="utf-8")
-    result = subprocess.run([node, str(path)], stdin=subprocess.DEVNULL,
-                            capture_output=True, text=True, encoding="utf-8", timeout=20)
+    result = subprocess.run(
+        [node, str(path)],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=20,
+    )
     assert result.returncode == 0, result.stderr

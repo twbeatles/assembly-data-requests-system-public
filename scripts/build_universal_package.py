@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Any, Optional, cast
 
-cast(Any, sys.stdout).reconfigure(encoding='utf-8')
+cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = SCRIPTS_DIR.parent
@@ -54,7 +54,12 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
             continue
         dst_item = scripts_dst / item.name
         if item.is_dir():
-            shutil.copytree(item, dst_item, dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+            shutil.copytree(
+                item,
+                dst_item,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
         else:
             shutil.copy2(item, dst_item)
     print("✓ 범용 스크립트 및 모듈 서브패키지 동기화 완료")
@@ -72,8 +77,8 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
             "*요구자료*목록*.xls*",
             "*자료요구*목록*.xls*",
             "*요구자료*대장*.xls*",
-            "*관리대장*.xls*"
-        ]
+            "*관리대장*.xls*",
+        ],
     }
     with open(target_dir / "config.json", "w", encoding="utf-8") as f:
         json.dump(univ_config, f, ensure_ascii=False, indent=2)
@@ -82,19 +87,40 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
     # 폴더 이름을 바꿔도 배포본으로 인식되도록 표식을 남긴다. 데이터는 포함하지 않으므로
     # 받는 부서에서는 자체 대장·원문으로 SQLite·통합 엑셀·대시보드를 모두 만든다.
     (target_dir / ".distribution_manifest.json").write_text(
-        json.dumps({"package": "universal", "data_included": False, "source_documents_included": False},
-                   ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "package": "universal",
+                "data_included": False,
+                "source_documents_included": False,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
     # 3. Batch files
-    write_all_bats.write_bat_file(target_dir / "00_새자료_추가_및_DB동기화.bat", write_all_bats.SYSTEM_BAT_00)
-    write_all_bats.write_bat_file(target_dir / "01_웹대시보드_실행.bat", write_all_bats.SYSTEM_BAT_01)
-    write_all_bats.write_bat_file(target_dir / "02_웹관리서버_실행.bat", write_all_bats.SYSTEM_BAT_02)
-    write_all_bats.write_bat_file(target_dir / "03_엑셀DB_열기.bat", write_all_bats.SYSTEM_BAT_03)
-    write_all_bats.write_bat_file(target_dir / "04_부서명_간편설정.bat", write_all_bats.SYSTEM_BAT_04)
-    write_all_bats.write_bat_file(target_dir / "05_통합검색프로그램_실행.bat", write_all_bats.SYSTEM_BAT_05)
-    write_all_bats.write_bat_file(target_dir / "07_기존자료_안전마이그레이션.bat", write_all_bats.SYSTEM_BAT_07)
+    write_all_bats.write_bat_file(
+        target_dir / "00_새자료_추가_및_DB동기화.bat", write_all_bats.SYSTEM_BAT_00
+    )
+    write_all_bats.write_bat_file(
+        target_dir / "01_웹대시보드_실행.bat", write_all_bats.SYSTEM_BAT_01
+    )
+    write_all_bats.write_bat_file(
+        target_dir / "02_웹관리서버_실행.bat", write_all_bats.SYSTEM_BAT_02
+    )
+    write_all_bats.write_bat_file(
+        target_dir / "03_엑셀DB_열기.bat", write_all_bats.SYSTEM_BAT_03
+    )
+    write_all_bats.write_bat_file(
+        target_dir / "04_부서명_간편설정.bat", write_all_bats.SYSTEM_BAT_04
+    )
+    write_all_bats.write_bat_file(
+        target_dir / "05_통합검색프로그램_실행.bat", write_all_bats.SYSTEM_BAT_05
+    )
+    write_all_bats.write_bat_file(
+        target_dir / "07_기존자료_안전마이그레이션.bat", write_all_bats.SYSTEM_BAT_07
+    )
     print("✓ 원클릭 바로가기 배치파일 7종 작성 완료")
 
     exe_src = SYSTEM_DIR / "dist" / "자료요구_통합검색.exe"
@@ -148,8 +174,12 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
         print("✓ 배치파일 안전설계 및 운영 가이드 복사 완료")
 
     # 7. Manuals
-    (target_dir / "사용설명서_및_안내.html").write_text(HTML_MANUAL_CONTENT_UNIVERSAL, encoding="utf-8")
-    (target_dir / "README_배포안내.txt").write_text(README_TXT_CONTENT_UNIVERSAL, encoding="utf-8-sig")
+    (target_dir / "사용설명서_및_안내.html").write_text(
+        HTML_MANUAL_CONTENT_UNIVERSAL, encoding="utf-8"
+    )
+    (target_dir / "README_배포안내.txt").write_text(
+        README_TXT_CONTENT_UNIVERSAL, encoding="utf-8-sig"
+    )
     print("✓ 사용설명서 HTML 및 README 텍스트 작성 완료")
 
     # 8. Clean Database & Dashboard
@@ -162,6 +192,7 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
     print("💡 이 폴더를 ZIP으로 압축하여 타 부서에 전달하시면 됩니다.")
     print("=" * 65)
     return target_dir
+
 
 if __name__ == "__main__":
     build_universal_package()

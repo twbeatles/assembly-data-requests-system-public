@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """엑셀 행 신원 비교와 보류 큐 상수."""
+
 import re
 import sys
 from pathlib import Path
@@ -37,7 +38,9 @@ def _norm_identity(field: str, value) -> str:
     return text
 
 
-def identity_matches(row_values: Dict[str, Any], reference: Optional[Dict[str, Any]]) -> Optional[bool]:
+def identity_matches(
+    row_values: Dict[str, Any], reference: Optional[Dict[str, Any]]
+) -> Optional[bool]:
     """엑셀 행과 기준 레코드가 같은 항목인가.
 
     양쪽 모두 값이 있는 첫 필드로 판정한다. 비교할 수 있는 필드가 없으면 None(판단 불가).

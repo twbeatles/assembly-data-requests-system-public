@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """대시보드 페이로드 믹스인(SRP: 압축·슬림화·렌더 치환)."""
+
 import base64
 import gzip
 import html
@@ -15,9 +16,13 @@ BODY_SPLIT_THRESHOLD_CHARS = 4_000_000
 BODY_CHUNK_CHARS = 3_000_000
 DATA_PLACEHOLDER = "__B64_GZIP_DATA__"
 _META_BLOCK_RE = re.compile(
-    r'<script\s+id=["\']COMPRESSED_DATA["\']\s+type=["\']text/plain["\']>([^<]+)</script>', re.I)
+    r'<script\s+id=["\']COMPRESSED_DATA["\']\s+type=["\']text/plain["\']>([^<]+)</script>',
+    re.I,
+)
 _BODY_BLOCK_RE = re.compile(
-    r'<script\s+id=["\']COMPRESSED_BODY_(\d+)["\']\s+type=["\']text/plain["\']>([^<]*)</script>', re.I)
+    r'<script\s+id=["\']COMPRESSED_BODY_(\d+)["\']\s+type=["\']text/plain["\']>([^<]*)</script>',
+    re.I,
+)
 
 
 class PayloadMixin:
@@ -30,7 +35,9 @@ class PayloadMixin:
 
     @staticmethod
     def decompress_block(b64: str) -> Dict[str, Any]:
-        return json.loads(gzip.decompress(base64.b64decode(b64.strip())).decode("utf-8"))
+        return json.loads(
+            gzip.decompress(base64.b64decode(b64.strip())).decode("utf-8")
+        )
 
     @staticmethod
     def split_payload(
@@ -49,7 +56,9 @@ class PayloadMixin:
         docs = payload.get("documents") or []
         qas = payload.get("qa_items") or []
         total = sum(len(d.get("full_markdown") or "") for d in docs)
-        total += sum(len(q.get("answer_markdown") or "") for q in qas if "am_ref" not in q)
+        total += sum(
+            len(q.get("answer_markdown") or "") for q in qas if "am_ref" not in q
+        )
         if not docs or total <= threshold:
             return payload, []
 
@@ -91,14 +100,20 @@ class PayloadMixin:
         return meta, chunks
 
     @classmethod
-    def encode_payload_parts(cls, payload: Dict[str, Any], threshold: Optional[int] = None,
-                             chunk_chars: Optional[int] = None) -> Tuple[str, List[str]]:
+    def encode_payload_parts(
+        cls,
+        payload: Dict[str, Any],
+        threshold: Optional[int] = None,
+        chunk_chars: Optional[int] = None,
+    ) -> Tuple[str, List[str]]:
         """(메타 base64, [본문 블록 base64...])."""
         meta, chunks = cls.split_payload(payload, threshold, chunk_chars)
         return cls.compress_payload(meta), [cls.compress_payload(c) for c in chunks]
 
     @staticmethod
-    def embed_data(template_html: str, meta_b64: str, body_b64s: Optional[List[str]] = None) -> str:
+    def embed_data(
+        template_html: str, meta_b64: str, body_b64s: Optional[List[str]] = None
+    ) -> str:
         """`COMPRESSED_DATA` 자리에 메타를 넣고, 바로 뒤에 본문 블록 스크립트를 붙인다."""
         body_b64s = body_b64s or []
         tags = "".join(
@@ -127,9 +142,14 @@ class PayloadMixin:
         if not isinstance(payload, dict):
             raise ValueError("내장 데이터 구조가 불완전합니다")
         expected = int(payload.pop("body_chunks", 0) or 0)
-        blocks = sorted(((int(i), b) for i, b in _BODY_BLOCK_RE.findall(html_content)), key=lambda x: x[0])
+        blocks = sorted(
+            ((int(i), b) for i, b in _BODY_BLOCK_RE.findall(html_content)),
+            key=lambda x: x[0],
+        )
         if len(blocks) != expected or [i for i, _ in blocks] != list(range(expected)):
-            raise ValueError(f"본문 블록 수가 맞지 않습니다 (기대 {expected}, 실제 {len(blocks)})")
+            raise ValueError(
+                f"본문 블록 수가 맞지 않습니다 (기대 {expected}, 실제 {len(blocks)})"
+            )
         if expected:
             docs_by_id = {d.get("doc_id"): d for d in payload.get("documents", [])}
             qas_by_id = {q.get("qa_id"): q for q in payload.get("qa_items", [])}
@@ -137,7 +157,9 @@ class PayloadMixin:
                 try:
                     chunk = cls.decompress_block(b64)
                 except (ValueError, OSError, UnicodeDecodeError) as error:
-                    raise ValueError(f"본문 블록을 읽을 수 없습니다: {error}") from error
+                    raise ValueError(
+                        f"본문 블록을 읽을 수 없습니다: {error}"
+                    ) from error
                 for doc_id, body in (chunk.get("bodies") or {}).items():
                     if doc_id in docs_by_id:
                         docs_by_id[doc_id]["full_markdown"] = body
@@ -149,6 +171,7 @@ class PayloadMixin:
             for q in payload.get("qa_items", []):
                 q.pop("body_chunk", None)
         return payload
+
     @staticmethod
     def build_slim_payload(raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """중복 필드만 정리한다. full_markdown·answer_markdown 전문은 절대 제거하지 않는다."""
@@ -168,7 +191,9 @@ class PayloadMixin:
         # 화면이 열릴 때 `00_boot.js`가 원문 그대로 되살린다. 전문 보존 정책 2항의
         # "삭제·절단하지 않는다"는 그대로 지킨다 — 복원한 문자열은 원본과 한 글자도 다르지 않다.
         # 위치를 못 찾으면(파싱 방식이 달라진 문서 등) 예전처럼 전문을 그대로 싣는다.
-        body_by_doc = {d.get("doc_id"): (d.get("full_markdown") or "") for d in slim_docs}
+        body_by_doc = {
+            d.get("doc_id"): (d.get("full_markdown") or "") for d in slim_docs
+        }
         slim_qas = []
         for q in raw_data.get("qa_items", []):
             answer = q.get("answer_markdown") or q.get("answer_full") or ""
@@ -190,22 +215,26 @@ class PayloadMixin:
         # 안전망. 삭제 tombstone이 파이프라인을 우회해 들어와도 화면에는 내보내지 않는다.
         # (본문 전문은 절대 자르지 않는다는 정책과 무관한, 대장 상태값 필터다.)
         slim_ledger = [
-            r for r in raw_data.get("request_ledger", [])
+            r
+            for r in raw_data.get("request_ledger", [])
             if str((r or {}).get("status") or "").strip() != "[삭제]"
         ]
 
         payload = {
             "documents": slim_docs,
             "qa_items": slim_qas,
-            "request_ledger": slim_ledger
+            "request_ledger": slim_ledger,
         }
         # 대장 변경 이력 타임라인(선택). 01번 오프라인 화면에서도 "누가 언제 무엇을 바꿨나"를
         # 볼 수 있게 싣는다. 화면에 있는 대장 항목의 이력만 남긴다(삭제 항목 제외, 불변조건 11).
         history = raw_data.get("ledger_history")
         if isinstance(history, dict) and history:
             visible = {str((r or {}).get("ledger_id") or "") for r in slim_ledger}
-            payload["ledger_history"] = {k: v for k, v in history.items() if k in visible and v}
+            payload["ledger_history"] = {
+                k: v for k, v in history.items() if k in visible and v
+            }
         return payload
+
     def render(
         self,
         template_str: str,
@@ -221,24 +250,46 @@ class PayloadMixin:
         template_str = self.embed_data(template_str, b64_data, body_b64s)
         dept_name = html.escape(str(config.get("department_name", "국회·대외기관")))
         agency_name = html.escape(str(config.get("agency_name", "공공기관")))
-        sys_title = html.escape(str(config.get("system_title", "국회·대외기관 자료요구 스마트 관리 및 검색 시스템")))
+        sys_title = html.escape(
+            str(
+                config.get(
+                    "system_title", "국회·대외기관 자료요구 스마트 관리 및 검색 시스템"
+                )
+            )
+        )
         clean_title = sys_title.replace("🛡️", "").strip()
-        sys_subtitle = html.escape(str(config.get("system_subtitle", "공문서 답변 전문 & 지능형 검색·공유 협업 플랫폼")))
+        sys_subtitle = html.escape(
+            str(
+                config.get(
+                    "system_subtitle", "공문서 답변 전문 & 지능형 검색·공유 협업 플랫폼"
+                )
+            )
+        )
 
         return (
-            template_str
-            .replace("/* __APP_CONFIG_JSON__ */ null", self.app_config_json(config))
+            template_str.replace(
+                "/* __APP_CONFIG_JSON__ */ null", self.app_config_json(config)
+            )
             .replace("/* __MARKED_JS__ */", marked_js)
             .replace("__PAGE_TITLE__", f"{dept_name} {clean_title}")
             .replace("__HEADER_TITLE__", f"🛡️ {dept_name} {clean_title}")
-            .replace("__HEADER_SUBTITLE__", f"{agency_name} {dept_name} | {sys_subtitle}")
+            .replace(
+                "__HEADER_SUBTITLE__", f"{agency_name} {dept_name} | {sys_subtitle}"
+            )
             .replace("__DEFAULT_DEPT__", dept_name)
         )
+
     @staticmethod
     def app_config_json(config: Dict[str, Any]) -> str:
         """대시보드 JS에 넣을 설정 원본값. `</script>`로 스크립트 블록이 끊기지 않게 한다."""
         # excel_filename: 화면의 [엑셀 파일 열기] 링크가 설정한 파일 이름을 따르게 한다(범용 배포본은 이름이 다르다).
-        keys = ("department_name", "agency_name", "system_title", "system_subtitle", "excel_filename")
+        keys = (
+            "department_name",
+            "agency_name",
+            "system_title",
+            "system_subtitle",
+            "excel_filename",
+        )
         values = {k: str(config.get(k)) for k in keys if config.get(k)}
         if "system_title" in values:
             values["system_title"] = values["system_title"].replace("🛡️", "").strip()

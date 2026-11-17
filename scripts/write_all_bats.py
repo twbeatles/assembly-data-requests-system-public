@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-cast(Any, sys.stdout).reconfigure(encoding='utf-8')
+cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 SYSTEM_DIR = SCRIPTS_DIR.parent
@@ -36,17 +36,9 @@ DIST_DIR = SYSTEM_DIR / "배포용_자료요구_통합검색시스템"
 UNIVERSAL_DIST_DIR = SYSTEM_DIR.parent / "국회자료요구_스마트시스템_범용배포용"
 
 
-
-
-
 # ============================================================================
 # Templates for SYSTEM_DIR & Distribution Packages (Relative to current dir)
 # ============================================================================
-
-
-
-
-
 
 
 # 배포본에도 포함한다. 더블클릭하면 폴더 선택 창이 열리고, 이전 폴더를 고르면
@@ -57,14 +49,14 @@ UNIVERSAL_DIST_DIR = SYSTEM_DIR.parent / "국회자료요구_스마트시스템_
 # 배포본에 들어가는 00~05. 06은 원본 전용이라 제외한다.
 
 
-
-
 def write_bat_file(path: Path, content: str):
     """Write batch file encoded in CP949 with CRLF line endings for native Windows cmd.exe compatibility."""
     validate_batch_file_rules(content, path.name)
     crlf = content.replace("\r\n", "\n").replace("\n", "\r\n")
-    path.write_bytes(crlf.encode('cp949'))
-    print(f"[OK] 배치파일 무결성 검증 및 작성 완료 (CP949, CRLF): {path.name} -> {path.parent.name}")
+    path.write_bytes(crlf.encode("cp949"))
+    print(
+        f"[OK] 배치파일 무결성 검증 및 작성 완료 (CP949, CRLF): {path.name} -> {path.parent.name}"
+    )
 
 
 def main():
@@ -113,5 +105,5 @@ def main():
     print("=" * 65)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

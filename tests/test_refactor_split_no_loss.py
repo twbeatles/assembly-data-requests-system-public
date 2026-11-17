@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """코드 분할 뒤 공개 심볼·단일 HTML 전달 규칙이 깨지지 않는지 검증한다."""
+
 from __future__ import annotations
 
 import json
@@ -35,7 +36,9 @@ class TestRefactorSplitNoLoss(unittest.TestCase):
         cls.assembled = DashboardRenderer().load_template()
 
     def test_snapshot_file_exists(self):
-        self.assertTrue(SNAPSHOT_PATH.exists(), f"심볼 스냅샷이 없습니다: {SNAPSHOT_PATH}")
+        self.assertTrue(
+            SNAPSHOT_PATH.exists(), f"심볼 스냅샷이 없습니다: {SNAPSHOT_PATH}"
+        )
 
     def test_python_public_names_reexported(self):
         missing = {}
@@ -44,7 +47,11 @@ class TestRefactorSplitNoLoss(unittest.TestCase):
             lost = [name for name in expected if name not in actual]
             if lost:
                 missing[key] = lost
-        self.assertEqual(missing, {}, f"분할 후 사라진 Python 심볼: {json.dumps(missing, ensure_ascii=False)}")
+        self.assertEqual(
+            missing,
+            {},
+            f"분할 후 사라진 Python 심볼: {json.dumps(missing, ensure_ascii=False)}",
+        )
 
     def test_dashboard_assembled_has_all_js_functions(self):
         expected = self.snapshot["dashboard_js"]
@@ -59,8 +66,15 @@ class TestRefactorSplitNoLoss(unittest.TestCase):
         )
 
     def test_assembled_html_keeps_placeholders_for_render(self):
-        for token in ("/* __MARKED_JS__ */", "__B64_GZIP_DATA__", "__PAGE_TITLE__", "/* __APP_CONFIG_JSON__ */"):
-            self.assertIn(token, self.assembled, f"템플릿 자리표시자가 없습니다: {token}")
+        for token in (
+            "/* __MARKED_JS__ */",
+            "__B64_GZIP_DATA__",
+            "__PAGE_TITLE__",
+            "/* __APP_CONFIG_JSON__ */",
+        ):
+            self.assertIn(
+                token, self.assembled, f"템플릿 자리표시자가 없습니다: {token}"
+            )
 
     def test_shim_modules_export_same_objects_when_packages_exist(self):
         pairs = [

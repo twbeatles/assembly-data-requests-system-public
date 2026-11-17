@@ -14,9 +14,16 @@ from extractors.ledger.paths import DEFAULT_SYSTEM_DIR
 
 class LedgerParser:
     """Object-oriented interface for parsing and merging master request ledgers."""
+
     def __init__(self, root_dir: Optional[Path] = None):
         self.root_dir = Path(root_dir) if root_dir else DEFAULT_SYSTEM_DIR
 
-    def parse_ledger(self, documents: list, merge_db_records: bool = True, protected_ids=None) -> List[Dict[str, Any]]:
-        return load_request_ledger(self.root_dir, documents, merge_db_records=merge_db_records,
-                                   protected_ids=protected_ids)
+    def parse_ledger(
+        self, documents: list, merge_db_records: bool = True, protected_ids=None
+    ) -> List[Dict[str, Any]]:
+        return load_request_ledger(
+            self.root_dir,
+            documents,
+            merge_db_records=merge_db_records,
+            protected_ids=protected_ids,
+        )

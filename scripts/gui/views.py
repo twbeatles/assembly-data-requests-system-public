@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """GUI 뷰 빌더 믹스인(SRP: 창·스타일·헤더·검색뷰·상태바 구성)."""
+
 import tkinter as tk
 from tkinter import scrolledtext, ttk
 from typing import TYPE_CHECKING
@@ -34,18 +35,25 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
         x = max(0, (sw - width) // 2)
         y = max(0, (sh - height) // 2 - 30)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
+
     def setup_styles(self):
         self.style = ttk.Style()
         try:
-            self.style.theme_use('vista' if 'vista' in self.style.theme_names() else 'clam')
+            self.style.theme_use(
+                "vista" if "vista" in self.style.theme_names() else "clam"
+            )
         except Exception:
             pass
         self.style.configure(".", font=(FONT, 10))
         self.style.configure("Treeview.Heading", font=(FONT, 10, "bold"), padding=5)
         self.style.configure("Treeview", font=(FONT, 9), rowheight=26)
-        self.style.configure("Target.TRadiobutton", font=(FONT, 9), background="#ffffff")
+        self.style.configure(
+            "Target.TRadiobutton", font=(FONT, 9), background="#ffffff"
+        )
+
     def create_header(self):
         import launcher_gui as lg  # 지연 import: 진입점 전역 패치를 그대로 본다.
+
         header = tk.Frame(self.root, bg="#133352", height=78)
         header.pack(fill=tk.X, side=tk.TOP)
         header.pack_propagate(False)
@@ -58,7 +66,7 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
             text=f"🛡️ {lg.DEPT_CONFIG.get('system_title', '국회·대외기관 자료요구 통합 검색 시스템')}",
             font=(FONT, 16, "bold"),
             fg="#ffffff",
-            bg="#133352"
+            bg="#133352",
         )
         title_lbl.pack(anchor="w")
 
@@ -67,7 +75,7 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
             text=f"{lg.DEPT_CONFIG.get('dept_name', '기획예산팀')} 공문서 및 Q&A 표준 데이터베이스 | 무설치 독립형 통합 패키지",
             font=(FONT, 9),
             fg="#93c5fd",
-            bg="#133352"
+            bg="#133352",
         )
         self.sub_lbl.pack(anchor="w", pady=(2, 0))
 
@@ -75,7 +83,11 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
         btn = tk.Button(
             parent,
             text=text,
-            font=(FONT, 10 if primary else 9, "bold" if (primary or bold) else "normal"),
+            font=(
+                FONT,
+                10 if primary else 9,
+                "bold" if (primary or bold) else "normal",
+            ),
             bg=PRIMARY if primary else NEUTRAL_BG,
             fg="white" if primary else TEXT,
             activebackground=PRIMARY_ACTIVE if primary else NEUTRAL_ACTIVE,
@@ -94,16 +106,28 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
         bar.pack(fill=tk.X, padx=16, pady=(12, 6))
 
         tk.Label(
-            bar,
-            text="바로 실행:",
-            font=(FONT, 10, "bold"),
-            fg="#334155",
-            bg="#f8fafc"
+            bar, text="바로 실행:", font=(FONT, 10, "bold"), fg="#334155", bg="#f8fafc"
         ).pack(side=tk.LEFT, padx=(4, 12))
 
-        self._flat_button(bar, "🌐 웹 대시보드 열기", self.open_html_dashboard, primary=True, side=tk.LEFT, padx=6)
-        self._flat_button(bar, "➕ 새 자료 추가 / DB 갱신", self.on_click_add_documents, bold=True, side=tk.LEFT, padx=6)
-        self._flat_button(bar, "📊 엑셀 통합 DB", self.open_excel_db, side=tk.LEFT, padx=6)
+        self._flat_button(
+            bar,
+            "🌐 웹 대시보드 열기",
+            self.open_html_dashboard,
+            primary=True,
+            side=tk.LEFT,
+            padx=6,
+        )
+        self._flat_button(
+            bar,
+            "➕ 새 자료 추가 / DB 갱신",
+            self.on_click_add_documents,
+            bold=True,
+            side=tk.LEFT,
+            padx=6,
+        )
+        self._flat_button(
+            bar, "📊 엑셀 통합 DB", self.open_excel_db, side=tk.LEFT, padx=6
+        )
         self._flat_button(bar, "📖 사용설명서", self.open_manual, side=tk.LEFT, padx=6)
         self._flat_button(bar, "📁 폴더 열기", self.open_folder, side=tk.RIGHT, padx=6)
 
@@ -115,61 +139,77 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
         ctrl_frame.pack(fill=tk.X, pady=(4, 4))
 
         tk.Label(
-            ctrl_frame,
-            text="🔍 검색:",
-            font=(FONT, 11, "bold"),
-            fg=TEXT,
-            bg="#ffffff"
+            ctrl_frame, text="🔍 검색:", font=(FONT, 11, "bold"), fg=TEXT, bg="#ffffff"
         ).pack(side=tk.LEFT, padx=(0, 8))
 
-        self.kw_entry = tk.Entry(ctrl_frame, font=(FONT, 11), width=35, bd=2, relief=tk.GROOVE)
+        self.kw_entry = tk.Entry(
+            ctrl_frame, font=(FONT, 11), width=35, bd=2, relief=tk.GROOVE
+        )
         self.kw_entry.pack(side=tk.LEFT, padx=(0, 8), ipady=3)
         self.kw_entry.bind("<Return>", lambda e: self.do_search())
         self.kw_entry.focus_set()
 
-        tk.Label(ctrl_frame, text="연도:", font=(FONT, 9), fg="#475569", bg="#ffffff").pack(side=tk.LEFT, padx=(8, 4))
+        tk.Label(
+            ctrl_frame, text="연도:", font=(FONT, 9), fg="#475569", bg="#ffffff"
+        ).pack(side=tk.LEFT, padx=(8, 4))
         # 연도 목록은 DB에 있는 연도로 채운다(init_db_and_load). 여기에 연도를 적어 두지 않는다.
-        self.year_combo = ttk.Combobox(ctrl_frame, values=["전체"], width=7, state="readonly")
+        self.year_combo = ttk.Combobox(
+            ctrl_frame, values=["전체"], width=7, state="readonly"
+        )
         self.year_combo.set("전체")
         self.year_combo.pack(side=tk.LEFT, padx=(0, 8))
         self.year_combo.bind("<<ComboboxSelected>>", lambda e: self.do_search())
 
-        self._flat_button(ctrl_frame, "검색", self.do_search, primary=True, side=tk.LEFT, padx=4)
+        self._flat_button(
+            ctrl_frame, "검색", self.do_search, primary=True, side=tk.LEFT, padx=4
+        )
         self._flat_button(ctrl_frame, "초기화", self.reset_search, side=tk.LEFT, padx=4)
 
         self.count_label = tk.Label(
-            ctrl_frame,
-            text="조회 준비 중...",
-            font=(FONT, 9),
-            fg=MUTED,
-            bg="#ffffff"
+            ctrl_frame, text="조회 준비 중...", font=(FONT, 9), fg=MUTED, bg="#ffffff"
         )
         self.count_label.pack(side=tk.RIGHT, padx=4)
 
         # 검색 대상: 콤보 대신 라디오 버튼(제안서 G8). 한눈에 보이고 한 번에 바꾼다.
         target_frame = tk.Frame(container, bg="#ffffff")
         target_frame.pack(fill=tk.X, pady=(0, 8))
-        tk.Label(target_frame, text="대상:", font=(FONT, 9), fg="#475569", bg="#ffffff").pack(side=tk.LEFT, padx=(0, 6))
+        tk.Label(
+            target_frame, text="대상:", font=(FONT, 9), fg="#475569", bg="#ffffff"
+        ).pack(side=tk.LEFT, padx=(0, 6))
         self.target_var = tk.StringVar(value="qa")
         for value, label in TARGET_CHOICES:
             ttk.Radiobutton(
-                target_frame, text=label, value=value, variable=self.target_var,
-                style="Target.TRadiobutton", command=self.do_search,
+                target_frame,
+                text=label,
+                value=value,
+                variable=self.target_var,
+                style="Target.TRadiobutton",
+                command=self.do_search,
             ).pack(side=tk.LEFT, padx=(0, 12))
         tk.Label(
             target_frame,
-            text="문법: 두 단어(모두 포함) · A OR B · -제외어 · \"구문\" · 초성(ㄷㅍㅇㅋ)",
-            font=(FONT, 8), fg=MUTED, bg="#ffffff",
+            text='문법: 두 단어(모두 포함) · A OR B · -제외어 · "구문" · 초성(ㄷㅍㅇㅋ)',
+            font=(FONT, 8),
+            fg=MUTED,
+            bg="#ffffff",
         ).pack(side=tk.RIGHT)
 
-        paned = tk.PanedWindow(container, orient=tk.HORIZONTAL, bg="#cbd5e1", sashwidth=5, sashrelief=tk.RAISED)
+        paned = tk.PanedWindow(
+            container,
+            orient=tk.HORIZONTAL,
+            bg="#cbd5e1",
+            sashwidth=5,
+            sashrelief=tk.RAISED,
+        )
         paned.pack(fill=tk.BOTH, expand=True)
 
         left_frame = tk.Frame(paned, bg="#ffffff")
         paned.add(left_frame, minsize=450, width=560)
 
         cols = ("id", "date", "requester", "title", "extra")
-        self.tree = ttk.Treeview(left_frame, columns=cols, show="headings", selectmode="browse")
+        self.tree = ttk.Treeview(
+            left_frame, columns=cols, show="headings", selectmode="browse"
+        )
         self.tree.heading("id", text="ID")
         self.tree.heading("date", text="일자")
         self.tree.heading("requester", text="의원/기관")
@@ -182,9 +222,15 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
         self.tree.column("title", width=230, anchor="w")
         self.tree.column("extra", width=110, anchor="w")
 
-        tree_scroll_y = ttk.Scrollbar(left_frame, orient=tk.VERTICAL, command=self.tree.yview)
-        tree_scroll_x = ttk.Scrollbar(left_frame, orient=tk.HORIZONTAL, command=self.tree.xview)
-        self.tree.configure(yscrollcommand=tree_scroll_y.set, xscrollcommand=tree_scroll_x.set)
+        tree_scroll_y = ttk.Scrollbar(
+            left_frame, orient=tk.VERTICAL, command=self.tree.yview
+        )
+        tree_scroll_x = ttk.Scrollbar(
+            left_frame, orient=tk.HORIZONTAL, command=self.tree.xview
+        )
+        self.tree.configure(
+            yscrollcommand=tree_scroll_y.set, xscrollcommand=tree_scroll_x.set
+        )
 
         tree_scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
         tree_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
@@ -206,32 +252,41 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
             fg=TEXT,
             bg="#ffffff",
             wraplength=380,
-            justify=tk.LEFT
+            justify=tk.LEFT,
         )
         self.det_title_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self._flat_button(det_top, "🌐 대시보드로 열기", self.open_current_in_web, side=tk.RIGHT, padx=4)
-        self._flat_button(det_top, "📋 전문 복사", self.copy_current_text, side=tk.RIGHT, padx=4)
+        self._flat_button(
+            det_top,
+            "🌐 대시보드로 열기",
+            self.open_current_in_web,
+            side=tk.RIGHT,
+            padx=4,
+        )
+        self._flat_button(
+            det_top, "📋 전문 복사", self.copy_current_text, side=tk.RIGHT, padx=4
+        )
 
         self.det_meta_lbl = tk.Label(
-            right_frame,
-            text="",
-            font=(FONT, 9),
-            fg=MUTED,
-            bg="#ffffff",
-            anchor="w"
+            right_frame, text="", font=(FONT, 9), fg=MUTED, bg="#ffffff", anchor="w"
         )
         self.det_meta_lbl.pack(fill=tk.X, pady=(0, 4))
 
         # 본문 안 찾기(Ctrl+F). 검색어 강조와 같은 태그를 쓴다(제안서 G3).
         find_bar = tk.Frame(right_frame, bg="#ffffff")
         find_bar.pack(fill=tk.X, pady=(0, 4))
-        tk.Label(find_bar, text="본문에서 찾기:", font=(FONT, 9), fg="#475569", bg="#ffffff").pack(side=tk.LEFT)
-        self.find_entry = tk.Entry(find_bar, font=(FONT, 9), width=24, bd=1, relief=tk.SOLID)
+        tk.Label(
+            find_bar, text="본문에서 찾기:", font=(FONT, 9), fg="#475569", bg="#ffffff"
+        ).pack(side=tk.LEFT)
+        self.find_entry = tk.Entry(
+            find_bar, font=(FONT, 9), width=24, bd=1, relief=tk.SOLID
+        )
         self.find_entry.pack(side=tk.LEFT, padx=6, ipady=2)
         self.find_entry.bind("<Return>", lambda e: self.find_next_in_detail())
         self._flat_button(find_bar, "다음 ▼", self.find_next_in_detail, side=tk.LEFT)
-        self.find_count_lbl = tk.Label(find_bar, text="", font=(FONT, 8), fg=MUTED, bg="#ffffff")
+        self.find_count_lbl = tk.Label(
+            find_bar, text="", font=(FONT, 8), fg=MUTED, bg="#ffffff"
+        )
         self.find_count_lbl.pack(side=tk.LEFT, padx=6)
 
         self.det_text = scrolledtext.ScrolledText(
@@ -241,11 +296,13 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
             bg="#f8fafc",
             fg=TEXT,
             bd=1,
-            relief=tk.SOLID
+            relief=tk.SOLID,
         )
         self.det_text.pack(fill=tk.BOTH, expand=True)
         self.det_text.tag_config("hit", background="#fef08a", foreground="#854d0e")
-        self.det_text.tag_config("hit_current", background="#f59e0b", foreground="#ffffff")
+        self.det_text.tag_config(
+            "hit_current", background="#f59e0b", foreground="#ffffff"
+        )
         self.root.bind_all("<Control-f>", lambda e: self.focus_find())
         self.root.bind_all("<Control-F>", lambda e: self.focus_find())
 
@@ -260,6 +317,7 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
     def highlight_detail(self, terms):
         """본문에서 검색어를 강조하고 첫 일치 위치로 스크롤한다."""
         from gui.search_text import find_all
+
         self.det_text.tag_remove("hit", "1.0", tk.END)
         self.det_text.tag_remove("hit_current", "1.0", tk.END)
         body = self.det_text.get("1.0", tk.END)
@@ -276,6 +334,7 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
 
     def find_next_in_detail(self):
         from gui.search_text import find_all
+
         needle = self.find_entry.get().strip()
         body = self.det_text.get("1.0", tk.END)
         hits = find_all(body, needle)
@@ -294,6 +353,7 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
 
     def create_status_bar(self):
         import launcher_gui as lg  # 지연 import: 진입점 전역 패치를 그대로 본다.
+
         bar = tk.Frame(self.root, bg=NEUTRAL_BG, height=26)
         bar.pack(fill=tk.X, side=tk.BOTTOM)
         bar.pack_propagate(False)
@@ -303,21 +363,17 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
             text=f"데이터 위치: {lg.BASE_DIR}",
             font=(FONT, 8),
             fg="#475569",
-            bg=NEUTRAL_BG
+            bg=NEUTRAL_BG,
         )
         self.status_lbl.pack(side=tk.LEFT, padx=12)
 
         # 마감 요약(제안서 G7). 기한 경과가 있으면 빨간 글씨.
-        self.due_lbl = tk.Label(bar, text="", font=(FONT, 8, "bold"), fg="#b91c1c", bg=NEUTRAL_BG)
+        self.due_lbl = tk.Label(
+            bar, text="", font=(FONT, 8, "bold"), fg="#b91c1c", bg=NEUTRAL_BG
+        )
         self.due_lbl.pack(side=tk.LEFT, padx=12)
 
-        self.ver_lbl = tk.Label(
-            bar,
-            text="",
-            font=(FONT, 8),
-            fg=MUTED,
-            bg=NEUTRAL_BG
-        )
+        self.ver_lbl = tk.Label(bar, text="", font=(FONT, 8), fg=MUTED, bg=NEUTRAL_BG)
         self.ver_lbl.pack(side=tk.RIGHT, padx=12)
 
     def flash_status(self, message, millis=2500):
@@ -330,6 +386,7 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
                 self.status_lbl.config(text=previous, fg="#475569")
             except tk.TclError:
                 pass
+
         self.root.after(millis, restore)
 
     def refresh_status_details(self, cur, doc_cnt, qa_cnt):
@@ -337,31 +394,46 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
         import datetime
 
         import launcher_gui as lg
+
         try:
             schema = cur.execute("PRAGMA user_version").fetchone()[0]
         except Exception:
             schema = "?"
         try:
-            mtime = datetime.datetime.fromtimestamp(lg.DB_PATH.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+            mtime = datetime.datetime.fromtimestamp(
+                lg.DB_PATH.stat().st_mtime
+            ).strftime("%Y-%m-%d %H:%M")
         except OSError:
             mtime = "-"
-        self.ver_lbl.config(text=f"DB 스키마 v{schema} · 최종 갱신 {mtime} · 문서 {doc_cnt:,} · Q&A {qa_cnt:,}")
+        self.ver_lbl.config(
+            text=f"DB 스키마 v{schema} · 최종 갱신 {mtime} · 문서 {doc_cnt:,} · Q&A {qa_cnt:,}"
+        )
         try:
             from gui.search_text import ledger_due_counts
+
             due = ledger_due_counts(lg.DB_PATH)
         except Exception:
             due = None
         if not due:
             self.due_lbl.config(text="")
         elif due["overdue"]:
-            self.due_lbl.config(text=f"🚨 기한 경과 미제출 {due['overdue']}건 · ⏰ 7일 이내 {due['soon']}건", fg="#b91c1c")
+            self.due_lbl.config(
+                text=f"🚨 기한 경과 미제출 {due['overdue']}건 · ⏰ 7일 이내 {due['soon']}건",
+                fg="#b91c1c",
+            )
         elif due["soon"]:
-            self.due_lbl.config(text=f"⏰ 7일 이내 마감 {due['soon']}건 · 미제출 {due['open']}건", fg="#c2410c")
+            self.due_lbl.config(
+                text=f"⏰ 7일 이내 마감 {due['soon']}건 · 미제출 {due['open']}건",
+                fg="#c2410c",
+            )
         else:
-            self.due_lbl.config(text=f"마감 임박 없음 · 미제출 {due['open']}건", fg="#15803d")
+            self.due_lbl.config(
+                text=f"마감 임박 없음 · 미제출 {due['open']}건", fg="#15803d"
+            )
 
     def init_db_and_load(self):
         import launcher_gui as lg  # 지연 import: 진입점 전역 패치를 그대로 본다.
+
         if not lg.DB_PATH.exists():
             self.count_label.config(text="⚠️ DB 파일 없음 (data_requests.db)")
             return
@@ -374,9 +446,13 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
             cur.execute("SELECT COUNT(*) FROM qa_items")
             qa_cnt = cur.fetchone()[0]
 
-            if hasattr(self, 'sub_lbl') and self.sub_lbl:
-                self.sub_lbl.config(text=f"공문서 {doc_cnt}건 · Q&A {qa_cnt:,}건 표준 데이터베이스 | 무설치 독립형 통합 패키지")
-            self.status_lbl.config(text=f"준비 완료 | 데이터베이스: data_requests.db (문서 {doc_cnt}건, Q&A {qa_cnt:,}건)")
+            if hasattr(self, "sub_lbl") and self.sub_lbl:
+                self.sub_lbl.config(
+                    text=f"공문서 {doc_cnt}건 · Q&A {qa_cnt:,}건 표준 데이터베이스 | 무설치 독립형 통합 패키지"
+                )
+            self.status_lbl.config(
+                text=f"준비 완료 | 데이터베이스: data_requests.db (문서 {doc_cnt}건, Q&A {qa_cnt:,}건)"
+            )
             self.refresh_status_details(cur, doc_cnt, qa_cnt)
 
             # Dynamically load distinct years from documents and request_ledger
@@ -390,7 +466,7 @@ class ViewsMixin(_HostBase_ViewsMixin):  # pyright: ignore[reportGeneralTypeIssu
                 years = [r[0] for r in cur.fetchall() if r[0]]
                 if years:
                     curr_val = self.year_combo.get()
-                    self.year_combo['values'] = ["전체"] + years
+                    self.year_combo["values"] = ["전체"] + years
                     if curr_val in (["전체"] + years):
                         self.year_combo.set(curr_val)
                     else:

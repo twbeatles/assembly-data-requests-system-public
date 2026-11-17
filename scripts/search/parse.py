@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """검색 질의 파싱(SRP: plan·FTS MATCH 생성)."""
+
 import re
 
 from search.lang import (
@@ -40,6 +41,8 @@ def _take_field(raw: str, plan: dict) -> bool:
         return True
     plan["fields"].setdefault(key, []).append(value.lower())
     return True
+
+
 def parse_query(kw: str) -> dict:
     """검색어를 {"groups", "phrases", "neg", "fields"}로 나눈다."""
     plan = {"groups": [], "phrases": [], "neg": [], "fields": {}}
@@ -72,6 +75,8 @@ def parse_query(kw: str) -> dict:
         if terms:
             plan["groups"].append(terms)
     return plan
+
+
 def _expand_terms(term: str, use_synonyms: bool) -> list:
     """동의어까지 펼친 낱말 목록. 사전이 없거나 꺼져 있으면 자기 자신뿐."""
     if not use_synonyms:
@@ -87,6 +92,8 @@ def _expand_terms(term: str, use_synonyms: bool) -> list:
             if v not in variants:
                 variants.append(v)
     return variants or [term]
+
+
 def build_fts_match(kw: str, use_synonyms: bool = False) -> str:
     """FTS5 MATCH 문자열. 기본 AND, OR 그룹, NOT 제외어, 구문 검색을 지원한다.
 
@@ -97,7 +104,11 @@ def build_fts_match(kw: str, use_synonyms: bool = False) -> str:
     plan = parse_query(kw)
     if _JAMO_RE.search(str(kw or "")):
         return ""
-    phrases = [p.replace('"', "") for p in plan["phrases"] if len(p.replace(" ", "")) >= FTS_MIN_TOKEN_LEN]
+    phrases = [
+        p.replace('"', "")
+        for p in plan["phrases"]
+        if len(p.replace(" ", "")) >= FTS_MIN_TOKEN_LEN
+    ]
     # 짧은 구문이나 짧은 제외어도 FTS로는 정확히 못 거른다. 통째로 대체 경로에 맡긴다.
     if any(len(p.replace(" ", "")) < FTS_MIN_TOKEN_LEN for p in plan["phrases"]):
         return ""
@@ -110,7 +121,9 @@ def build_fts_match(kw: str, use_synonyms: bool = False) -> str:
             return ""
         parts = []
         for t in terms:
-            variants = [v for v in _expand_terms(t, use_synonyms) if len(v) >= FTS_MIN_TOKEN_LEN]
+            variants = [
+                v for v in _expand_terms(t, use_synonyms) if len(v) >= FTS_MIN_TOKEN_LEN
+            ]
             if not variants:
                 return ""
             if len(variants) == 1:

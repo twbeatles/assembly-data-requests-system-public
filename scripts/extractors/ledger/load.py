@@ -33,8 +33,15 @@ from extractors.ledger.workbook import connect_readonly
 from extractors.text_extractor import mask_pii
 
 
-def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool = True,
-                        protected_ids=None, db_path=None, system_dir=None, excel_path=None) -> list:
+def load_request_ledger(
+    root_dir: Path,
+    documents: list,
+    merge_db_records: bool = True,
+    protected_ids=None,
+    db_path=None,
+    system_dir=None,
+    excel_path=None,
+) -> list:
     """Finds and parses *국회 요구자료 목록*.xlsm/.xlsx, merges DB-only records, and links records to documents.
 
     `protected_ids`: 아직 엑셀에 반영되지 않은 웹 변경의 대장 ID(보류 큐·격리 작업).
@@ -60,7 +67,9 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
             tmp_conn = connect_readonly(active_db)
             tmp_conn.row_factory = sqlite3.Row
             tmp_cur = tmp_conn.cursor()
-            tbl_chk = tmp_cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='request_ledger'").fetchone()
+            tbl_chk = tmp_cur.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='request_ledger'"
+            ).fetchone()
             if tbl_chk:
                 for r in tmp_cur.execute("SELECT * FROM request_ledger").fetchall():
                     existing_user_records[r["ledger_id"]] = dict(r)
@@ -71,14 +80,18 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
                 tmp_conn.close()
 
     root_dir = Path(root_dir)
-    sys_dir = Path(system_dir) if system_dir is not None else _get_active_system_dir(root_dir)
+    sys_dir = (
+        Path(system_dir) if system_dir is not None else _get_active_system_dir(root_dir)
+    )
 
     if excel_path is not None and Path(excel_path).exists():
         target_excel = Path(excel_path)
     else:
         target_excel, candidates, pinned = discover_master_excel(sys_dir, root_dir)
         if target_excel is None:
-            print("알림: 요구자료 목록 엑셀 파일을 찾을 수 없습니다. (신규 등록 및 공문서 데이터만 반영)")
+            print(
+                "알림: 요구자료 목록 엑셀 파일을 찾을 수 없습니다. (신규 등록 및 공문서 데이터만 반영)"
+            )
             return list(existing_user_records.values())
         if not pinned and len(candidates) > 1:
             print(
@@ -97,11 +110,11 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
         req = d.get("requester", "")
         req_date = d.get("request_date", "")
         if dnum:
-            clean_num = re.sub(r'\D', '', str(dnum)).lstrip('0')
+            clean_num = re.sub(r"\D", "", str(dnum)).lstrip("0")
             if clean_num:
                 doc_map_by_num[(yr, clean_num)] = did
         if req and req_date:
-            req_clean = re.sub(r'\s*(의원|처|실|팀|관)?$', '', req).strip()
+            req_clean = re.sub(r"\s*(의원|처|실|팀|관)?$", "", req).strip()
             doc_map_by_req_date[(yr, req_clean, req_date)] = did
 
     wb = openpyxl.load_workbook(str(target_excel), data_only=True)
@@ -134,6 +147,7 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
 
         row_seq = 0
         for r in range(2, ws.max_row + 1):
+
             def gv(*names, _header_map=header_map, _ws=ws, _r=r):
                 for name in names:
                     c = _header_map.get(name)
@@ -142,7 +156,7 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
                         if v is not None and str(v).strip():
                             return str(v).strip()
                 return ""
-            
+
             A = LEDGER_COLUMN_ALIAS_MAP
             seq = gv(*A["seq_no"])
             title = gv(*A["title"])
@@ -151,7 +165,7 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
             req = gv(*A["requester"])
             if not any([seq, title, detail, req]):
                 continue
-            
+
             c_id = gv(*ID_HEADER_NAMES)
             if c_id and LEDGER_ID_RE.match(c_id):
                 if c_id in seen_ids:
@@ -171,19 +185,18 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
                     continue
             seen_ids.add(ledger_id)
 
-
             req_d = normalize_ledger_date(gv(*A["request_date"]), y)
             dline = normalize_ledger_date(gv(*A["deadline"]), y)
             sub_d = normalize_ledger_date(gv(*A["submit_date"]), y)
-            
+
             # Linking logic
             linked_did = ""
             if seq:
-                clean_seq = re.sub(r'\D', '', str(seq)).lstrip('0')
+                clean_seq = re.sub(r"\D", "", str(seq)).lstrip("0")
                 if clean_seq and (y, clean_seq) in doc_map_by_num:
                     linked_did = doc_map_by_num[(y, clean_seq)]
             if not linked_did and req and req_d:
-                req_clean = re.sub(r'\s*(의원|처|실|팀|관)?$', '', req).strip()
+                req_clean = re.sub(r"\s*(의원|처|실|팀|관)?$", "", req).strip()
                 if (y, req_clean, req_d) in doc_map_by_req_date:
                     linked_did = doc_map_by_req_date[(y, req_clean, req_d)]
 
@@ -212,7 +225,7 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
                 "request_type": gv(*A["request_type"]),
                 "linked_doc_id": linked_did,
                 "created_at": now_str,
-                "updated_at": now_str
+                "updated_at": now_str,
             }
 
             # 필드 값의 정본은 마스터 엑셀이다(README 「저장소별 정본」). DB 값을 쓰는 경우는
@@ -256,7 +269,9 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
             "엑셀 잠금이 풀린 뒤 ID 고정(스탬핑)이 완료되면 자동 반영됩니다."
         )
     if skipped_duplicate:
-        print(f"⚠️ 중복된 대장ID {skipped_duplicate}건을 건너뛰었습니다. 복사된 행의 ID를 비워 두면 새 ID가 부여됩니다.")
+        print(
+            f"⚠️ 중복된 대장ID {skipped_duplicate}건을 건너뛰었습니다. 복사된 행의 ID를 비워 두면 새 ID가 부여됩니다."
+        )
 
     # Merge custom user-created records not present in Excel (e.g. registered via web UI or API)
     excel_ids = {item["ledger_id"] for item in ledger_items}
@@ -269,20 +284,24 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
                 y = str(old.get("year") or "")
                 req = old.get("requester", "")
                 req_d = old.get("request_date", "")
-                clean_seq = re.sub(r'\D', '', str(seq)).lstrip('0') if seq else ""
+                clean_seq = re.sub(r"\D", "", str(seq)).lstrip("0") if seq else ""
                 if clean_seq and (y, clean_seq) in doc_map_by_num:
                     old["linked_doc_id"] = doc_map_by_num[(y, clean_seq)]
                 elif req and req_d:
-                    req_clean = re.sub(r'\s*(의원|처|실|팀|관)?$', '', req).strip()
+                    req_clean = re.sub(r"\s*(의원|처|실|팀|관)?$", "", req).strip()
                     if (y, req_clean, req_d) in doc_map_by_req_date:
-                        old["linked_doc_id"] = doc_map_by_req_date[(y, req_clean, req_d)]
+                        old["linked_doc_id"] = doc_map_by_req_date[
+                            (y, req_clean, req_d)
+                        ]
             if old.get("linked_doc_id"):
                 doc_id_to_ledger[old["linked_doc_id"]] = lid
             ledger_items.append(old)
             custom_added_count += 1
 
     if custom_added_count > 0:
-        print(f"✓ 기존 웹 관리화면/DB에서 등록된 신규 요구자료 {custom_added_count}건 보존 및 병합 완료!")
+        print(
+            f"✓ 기존 웹 관리화면/DB에서 등록된 신규 요구자료 {custom_added_count}건 보존 및 병합 완료!"
+        )
 
     # Update linked_ledger_id on documents
     for d in documents:
@@ -292,6 +311,7 @@ def load_request_ledger(root_dir: Path, documents: list, merge_db_records: bool 
         else:
             d["linked_ledger_id"] = ""
 
-    print(f"국회 요구자료 관리대장 파싱 완료: 총 {len(ledger_items)}건 (답변문서 연동: {len(doc_id_to_ledger)}건)")
+    print(
+        f"국회 요구자료 관리대장 파싱 완료: 총 {len(ledger_items)}건 (답변문서 연동: {len(doc_id_to_ledger)}건)"
+    )
     return ledger_items
-

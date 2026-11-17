@@ -30,7 +30,7 @@ def test_job_lifecycle_and_ttl():
     fetched = jobs.get_job(job["job_id"])
     assert fetched is not None and fetched["job_id"] == job["job_id"]
     assert jobs.get_job("job-nonexistent") is None
-    jobs._JOBS[job["job_id"]]["created_at"] -= (jobs.TTL_SECONDS + 1)
+    jobs._JOBS[job["job_id"]]["created_at"] -= jobs.TTL_SECONDS + 1
     assert jobs.get_job(job["job_id"]) is None
 
 
@@ -39,12 +39,12 @@ def test_artifact_manifest_roundtrip_and_tamper(tmp_path):
     target.write_text("배포 산출물", encoding="utf-8")
     mark = artifacts.fingerprint_file(target)
     assert mark["available"] is True
-    ok = artifacts.verify_manifest([{"path": str(target),
-                                     "sha256": mark["sha256"]}])
+    ok = artifacts.verify_manifest([{"path": str(target), "sha256": mark["sha256"]}])
     assert ok["ok"] is True
     target.write_text("배포 산출물 변조", encoding="utf-8")
-    tampered = artifacts.verify_manifest([{"path": str(target),
-                                           "sha256": mark["sha256"]}])
+    tampered = artifacts.verify_manifest(
+        [{"path": str(target), "sha256": mark["sha256"]}]
+    )
     assert tampered["ok"] is False
     missing = artifacts.fingerprint_file(tmp_path / "nope.bin")
     assert missing["available"] is False
@@ -64,8 +64,8 @@ def test_full_text_roundtrip_through_paging(tmp_path):
     conn = sqlite3.connect(str(tmp_path / "data_requests.db"))
     try:
         expected = conn.execute(
-            "SELECT full_markdown FROM documents WHERE doc_id = ?",
-            ("DOC-2024-001",)).fetchone()[0]
+            "SELECT full_markdown FROM documents WHERE doc_id = ?", ("DOC-2024-001",)
+        ).fetchone()[0]
     finally:
         conn.close()
     collected = []

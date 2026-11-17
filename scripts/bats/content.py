@@ -10,7 +10,11 @@ MIN_PYTHON = (3, 9)
 # `where python`은 Microsoft Store 바로가기(WindowsApps\python.exe)도 찾는다. 그 바로가기는
 # 실행하면 9009로 끝나므로, 위치가 아니라 "실제로 실행되고 3.9 이상인가"로 판정한다.
 # `if not defined X cmd && set ...`는 cmd가 `&&` 뒤까지 if 본문으로 묶으므로 안전하다.
-PY_VERSION_CHECK = 'import sys; sys.exit(0 if sys.version_info >= ({0}, {1}) else 1)'.format(*MIN_PYTHON)
+PY_VERSION_CHECK = (
+    "import sys; sys.exit(0 if sys.version_info >= ({0}, {1}) else 1)".format(
+        *MIN_PYTHON
+    )
+)
 
 PY_DETECT = (
     'set "PYCMD="\n'
@@ -39,14 +43,17 @@ echo.
 pause
 exit /b 1
 """
+
+
 def _fill(template: str) -> str:
     return (
-        template
-        .replace("__PY_DETECT__\n", PY_DETECT)
+        template.replace("__PY_DETECT__\n", PY_DETECT)
         .replace("__DEPS_CHECK__\n", DEPS_CHECK)
         .replace("__NO_PYTHON_REASON__\n", NO_PYTHON_REASON)
         .replace("__NO_DEPS_BLOCK__\n", NO_DEPS_BLOCK)
     )
+
+
 SYSTEM_BAT_00 = _fill("""@echo off
 chcp 949 >nul
 set PYTHONIOENCODING=utf-8
@@ -476,6 +483,4 @@ DISTRIBUTED_BATS = (
     ("05_통합검색프로그램_실행.bat", SYSTEM_BAT_05),
     ("07_기존자료_안전마이그레이션.bat", SYSTEM_BAT_07),
 )
-SOURCE_ONLY_BATS = (
-    ("06_배포패키지_동기화.bat", SYSTEM_BAT_06),
-)
+SOURCE_ONLY_BATS = (("06_배포패키지_동기화.bat", SYSTEM_BAT_06),)

@@ -42,7 +42,9 @@ class ExcelWatcherMixin(_HostBase_ExcelWatcherMixin):  # pyright: ignore[reportG
         try:
             flushed = self.flush_pending_queue()
             if flushed:
-                print(f"✓ 시작 시 보류 중이던 엑셀 반영 {flushed}건을 먼저 처리했습니다.")
+                print(
+                    f"✓ 시작 시 보류 중이던 엑셀 반영 {flushed}건을 먼저 처리했습니다."
+                )
         except Exception as e:
             self._startup_error = f"보류 큐 선반영 실패: {e}"
             print(f"🚨 [시작 동기화] {self._startup_error}")
@@ -58,8 +60,15 @@ class ExcelWatcherMixin(_HostBase_ExcelWatcherMixin):  # pyright: ignore[reportG
             # 큐 반영이 엑셀(과 DB 이력)을 방금 다시 썼다면 mtime 비교로는 서버가 꺼진 동안의
             # 수기 수정을 가려낼 수 없다. 이 경우와 flush 전 엑셀이 DB보다 새로웠던 경우 모두
             # 동기화한다.
-            if flushed or self._external_change_pending or excel_mtime_before > db_mtime or excel_mtime > db_mtime:
-                print(f"ℹ️ 엑셀 파일 수기 수정 감지 ({master_excel.name}). 시작 전 DB 동기화 진행...")
+            if (
+                flushed
+                or self._external_change_pending
+                or excel_mtime_before > db_mtime
+                or excel_mtime > db_mtime
+            ):
+                print(
+                    f"ℹ️ 엑셀 파일 수기 수정 감지 ({master_excel.name}). 시작 전 DB 동기화 진행..."
+                )
                 res = self.sync_excel_to_db()
                 if not res.get("success"):
                     # 동기화를 건너뛴 경우 mtime을 최신으로 기록하면 watcher가
@@ -102,7 +111,9 @@ class ExcelWatcherMixin(_HostBase_ExcelWatcherMixin):  # pyright: ignore[reportG
                         and current_mtime != self._last_web_write_time
                     )
                     if external_save or self._external_change_pending:
-                        print(f"\n[실시간 감지] 마스터 엑셀 저장 감지 ({master_excel.name}) ➔ DB 동기화 실행 중...")
+                        print(
+                            f"\n[실시간 감지] 마스터 엑셀 저장 감지 ({master_excel.name}) ➔ DB 동기화 실행 중..."
+                        )
                         self.sync_excel_to_db()
 
                     # 그다음에 잠금 때문에 미뤘던 웹 변경을 엑셀에 기록한다.
@@ -114,10 +125,14 @@ class ExcelWatcherMixin(_HostBase_ExcelWatcherMixin):  # pyright: ignore[reportG
                     # 아무 흔적이 없으면 감시가 멈춘 줄 모른다. 오류가 바뀔 때만 한 번 출력한다.
                     message = f"{type(e).__name__}: {e}"
                     if message != last_error:
-                        print(f"[엑셀 감시 알림] {message} (다음 주기에 다시 시도합니다)")
+                        print(
+                            f"[엑셀 감시 알림] {message} (다음 주기에 다시 시도합니다)"
+                        )
                         last_error = message
 
-        t = threading.Thread(target=_watcher_loop, daemon=True, name="ExcelWatcherThread")
+        t = threading.Thread(
+            target=_watcher_loop, daemon=True, name="ExcelWatcherThread"
+        )
         self._watcher_thread = t
         t.start()
         print("✓ 마스터 엑셀 실시간 감시 스레드 가동 완료")

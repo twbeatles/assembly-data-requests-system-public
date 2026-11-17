@@ -11,6 +11,7 @@
 2. 루트 직하 원문이나 연도가 아닌 폴더의 원문은 `detect_target_year`로 연도를 정해
    `<연도>/` 아래에 둔다.
 """
+
 import os
 import re
 import shutil
@@ -20,8 +21,8 @@ from typing import Dict, Iterable, List, Optional
 
 from pipeline.parse.year_detect import YEAR_DIR_RE, detect_target_year
 
-SOURCE_HEADER_RE = re.compile(r'^﻿?<!--\s*source:\s*(.*?)\s*-->')
-UNSORTED_DIR = '미분류'
+SOURCE_HEADER_RE = re.compile(r"^﻿?<!--\s*source:\s*(.*?)\s*-->")
+UNSORTED_DIR = "미분류"
 
 
 def expected_output_path(file_path: Path, root_dir: Path, output_dir: Path) -> Path:
@@ -31,9 +32,11 @@ def expected_output_path(file_path: Path, root_dir: Path, output_dir: Path) -> P
     if len(parts) > 1 and (YEAR_DIR_RE.match(parts[0]) or parts[0] == UNSORTED_DIR):
         return Path(output_dir) / rel_path.parent / f"{Path(file_path).name}.md"
     target_year = detect_target_year(file_path, root_dir)
-    if rel_path.parent == Path('.'):
+    if rel_path.parent == Path("."):
         return Path(output_dir) / target_year / f"{Path(file_path).name}.md"
-    return Path(output_dir) / target_year / rel_path.parent / f"{Path(file_path).name}.md"
+    return (
+        Path(output_dir) / target_year / rel_path.parent / f"{Path(file_path).name}.md"
+    )
 
 
 def legacy_output_path(file_path: Path, root_dir: Path, output_dir: Path) -> Path:
@@ -49,17 +52,17 @@ def hash_path(md_path: Path) -> Path:
 def read_source_header(md_path: Path) -> Optional[str]:
     """마크다운 첫 줄의 `<!-- source: 상대경로 -->`. 없으면 None."""
     try:
-        with open(md_path, 'r', encoding='utf-8', errors='replace') as fp:
+        with open(md_path, "r", encoding="utf-8", errors="replace") as fp:
             first = fp.readline()
     except OSError:
         return None
     m = SOURCE_HEADER_RE.match(first)
-    return m.group(1).strip().replace('\\', '/') if m else None
+    return m.group(1).strip().replace("\\", "/") if m else None
 
 
 def strip_source_header(text: str) -> str:
     """본문에서 역추적 주석 한 줄을 뗀다. 주석은 원문 내용이 아니라 파이프라인 메타데이터다."""
-    return re.sub(r'^﻿?<!--\s*source:.*?-->[ \t]*\r?\n?', '', text or '', count=1)
+    return re.sub(r"^﻿?<!--\s*source:.*?-->[ \t]*\r?\n?", "", text or "", count=1)
 
 
 def write_text_atomic(path: Path, text: str):
@@ -67,7 +70,7 @@ def write_text_atomic(path: Path, text: str):
     path = Path(path)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
-        tmp.write_text(text, encoding='utf-8')
+        tmp.write_text(text, encoding="utf-8")
         os.replace(tmp, path)
     finally:
         if tmp.exists():
@@ -83,7 +86,7 @@ def _source_key_for(md_path: Path, output_dir: Path) -> str:
     if src:
         return src
     rel = Path(md_path).relative_to(output_dir).as_posix()
-    return rel[:-3] if rel.endswith('.md') else rel
+    return rel[:-3] if rel.endswith(".md") else rel
 
 
 def _preference(md_path: Path):
@@ -116,7 +119,7 @@ def _retire_pair(md_path: Path, output_dir: Path, backup_dir: Optional[Path]):
             p.unlink()
 
 
-def _prune_empty_dirs(output_dir: Path, keep: Iterable[str] = ('images',)):
+def _prune_empty_dirs(output_dir: Path, keep: Iterable[str] = ("images",)):
     keep = set(keep)
     for dirpath, _dirnames, _filenames in os.walk(output_dir, topdown=False):
         p = Path(dirpath)
@@ -129,8 +132,13 @@ def _prune_empty_dirs(output_dir: Path, keep: Iterable[str] = ('images',)):
             pass
 
 
-def consolidate_layout(files: Iterable[Path], root_dir: Path, output_dir: Path,
-                       dry_run: bool = False, backup_dir: Optional[Path] = None) -> Dict[str, List[str]]:
+def consolidate_layout(
+    files: Iterable[Path],
+    root_dir: Path,
+    output_dir: Path,
+    dry_run: bool = False,
+    backup_dir: Optional[Path] = None,
+) -> Dict[str, List[str]]:
     """원문마다 파싱 결과가 정해진 자리 한 곳에만 있게 맞춘다.
 
     - 정해진 자리에 이미 있으면 다른 자리의 사본(옛 배치·이전 재배치 도구 결과)을 치운다.
@@ -156,7 +164,7 @@ def consolidate_layout(files: Iterable[Path], root_dir: Path, output_dir: Path,
     groups: Dict[str, List[Path]] = {}
     for dirpath, _dirnames, filenames in os.walk(output_dir):
         for name in filenames:
-            if not name.endswith('.md'):
+            if not name.endswith(".md"):
                 continue
             md = Path(dirpath) / name
             key = _source_key_for(md, output_dir)
@@ -165,13 +173,19 @@ def consolidate_layout(files: Iterable[Path], root_dir: Path, output_dir: Path,
 
     for key, copies in groups.items():
         target = expected[key]
-        others = [m for m in copies if os.path.normcase(str(m)) != os.path.normcase(str(target))]
+        others = [
+            m
+            for m in copies
+            if os.path.normcase(str(m)) != os.path.normcase(str(target))
+        ]
         if not others:
             continue
         if not target.exists():
             best = max(others, key=_preference)
             others = [m for m in others if m != best]
-            result["moved"].append(f"{best.relative_to(output_dir).as_posix()} -> {target.relative_to(output_dir).as_posix()}")
+            result["moved"].append(
+                f"{best.relative_to(output_dir).as_posix()} -> {target.relative_to(output_dir).as_posix()}"
+            )
             if not dry_run:
                 _move_pair(best, target)
         for dup in others:

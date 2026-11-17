@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 """문서 경로 및 파일명 기반 표준 연도 판별 모듈."""
+
 import re
 from pathlib import Path
 from typing import Optional
 
-YEAR_DIR_RE = re.compile(r'^20[1-3]\d$')
-YEAR_4DIGIT_RE = re.compile(r'(?:^|[^\d])(20[1-3]\d)(?:[^\d]|$)')
-DATE_6DIGIT_RE = re.compile(r'(?:^|[^\d])([1-3]\d)(?:0[1-9]|1[0-2])(?:[0-3]\d)')
+YEAR_DIR_RE = re.compile(r"^20[1-3]\d$")
+YEAR_4DIGIT_RE = re.compile(r"(?:^|[^\d])(20[1-3]\d)(?:[^\d]|$)")
+DATE_6DIGIT_RE = re.compile(r"(?:^|[^\d])([1-3]\d)(?:0[1-9]|1[0-2])(?:[0-3]\d)")
 
 
 def detect_target_year(file_path: Path, root_dir: Optional[Path] = None) -> str:
     """주어진 파일 경로에서 소속 연도(2018~2039)를 판별하여 문자열로 반환한다.
-    
+
     판별 실패 시 '미분류'를 반환한다.
-    
+
     우선순위:
     1. root_dir 기준 최상위 서브폴더가 이미 연도(2018~2039)인 경우 해당 연도 유지
     2. 파일명에 포함된 6자리 날짜(예: 260901 -> 2026, 241007 -> 2024)

@@ -80,7 +80,9 @@ class LedgerFixtureMixin:
         return path
 
     def sync_service(self):
-        svc = ExcelSyncService(base_dir=self.tmp, db_path=self.db_path, json_path=self.json_path)
+        svc = ExcelSyncService(
+            base_dir=self.tmp, db_path=self.db_path, json_path=self.json_path
+        )
         ExcelSyncService._instance = svc
         return svc
 
@@ -91,7 +93,10 @@ class LedgerFixtureMixin:
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         try:
-            return {r["ledger_id"]: dict(r) for r in conn.execute("SELECT * FROM request_ledger")}
+            return {
+                r["ledger_id"]: dict(r)
+                for r in conn.execute("SELECT * FROM request_ledger")
+            }
         finally:
             conn.close()
 
@@ -99,10 +104,15 @@ class LedgerFixtureMixin:
         wb = openpyxl.load_workbook(str(path), data_only=True)
         try:
             ws = wb[sheet]
-            header = [str(ws.cell(1, c).value or "") for c in range(1, ws.max_column + 1)]
+            header = [
+                str(ws.cell(1, c).value or "") for c in range(1, ws.max_column + 1)
+            ]
             out = []
             for r in range(2, ws.max_row + 1):
-                row = {header[c - 1]: ws.cell(r, c).value for c in range(1, ws.max_column + 1)}
+                row = {
+                    header[c - 1]: ws.cell(r, c).value
+                    for c in range(1, ws.max_column + 1)
+                }
                 if any(v is not None and str(v).strip() for v in row.values()):
                     out.append(row)
             return out
@@ -128,7 +138,9 @@ class TestWorkspaceRootDetection(unittest.TestCase):
             (ws / y).mkdir()
             (ws / y / f"{y}_요구자료.hwp").write_text("원본", encoding="utf-8")
             (md_root / y).mkdir(parents=True)
-            (md_root / y / f"{y}_요구자료.hwp.md").write_text("# 전문", encoding="utf-8")
+            (md_root / y / f"{y}_요구자료.hwp.md").write_text(
+                "# 전문", encoding="utf-8"
+            )
         return ws, sys_dir, md_root
 
     def _load_parse_all(self, sys_dir):
@@ -163,10 +175,13 @@ class TestWorkspaceRootDetection(unittest.TestCase):
                     "parse_all과 system_config의 워크스페이스 루트 판정이 달라지면 안 된다",
                 )
                 self.assertNotEqual(
-                    mod.ROOT_DIR.resolve(), mod.SYSTEM_DIR.resolve(),
+                    mod.ROOT_DIR.resolve(),
+                    mod.SYSTEM_DIR.resolve(),
                     "연도 폴더가 있는데 루트가 시스템 폴더로 무너지면 안 된다",
                 )
-                self.assertEqual(len(mod.find_target_files(mod.ROOT_DIR)), len(year_dirs))
+                self.assertEqual(
+                    len(mod.find_target_files(mod.ROOT_DIR)), len(year_dirs)
+                )
 
     def test_prune_keeps_everything_when_no_source_document_found(self):
         """원본을 한 건도 못 찾으면 고아 마크다운을 하나도 지우지 않는다."""
@@ -176,7 +191,9 @@ class TestWorkspaceRootDetection(unittest.TestCase):
 
         pruned = mod.prune_orphan_markdowns(mod.SYSTEM_DIR, md_root, source_count=0)
 
-        self.assertEqual(pruned, 0, "원본 0건이면 경로 판정 실패이지 문서 삭제가 아니다")
+        self.assertEqual(
+            pruned, 0, "원본 0건이면 경로 판정 실패이지 문서 삭제가 아니다"
+        )
         self.assertEqual(sorted(p.name for p in md_root.rglob("*.md")), before)
 
     def test_prune_blocks_mass_deletion_over_ratio(self):
@@ -220,7 +237,9 @@ class TestWorkspaceRootDetection(unittest.TestCase):
 
         result = mod.main()
 
-        self.assertFalse(result["success"], "경로 이상이면 파싱 단계를 실패로 보고해야 한다")
+        self.assertFalse(
+            result["success"], "경로 이상이면 파싱 단계를 실패로 보고해야 한다"
+        )
         self.assertIn("원본", result.get("error", ""))
         self.assertTrue(list(md_root.rglob("*.md")), "마크다운이 남아 있어야 한다")
 
@@ -246,20 +265,26 @@ class TestParseStageContract(unittest.TestCase):
         def fake_parse(file_path, output_dir, force=False):
             failed = file_path.name == "doc1.hwp"
             return {
-                "file": file_path.name, "out_file": file_path.name + ".md",
-                "success": not failed, "elapsed": 0.0,
+                "file": file_path.name,
+                "out_file": file_path.name + ".md",
+                "success": not failed,
+                "elapsed": 0.0,
                 "size_bytes": 0 if failed else 10,
                 "error": "kordoc 변환 실패" if failed else "",
             }
 
-        with mock.patch.object(parse_all, "ROOT_DIR", base), \
-             mock.patch.object(parse_all, "OUTPUT_DIR", base / "_parsed_markdown"), \
-             mock.patch.object(parse_all, "SYSTEM_DIR", base), \
-             mock.patch.object(parse_all, "parse_single_file", side_effect=fake_parse), \
-             mock.patch.object(parse_all.shutil, "which", return_value="kordoc.cmd"):
+        with (
+            mock.patch.object(parse_all, "ROOT_DIR", base),
+            mock.patch.object(parse_all, "OUTPUT_DIR", base / "_parsed_markdown"),
+            mock.patch.object(parse_all, "SYSTEM_DIR", base),
+            mock.patch.object(parse_all, "parse_single_file", side_effect=fake_parse),
+            mock.patch.object(parse_all.shutil, "which", return_value="kordoc.cmd"),
+        ):
             result = parse_all.main()
 
-        self.assertTrue(result["success"], "문서 1건 실패로 파이프라인 전체를 막으면 안 된다")
+        self.assertTrue(
+            result["success"], "문서 1건 실패로 파이프라인 전체를 막으면 안 된다"
+        )
         self.assertEqual(result["partial_failures"], 1)
         self.assertEqual(result["failed_files"], ["doc1.hwp"])
 
@@ -273,14 +298,21 @@ class TestParseStageContract(unittest.TestCase):
             (year / f"doc{i}.hwp").write_text("원본", encoding="utf-8")
 
         def all_fail(file_path, output_dir, force=False):
-            return {"file": file_path.name, "out_file": "", "success": False,
-                    "elapsed": 0.0, "error": "kordoc 없음"}
+            return {
+                "file": file_path.name,
+                "out_file": "",
+                "success": False,
+                "elapsed": 0.0,
+                "error": "kordoc 없음",
+            }
 
-        with mock.patch.object(parse_all, "ROOT_DIR", base), \
-             mock.patch.object(parse_all, "OUTPUT_DIR", base / "_parsed_markdown"), \
-             mock.patch.object(parse_all, "SYSTEM_DIR", base), \
-             mock.patch.object(parse_all, "parse_single_file", side_effect=all_fail), \
-             mock.patch.object(parse_all.shutil, "which", return_value="kordoc.cmd"):
+        with (
+            mock.patch.object(parse_all, "ROOT_DIR", base),
+            mock.patch.object(parse_all, "OUTPUT_DIR", base / "_parsed_markdown"),
+            mock.patch.object(parse_all, "SYSTEM_DIR", base),
+            mock.patch.object(parse_all, "parse_single_file", side_effect=all_fail),
+            mock.patch.object(parse_all.shutil, "which", return_value="kordoc.cmd"),
+        ):
             result = parse_all.main()
 
         self.assertFalse(result["success"])
@@ -294,10 +326,12 @@ class TestParseStageContract(unittest.TestCase):
         year.mkdir()
         (year / "doc.hwp").write_text("원본", encoding="utf-8")
 
-        with mock.patch.object(parse_all, "ROOT_DIR", base), \
-             mock.patch.object(parse_all, "OUTPUT_DIR", base / "_parsed_markdown"), \
-             mock.patch.object(parse_all, "SYSTEM_DIR", base), \
-             mock.patch.object(parse_all.shutil, "which", return_value=None):
+        with (
+            mock.patch.object(parse_all, "ROOT_DIR", base),
+            mock.patch.object(parse_all, "OUTPUT_DIR", base / "_parsed_markdown"),
+            mock.patch.object(parse_all, "SYSTEM_DIR", base),
+            mock.patch.object(parse_all.shutil, "which", return_value=None),
+        ):
             result = parse_all.main()
 
         self.assertFalse(result["success"])
@@ -321,13 +355,18 @@ class TestParseStageContract(unittest.TestCase):
         self.assertIn('"-o"', line)
         self.assertTrue(line.startswith("cmd.exe /s /c "))
 
-    @unittest.skipUnless(sys.platform == "win32", "cmd.exe 동작은 Windows에서만 확인한다")
+    @unittest.skipUnless(
+        sys.platform == "win32", "cmd.exe 동작은 Windows에서만 확인한다"
+    )
     def test_ampersand_filename_cannot_inject_a_command(self):
         """`자료&ver.hwp` 같은 이름이 부가 명령을 실행하면 안 된다 (실제 cmd 실행)."""
         tmp = Path(tempfile.mkdtemp(prefix="audit_phase9_cmd_"))
         self.addCleanup(shutil.rmtree, tmp, True)
         fake = tmp / "fake kordoc.cmd"
-        fake.write_text("@echo off\r\necho ARG_IN=[%~1]\r\necho # parsed > \"%~3\"\r\n", encoding="ascii")
+        fake.write_text(
+            '@echo off\r\necho ARG_IN=[%~1]\r\necho # parsed > "%~3"\r\n',
+            encoding="ascii",
+        )
         src = tmp / "AAA&ver.hwp"
         src.write_text("원본", encoding="utf-8")
         out_file = tmp / "out" / "AAA&ver.hwp.md"
@@ -336,12 +375,20 @@ class TestParseStageContract(unittest.TestCase):
             with parse_all.kordoc_paths(src, out_file) as (safe_src, safe_out):
                 proc = subprocess.run(
                     parse_all.kordoc_cmd(str(safe_src), "-o", str(safe_out)),
-                    capture_output=True, text=True, encoding="utf-8", errors="replace",
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
                 )
 
-        self.assertNotIn("Microsoft Windows", proc.stdout or "",
-                         "`&` 뒤가 별도 명령으로 실행되면 안 된다")
-        self.assertIn(str(safe_src), proc.stdout or "", "경로가 잘리지 않고 그대로 전달돼야 한다")
+        self.assertNotIn(
+            "Microsoft Windows",
+            proc.stdout or "",
+            "`&` 뒤가 별도 명령으로 실행되면 안 된다",
+        )
+        self.assertIn(
+            str(safe_src), proc.stdout or "", "경로가 잘리지 않고 그대로 전달돼야 한다"
+        )
         self.assertTrue(out_file.exists(), "결과 마크다운이 원래 위치로 돌아와야 한다")
 
 
@@ -359,7 +406,9 @@ class TestWorkbookWideIdLookup(LedgerFixtureMixin, unittest.TestCase):
         wb = openpyxl.load_workbook(excel)
         ws = wb.create_sheet("2025", 0)
         ws.append(HEADERS_WITH_ID)
-        ws.append(["REQ-2025-001", "1", "김의원", "작년자료", "완료", "일반", "원래비고"])
+        ws.append(
+            ["REQ-2025-001", "1", "김의원", "작년자료", "완료", "일반", "원래비고"]
+        )
         wb.save(excel)
         wb.close()
 
@@ -367,26 +416,41 @@ class TestWorkbookWideIdLookup(LedgerFixtureMixin, unittest.TestCase):
         svc.sync_excel_to_db()
         ledger = self.ledger_service()
 
-        res = ledger.update_ledger_item("REQ-2025-001", {"year": "2026", "title": "작년자료(연도정정)"})
+        res = ledger.update_ledger_item(
+            "REQ-2025-001", {"year": "2026", "title": "작년자료(연도정정)"}
+        )
         self.assertTrue(res["success"])
 
-        self.assertEqual(self.sheet_rows(excel, "2025"), [], "원래 시트의 행이 남으면 중복 ID가 된다")
-        moved = [r for r in self.sheet_rows(excel, "2026") if r["대장ID"] == "REQ-2025-001"]
+        self.assertEqual(
+            self.sheet_rows(excel, "2025"), [], "원래 시트의 행이 남으면 중복 ID가 된다"
+        )
+        moved = [
+            r for r in self.sheet_rows(excel, "2026") if r["대장ID"] == "REQ-2025-001"
+        ]
         self.assertEqual(len(moved), 1, "옮겨 간 행은 정확히 하나여야 한다")
-        self.assertEqual(moved[0]["의원"], "김의원", "새 행을 만들 때 전체 필드를 기록해야 한다")
+        self.assertEqual(
+            moved[0]["의원"], "김의원", "새 행을 만들 때 전체 필드를 기록해야 한다"
+        )
         self.assertEqual(moved[0]["요구자료"], "작년자료(연도정정)")
 
         svc._id_stamp_fingerprint = None
         svc.sync_excel_to_db()
         active = {lid for lid, r in self.db_rows().items() if r["status"] != "[삭제]"}
-        self.assertEqual(active, {"REQ-2025-001", "REQ-2026-001"},
-                         "연도 변경이 유령 항목을 만들면 안 된다")
-        self.assertEqual(self.db_rows()["REQ-2025-001"]["requester"], "김의원",
-                         "요구자명이 빈 칸으로 덮어써지면 안 된다")
+        self.assertEqual(
+            active,
+            {"REQ-2025-001", "REQ-2026-001"},
+            "연도 변경이 유령 항목을 만들면 안 된다",
+        )
+        self.assertEqual(
+            self.db_rows()["REQ-2025-001"]["requester"],
+            "김의원",
+            "요구자명이 빈 칸으로 덮어써지면 안 된다",
+        )
 
     def test_delete_finds_the_row_in_any_sheet(self):
         excel = self.make_excel(
-            [["REQ-2026-001", "1", "이의원", "올해자료", "작성중", "일반", ""]], sheets=("2026",)
+            [["REQ-2026-001", "1", "이의원", "올해자료", "작성중", "일반", ""]],
+            sheets=("2026",),
         )
         wb = openpyxl.load_workbook(excel)
         ws = wb.create_sheet("2025", 0)
@@ -399,14 +463,18 @@ class TestWorkbookWideIdLookup(LedgerFixtureMixin, unittest.TestCase):
         svc.sync_excel_to_db()
         # DB의 연도를 일부러 어긋나게 만들어 대상 시트 추정이 빗나가게 한다.
         conn = sqlite3.connect(str(self.db_path))
-        conn.execute("UPDATE request_ledger SET year='2026' WHERE ledger_id='REQ-2025-001'")
+        conn.execute(
+            "UPDATE request_ledger SET year='2026' WHERE ledger_id='REQ-2025-001'"
+        )
         conn.commit()
         conn.close()
 
         res = self.ledger_service().delete_ledger_item("REQ-2025-001")
         self.assertTrue(res["success"])
         self.assertTrue(res["excel_synced"], "다른 시트에 있어도 삭제 표시를 해야 한다")
-        row = [r for r in self.sheet_rows(excel, "2025") if r["대장ID"] == "REQ-2025-001"][0]
+        row = [
+            r for r in self.sheet_rows(excel, "2025") if r["대장ID"] == "REQ-2025-001"
+        ][0]
         self.assertEqual(row["제출"], "[삭제]")
 
     def test_delete_reports_failure_when_row_is_absent(self):
@@ -415,7 +483,9 @@ class TestWorkbookWideIdLookup(LedgerFixtureMixin, unittest.TestCase):
         예전에는 대상 행을 못 찾아도 True를 돌려줘서 "✓ 즉시 반영되었습니다"가
         떴고, 사용자는 엑셀이 정리된 줄 알았다.
         """
-        self.make_excel([["REQ-2026-001", "1", "이의원", "올해자료", "작성중", "일반", ""]])
+        self.make_excel(
+            [["REQ-2026-001", "1", "이의원", "올해자료", "작성중", "일반", ""]]
+        )
         svc = self.sync_service()
         svc.sync_excel_to_db()
 
@@ -425,14 +495,25 @@ class TestWorkbookWideIdLookup(LedgerFixtureMixin, unittest.TestCase):
         conn.execute(
             "INSERT INTO request_ledger (ledger_id, year, requester, title, status, "
             "request_type, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-            ("REQ-2026-777", "2026", "없는의원", "엑셀에 없는 항목", "작성중", "메일", now, now),
+            (
+                "REQ-2026-777",
+                "2026",
+                "없는의원",
+                "엑셀에 없는 항목",
+                "작성중",
+                "메일",
+                now,
+                now,
+            ),
         )
         conn.commit()
         conn.close()
 
         res = self.ledger_service().delete_ledger_item("REQ-2026-777")
         self.assertTrue(res["success"], "DB 삭제 자체는 성공한다")
-        self.assertFalse(res["excel_synced"], "엑셀에서 못 찾았으면 반영했다고 하면 안 된다")
+        self.assertFalse(
+            res["excel_synced"], "엑셀에서 못 찾았으면 반영했다고 하면 안 된다"
+        )
         self.assertIn("찾지 못해", res["excel_message"])
 
 
@@ -443,33 +524,43 @@ class TestLedgerConcurrency(LedgerFixtureMixin, unittest.TestCase):
     """[T-002][T-003] 동시 실행에서 사용자의 등록이 사라지지 않는다."""
 
     def test_insert_during_excel_sync_is_not_tombstoned(self):
-        rows = [[f"REQ-2026-{i:03d}", str(i), f"의원{i}", f"자료{i}", "작성중", "메일", ""]
-                for i in range(1, 21)]
+        rows = [
+            [f"REQ-2026-{i:03d}", str(i), f"의원{i}", f"자료{i}", "작성중", "메일", ""]
+            for i in range(1, 21)
+        ]
         self.make_excel(rows)
         svc = self.sync_service()
         svc.sync_excel_to_db()
         ledger = self.ledger_service()
 
         import extractors.ledger_parser as ledger_parser
+
         real_parse = ledger_parser.load_request_ledger
         started = threading.Event()
 
         def slow_parse(*args, **kwargs):
             result = real_parse(*args, **kwargs)
             started.set()
-            time.sleep(0.8)          # 대형 워크북 파싱 시간을 흉내
+            time.sleep(0.8)  # 대형 워크북 파싱 시간을 흉내
             return result
 
         created = {}
 
         def do_insert():
             started.wait(5)
-            created["res"] = ledger.insert_ledger_item({
-                "year": "2026", "requester": "신규의원", "title": "동시 등록된 신규 자료",
-                "request_type": "메일", "status": "작성중",
-            })
+            created["res"] = ledger.insert_ledger_item(
+                {
+                    "year": "2026",
+                    "requester": "신규의원",
+                    "title": "동시 등록된 신규 자료",
+                    "request_type": "메일",
+                    "status": "작성중",
+                }
+            )
 
-        with mock.patch.object(ledger_parser, "load_request_ledger", side_effect=slow_parse):
+        with mock.patch.object(
+            ledger_parser, "load_request_ledger", side_effect=slow_parse
+        ):
             svc._id_stamp_fingerprint = None
             t_sync = threading.Thread(target=svc.sync_excel_to_db)
             t_insert = threading.Thread(target=do_insert)
@@ -481,22 +572,32 @@ class TestLedgerConcurrency(LedgerFixtureMixin, unittest.TestCase):
         self.assertTrue(created["res"]["success"])
         new_id = created["res"]["item"]["ledger_id"]
         self.assertNotEqual(
-            self.db_rows()[new_id]["status"], "[삭제]",
+            self.db_rows()[new_id]["status"],
+            "[삭제]",
             "동기화 중에 등록한 항목이 같은 실행에서 삭제되면 안 된다",
         )
 
     def test_queue_flush_and_web_write_do_not_overwrite_each_other(self):
         """watcher의 flush와 HTTP 쓰기가 같은 워크북을 동시에 덮어쓰면 안 된다."""
-        excel = self.make_excel([["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]])
+        excel = self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]]
+        )
         svc = self.sync_service()
         with svc._pending_lock:
-            svc._enqueue_pending({
-                "ledger_id": "REQ-2026-900", "year": "2026", "seq_no": "90",
-                "requester": "보류의원", "title": "보류로 들어온 자료",
-            }, "insert")
+            svc._enqueue_pending(
+                {
+                    "ledger_id": "REQ-2026-900",
+                    "year": "2026",
+                    "seq_no": "90",
+                    "requester": "보류의원",
+                    "title": "보류로 들어온 자료",
+                },
+                "insert",
+            )
 
         # load~save 사이에 지연을 넣어 실제 대형 워크북의 인터리브를 재현한다.
         real_load = openpyxl.load_workbook
+
         # A barrier inside the serialized critical section can never see both
         # threads: it made a correct implementation take multiple 15s timeouts.
         def slow_load(*args, **kwargs):
@@ -505,12 +606,21 @@ class TestLedgerConcurrency(LedgerFixtureMixin, unittest.TestCase):
             return wb
 
         import services.excel_sync_service as ess
+
         with mock.patch.object(ess.openpyxl, "load_workbook", side_effect=slow_load):
             t_flush = threading.Thread(target=svc.flush_pending_queue)
-            t_web = threading.Thread(target=lambda: svc.sync_item_to_excel({
-                "ledger_id": "REQ-2026-002", "year": "2026", "seq_no": "2",
-                "requester": "웹의원", "title": "웹에서 바로 등록",
-            }, action="insert"))
+            t_web = threading.Thread(
+                target=lambda: svc.sync_item_to_excel(
+                    {
+                        "ledger_id": "REQ-2026-002",
+                        "year": "2026",
+                        "seq_no": "2",
+                        "requester": "웹의원",
+                        "title": "웹에서 바로 등록",
+                    },
+                    action="insert",
+                )
+            )
             t_flush.start()
             t_web.start()
             t_flush.join(30)
@@ -519,16 +629,27 @@ class TestLedgerConcurrency(LedgerFixtureMixin, unittest.TestCase):
             self.assertFalse(t_web.is_alive())
 
         ids = {r["대장ID"] for r in self.sheet_rows(excel, "2026")}
-        self.assertIn("REQ-2026-900", ids, "보류 큐에서 반영한 등록이 덮어써지면 안 된다")
+        self.assertIn(
+            "REQ-2026-900", ids, "보류 큐에서 반영한 등록이 덮어써지면 안 된다"
+        )
         self.assertIn("REQ-2026-002", ids, "웹에서 바로 한 등록이 덮어써지면 안 된다")
 
     def test_workbook_writes_are_serialized_by_a_single_lock(self):
         """두 쓰기 경로가 동시에 _apply_to_excel에 들어가지 않아야 한다."""
-        self.make_excel([["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]])
+        self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]]
+        )
         svc = self.sync_service()
         with svc._pending_lock:
-            svc._enqueue_pending({"ledger_id": "REQ-2026-900", "year": "2026",
-                                  "requester": "보류의원", "title": "보류 자료"}, "insert")
+            svc._enqueue_pending(
+                {
+                    "ledger_id": "REQ-2026-900",
+                    "year": "2026",
+                    "requester": "보류의원",
+                    "title": "보류 자료",
+                },
+                "insert",
+            )
 
         inside = []
         max_concurrent = []
@@ -548,33 +669,59 @@ class TestLedgerConcurrency(LedgerFixtureMixin, unittest.TestCase):
 
         svc._apply_to_excel = traced
         t1 = threading.Thread(target=svc.flush_pending_queue)
-        t2 = threading.Thread(target=lambda: svc.sync_item_to_excel(
-            {"ledger_id": "REQ-2026-002", "year": "2026", "requester": "웹의원", "title": "웹 자료"},
-            action="insert"))
+        t2 = threading.Thread(
+            target=lambda: svc.sync_item_to_excel(
+                {
+                    "ledger_id": "REQ-2026-002",
+                    "year": "2026",
+                    "requester": "웹의원",
+                    "title": "웹 자료",
+                },
+                action="insert",
+            )
+        )
         t1.start()
         t2.start()
         t1.join(30)
         t2.join(30)
 
         self.assertTrue(max_concurrent, "_apply_to_excel이 한 번도 호출되지 않았다")
-        self.assertEqual(max(max_concurrent), 1,
-                         "워크북 쓰기가 직렬화되지 않으면 lost update가 발생한다")
+        self.assertEqual(
+            max(max_concurrent),
+            1,
+            "워크북 쓰기가 직렬화되지 않으면 lost update가 발생한다",
+        )
 
 
 # ---------------------------------------------------------------------------
 # 보류 큐 / 삭제 안전장치 / 입력 검증
 # ---------------------------------------------------------------------------
 class TestQueueAndGuards(LedgerFixtureMixin, unittest.TestCase):
-
     def test_permanently_failing_operation_is_quarantined(self):
         """영구 실패 작업이 큐 선두에서 뒤의 정상 작업을 영원히 막으면 안 된다."""
-        excel = self.make_excel([["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]])
+        excel = self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]]
+        )
         svc = self.sync_service()
         with svc._pending_lock:
-            svc._enqueue_pending({"ledger_id": "REQ-2026-BAD", "year": "2026",
-                                  "requester": "실패의원", "title": "영구 실패"}, "insert")
-            svc._enqueue_pending({"ledger_id": "REQ-2026-002", "year": "2026",
-                                  "requester": "정상의원", "title": "뒤에 밀린 정상 작업"}, "insert")
+            svc._enqueue_pending(
+                {
+                    "ledger_id": "REQ-2026-BAD",
+                    "year": "2026",
+                    "requester": "실패의원",
+                    "title": "영구 실패",
+                },
+                "insert",
+            )
+            svc._enqueue_pending(
+                {
+                    "ledger_id": "REQ-2026-002",
+                    "year": "2026",
+                    "requester": "정상의원",
+                    "title": "뒤에 밀린 정상 작업",
+                },
+                "insert",
+            )
 
         real_apply = svc._apply_to_excel
 
@@ -594,12 +741,14 @@ class TestQueueAndGuards(LedgerFixtureMixin, unittest.TestCase):
 
     def test_small_ledger_is_protected_from_bulk_tombstoning(self):
         """10건 이하 대장도 파싱 급감 시 일괄 삭제 방어를 받아야 한다."""
-        excel = self.make_excel([
-            ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "메일", ""],
-            ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "메일", ""],
-            ["REQ-2026-003", "3", "박의원", "자료C", "작성중", "메일", ""],
-            ["REQ-2026-004", "4", "최의원", "자료D", "작성중", "메일", ""],
-        ])
+        excel = self.make_excel(
+            [
+                ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "메일", ""],
+                ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "메일", ""],
+                ["REQ-2026-003", "3", "박의원", "자료C", "작성중", "메일", ""],
+                ["REQ-2026-004", "4", "최의원", "자료D", "작성중", "메일", ""],
+            ]
+        )
         svc = self.sync_service()
         svc.sync_excel_to_db()
         self.assertEqual(len(self.db_rows()), 4)
@@ -618,25 +767,43 @@ class TestQueueAndGuards(LedgerFixtureMixin, unittest.TestCase):
 
     def test_custom_ledger_id_must_match_the_expected_format(self):
         """자동 채번이 REQ-YYYY-NNN을 전제하므로 형식을 강제한다."""
-        self.make_excel([["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]])
+        self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]]
+        )
         ledger = self.ledger_service()
-        bad = ledger.insert_ledger_item({"ledger_id": "임의번호-1", "year": "2026",
-                                         "requester": "김의원", "title": "형식 위반"})
+        bad = ledger.insert_ledger_item(
+            {
+                "ledger_id": "임의번호-1",
+                "year": "2026",
+                "requester": "김의원",
+                "title": "형식 위반",
+            }
+        )
         self.assertFalse(bad["success"])
         self.assertIn("REQ-", bad["error"])
 
-        good = ledger.insert_ledger_item({"ledger_id": "REQ-2026-050", "year": "2026",
-                                          "requester": "김의원", "title": "형식 준수"})
+        good = ledger.insert_ledger_item(
+            {
+                "ledger_id": "REQ-2026-050",
+                "year": "2026",
+                "requester": "김의원",
+                "title": "형식 준수",
+            }
+        )
         self.assertTrue(good["success"])
 
     def test_master_excel_is_backed_up_before_overwrite(self):
         """마스터 엑셀을 덮어쓰기 전에 백업본이 남아야 한다."""
-        self.make_excel([["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]])
+        self.make_excel(
+            [["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""]]
+        )
         # 서버 시작 순서대로 엑셀을 먼저 DB에 반영한다. 반영 전에 등록하면 DB가 엑셀의
         # REQ-2026-001을 몰라 같은 ID를 발급하고, 이제는 충돌로 거부된다(감사 R3-02).
         self.sync_service().sync_excel_to_db()
         ledger = self.ledger_service()
-        res = ledger.insert_ledger_item({"year": "2026", "requester": "신규의원", "title": "백업 확인용"})
+        res = ledger.insert_ledger_item(
+            {"year": "2026", "requester": "신규의원", "title": "백업 확인용"}
+        )
         self.assertTrue(res["success"])
 
         backups = list((self.tmp / ".ledger_backup").glob("*.xlsx"))
@@ -655,42 +822,62 @@ class TestTombstoneIsolation(LedgerFixtureMixin, unittest.TestCase):
     """[T-006] 삭제한 항목은 오프라인 대시보드·엑셀 산출물에 다시 나타나지 않는다."""
 
     def test_pipeline_json_excludes_tombstones_but_db_keeps_them(self):
-        self.make_excel([
-            ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""],
-            ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
-        ])
+        self.make_excel(
+            [
+                ["REQ-2026-001", "1", "김의원", "자료A", "작성중", "일반", ""],
+                ["REQ-2026-002", "2", "이의원", "자료B", "작성중", "일반", ""],
+            ]
+        )
         svc = self.sync_service()
         svc.sync_excel_to_db()
-        self.assertTrue(self.ledger_service().delete_ledger_item("REQ-2026-001")["success"])
+        self.assertTrue(
+            self.ledger_service().delete_ledger_item("REQ-2026-001")["success"]
+        )
 
         import extract_and_build_db as builder
-        with mock.patch.object(builder, "SYSTEM_DIR", self.tmp), \
-             mock.patch.object(builder, "ROOT_DIR", self.tmp), \
-             mock.patch.object(builder, "DB_PATH", self.db_path), \
-             mock.patch.object(builder, "JSON_PATH", self.json_path), \
-             mock.patch.object(builder, "PARSED_DIR", self.tmp / "_parsed_markdown"), \
-             mock.patch.object(builder, "DIST_MANIFEST", self.tmp / ".distribution_manifest.json"):
+
+        with (
+            mock.patch.object(builder, "SYSTEM_DIR", self.tmp),
+            mock.patch.object(builder, "ROOT_DIR", self.tmp),
+            mock.patch.object(builder, "DB_PATH", self.db_path),
+            mock.patch.object(builder, "JSON_PATH", self.json_path),
+            mock.patch.object(builder, "PARSED_DIR", self.tmp / "_parsed_markdown"),
+            mock.patch.object(
+                builder, "DIST_MANIFEST", self.tmp / ".distribution_manifest.json"
+            ),
+        ):
             result = builder.main()
 
         self.assertTrue(result["success"])
         payload = json.loads(self.json_path.read_text(encoding="utf-8"))
         ids = {r["ledger_id"] for r in payload["request_ledger"]}
-        self.assertNotIn("REQ-2026-001", ids, "삭제 항목이 검색 산출물에 되살아나면 안 된다")
+        self.assertNotIn(
+            "REQ-2026-001", ids, "삭제 항목이 검색 산출물에 되살아나면 안 된다"
+        )
         self.assertIn("REQ-2026-002", ids)
 
-        self.assertEqual(self.db_rows()["REQ-2026-001"]["status"], "[삭제]",
-                         "tombstone 자체는 DB에 남아야 stale 엑셀이 항목을 되살리지 못한다")
+        self.assertEqual(
+            self.db_rows()["REQ-2026-001"]["status"],
+            "[삭제]",
+            "tombstone 자체는 DB에 남아야 stale 엑셀이 항목을 되살리지 못한다",
+        )
 
     def test_slim_payload_drops_tombstones_as_a_safety_net(self):
         from template_renderer import DashboardRenderer
-        payload = DashboardRenderer.build_slim_payload({
-            "documents": [], "qa_items": [],
-            "request_ledger": [
-                {"ledger_id": "REQ-2026-001", "status": "[삭제]"},
-                {"ledger_id": "REQ-2026-002", "status": "작성중"},
-            ],
-        })
-        self.assertEqual([r["ledger_id"] for r in payload["request_ledger"]], ["REQ-2026-002"])
+
+        payload = DashboardRenderer.build_slim_payload(
+            {
+                "documents": [],
+                "qa_items": [],
+                "request_ledger": [
+                    {"ledger_id": "REQ-2026-001", "status": "[삭제]"},
+                    {"ledger_id": "REQ-2026-002", "status": "작성중"},
+                ],
+            }
+        )
+        self.assertEqual(
+            [r["ledger_id"] for r in payload["request_ledger"]], ["REQ-2026-002"]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -734,7 +921,11 @@ class TestLauncherGuiCompletionHandler(unittest.TestCase):
 
             def on_finish():
                 nonlocal err_msg
-                if not err_msg and isinstance(result_data, dict) and not result_data.get("success", True):
+                if (
+                    not err_msg
+                    and isinstance(result_data, dict)
+                    and not result_data.get("success", True)
+                ):
                     err_msg = result_data.get("error") or "파이프라인 단계 실패"
                 seen.append(err_msg)
 

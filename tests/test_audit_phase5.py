@@ -45,7 +45,9 @@ class TestAuditPhase5(unittest.TestCase):
         content = tmpl_path.read_text(encoding="utf-8")
 
         # Must not unconditionally remove the entire storage
-        self.assertNotIn("localStorage.removeItem('datareq_local_ledger');\n  const banner", content)
+        self.assertNotIn(
+            "localStorage.removeItem('datareq_local_ledger');\n  const banner", content
+        )
         # Must track successfulIds and compute remaining
         self.assertIn("successfulIds", content)
         self.assertIn("remaining", content)
@@ -55,7 +57,7 @@ class TestAuditPhase5(unittest.TestCase):
         """Verify that LedgerService queries safely close connections."""
         db_file = self.temp_path / "test_conn.db"
         json_file = self.temp_path / "test_conn.json"
-        
+
         mgr = DatabaseManager(db_file)
         conn = mgr.get_conn()
         try:
@@ -95,12 +97,14 @@ class TestAuditPhase5(unittest.TestCase):
             conn.close()
 
         service = LedgerService(db_file, json_file)
-        service.insert_ledger_item({
-            "year": "2026",
-            "seq_no": "001",
-            "requester": "의원",
-            "title": "원자적 동기화 테스트"
-        })
+        service.insert_ledger_item(
+            {
+                "year": "2026",
+                "seq_no": "001",
+                "requester": "의원",
+                "title": "원자적 동기화 테스트",
+            }
+        )
 
         # Run synchronous JSON sync
         service.sync_json_file(async_mode=False)
@@ -109,7 +113,12 @@ class TestAuditPhase5(unittest.TestCase):
         with open(json_file, "r", encoding="utf-8") as fp:
             data = json.load(fp)
             self.assertIn("request_ledger", data)
-            self.assertTrue(any(it["title"] == "원자적 동기화 테스트" for it in data["request_ledger"]))
+            self.assertTrue(
+                any(
+                    it["title"] == "원자적 동기화 테스트"
+                    for it in data["request_ledger"]
+                )
+            )
 
     def test_sync_service_status_lifecycle(self):
         """Verify SyncService reports proper status and execution metrics."""
@@ -138,8 +147,9 @@ class TestAuditPhase5(unittest.TestCase):
         """Verify web_server's RequestLedgerHandler handles GET and POST /api/sync."""
         handler: Any = RequestLedgerHandler.__new__(RequestLedgerHandler)
         handler.headers = {"Origin": "http://localhost:8000"}
-        
+
         sent_responses = []
+
         def mock_send_json(data, status_code=200):
             sent_responses.append((status_code, data))
 
@@ -161,7 +171,9 @@ class TestAuditPhase5(unittest.TestCase):
         )
         self.assertIn("wb.close()", ledger_src)
 
-        excel_gen_code = (SCRIPTS_DIR / "generate_excel_db.py").read_text(encoding="utf-8")
+        excel_gen_code = (SCRIPTS_DIR / "generate_excel_db.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("wb.close()", excel_gen_code)
 
 

@@ -17,29 +17,49 @@ from test_audit_phase10_dashboard import NODE, TEMPLATE, run_node
 @unittest.skipUnless(NODE, "node가 없어 대시보드 JS 실행 검증을 건너뜁니다")
 class DashboardUiHelperTests(unittest.TestCase):
     def test_csv_cell_neutralizes_formulas_and_escapes_quotes(self):
-        out = run_node(["csvCell", "csvRow"], """
+        out = run_node(
+            ["csvCell", "csvRow"],
+            """
 console.log(JSON.stringify([
   csvCell('=HYPERLINK("http://x","y")'), csvCell('+1'), csvCell('-2+3'), csvCell('@SUM(A1)'),
   csvCell('정상 "인용"'), csvCell(null), csvCell(12), csvCell('abcdef', 3), csvRow(['"a"', '"b"'])
 ]));
-""")
-        self.assertEqual(out, [
-            '"\'=HYPERLINK(""http://x"",""y"")"', '"\'+1"', '"\'-2+3"', '"\'@SUM(A1)"',
-            '"정상 ""인용"""', '""', '"12"', '"abc"', '"a","b"\n',
-        ])
+""",
+        )
+        self.assertEqual(
+            out,
+            [
+                '"\'=HYPERLINK(""http://x"",""y"")"',
+                '"\'+1"',
+                '"\'-2+3"',
+                '"\'@SUM(A1)"',
+                '"정상 ""인용"""',
+                '""',
+                '"12"',
+                '"abc"',
+                '"a","b"\n',
+            ],
+        )
 
     def test_notify_type_inference(self):
-        out = run_node(["inferNotifyType"], """
+        out = run_node(
+            ["inferNotifyType"],
+            """
 console.log(JSON.stringify([
   inferNotifyType('❌ 등록 실패: x'), inferNotifyType('서버 연결 오류: y'), inferNotifyType('⚠️ 동기화 실패: z'),
   inferNotifyType('✅ 등록되었습니다'), inferNotifyType('표가 복사되었습니다.'),
   inferNotifyType('요구자료명(제목)은 필수 항목입니다.'), inferNotifyType('안내')
 ]));
-""")
-        self.assertEqual(out, ["error", "error", "warn", "success", "success", "warn", "info"])
+""",
+        )
+        self.assertEqual(
+            out, ["error", "error", "warn", "success", "success", "warn", "info"]
+        )
 
     def test_run_exclusive_blocks_double_submit(self):
-        out = run_node(["BUSY_ACTIONS", "runExclusive"], """
+        out = run_node(
+            ["BUSY_ACTIONS", "runExclusive"],
+            """
 (async () => {
   let calls = 0;
   const button = { disabled: false, attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; } };
@@ -56,23 +76,47 @@ console.log(JSON.stringify([
   console.log(JSON.stringify({ calls, second: second === undefined, lockedWhileRunning, firstResult, failed, third,
     restored: button.disabled === false && !('aria-busy' in button.attrs) }));
 })();
-""")
-        self.assertEqual(out, {"calls": 2, "second": True, "lockedWhileRunning": True, "firstResult": "done",
-                               "failed": True, "third": "again", "restored": True})
+""",
+        )
+        self.assertEqual(
+            out,
+            {
+                "calls": 2,
+                "second": True,
+                "lockedWhileRunning": True,
+                "firstResult": "done",
+                "failed": True,
+                "third": "again",
+                "restored": True,
+            },
+        )
 
     def test_view_prefs_are_sanitized(self):
-        out = run_node(["VIEW_MODES", "VIEW_SORTS", "sanitizeViewPrefs"], """
+        out = run_node(
+            ["VIEW_MODES", "VIEW_SORTS", "sanitizeViewPrefs"],
+            """
 console.log(JSON.stringify([
   sanitizeViewPrefs({ mode: 'ledger', view: 'table', sort: 'deadline-asc' }),
   sanitizeViewPrefs({ mode: 'evil', view: 'grid', sort: 'relevance' }),
   sanitizeViewPrefs(null), sanitizeViewPrefs('x')
 ]));
-""")
+""",
+        )
         default = {"mode": "docs", "view": "card", "sort": "date-desc"}
-        self.assertEqual(out, [{"mode": "ledger", "view": "table", "sort": "deadline-asc"}, default, default, default])
+        self.assertEqual(
+            out,
+            [
+                {"mode": "ledger", "view": "table", "sort": "deadline-asc"},
+                default,
+                default,
+                default,
+            ],
+        )
 
     def test_offline_sync_commits_per_item_without_clobbering_other_tabs(self):
-        out = run_node(["removeLocalLedgerIds"], """
+        out = run_node(
+            ["removeLocalLedgerIds"],
+            """
 const store = { datareq_local_ledger: JSON.stringify([{ ledger_id: 'LOCAL-1' }, { ledger_id: 'LOCAL-2' }]) };
 localStorage.getItem = k => (k in store ? store[k] : null);
 localStorage.setItem = (k, v) => { store[k] = v; };
@@ -83,7 +127,8 @@ store.datareq_local_ledger = JSON.stringify(JSON.parse(store.datareq_local_ledge
 const afterSecond = removeLocalLedgerIds(new Set(['LOCAL-1', 'LOCAL-2']));
 const afterAll = removeLocalLedgerIds(new Set(['LOCAL-3']));
 console.log(JSON.stringify({ afterFirst, afterSecond, afterAll, removed: !('datareq_local_ledger' in store) }));
-""")
+""",
+        )
         self.assertEqual(out["afterFirst"], [{"ledger_id": "LOCAL-2"}])
         self.assertEqual(out["afterSecond"], [{"ledger_id": "LOCAL-3"}])
         self.assertEqual(out["afterAll"], [])
@@ -96,11 +141,17 @@ class DashboardUiWiringTests(unittest.TestCase):
         cls.src = TEMPLATE.read_text(encoding="utf-8")
 
     def test_mutating_entry_points_are_exclusive(self):
-        for name, key in (("submitNewLedgerItem", "ledger-add"), ("submitEditLedgerItem", "ledger-edit"),
-                          ("deleteCurrentLedgerItem", "ledger-delete"), ("syncOfflineLedgerToServer", "offline-sync"),
-                          ("handleConfigSubmit", "config-save")):
+        for name, key in (
+            ("submitNewLedgerItem", "ledger-add"),
+            ("submitEditLedgerItem", "ledger-edit"),
+            ("deleteCurrentLedgerItem", "ledger-delete"),
+            ("syncOfflineLedgerToServer", "offline-sync"),
+            ("handleConfigSubmit", "config-save"),
+        ):
             with self.subTest(fn=name):
-                m = re.search(rf"^function {name}\((?:e)?\) \{{(.*?)^\}}", self.src, re.M | re.S)
+                m = re.search(
+                    rf"^function {name}\((?:e)?\) \{{(.*?)^\}}", self.src, re.M | re.S
+                )
                 self.assertIsNotNone(m, name)
                 assert m is not None
                 self.assertIn(f"runExclusive('{key}'", m.group(1))
@@ -111,13 +162,16 @@ class DashboardUiWiringTests(unittest.TestCase):
         self.assertIn("notify(", self.src)
 
     def test_csv_exports_use_safe_cells(self):
-        self.assertNotIn(".replace(/\"/g, '\"\"')}\"`", self.src)
+        self.assertNotIn('.replace(/"/g, \'""\')}"`', self.src)
         self.assertGreaterEqual(self.src.count("csvCell("), 30)
 
     def test_keyboard_and_loading_markup(self):
         self.assertIn('id="app-loading"', self.src)
         self.assertIn('id="toast-stack"', self.src)
-        self.assertEqual(self.src.count('class="mode-tab'), self.src.count('role="button" tabindex="0" aria-pressed='))
+        self.assertEqual(
+            self.src.count('class="mode-tab'),
+            self.src.count('role="button" tabindex="0" aria-pressed='),
+        )
         self.assertIn("showAppLoadingError(", self.src)
         self.assertIn("restoreViewPrefs();", self.src)
 

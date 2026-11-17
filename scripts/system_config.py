@@ -20,10 +20,11 @@ DEFAULT_CONFIG = {
         "*요구자료*목록*.xls*",
         "*자료요구*목록*.xls*",
         "*요구자료*대장*.xls*",
-        "*관리대장*.xls*"
+        "*관리대장*.xls*",
     ],
-    "exclude_dirs": []
+    "exclude_dirs": [],
 }
+
 
 def find_system_dir(start_path=None) -> Path:
     if start_path is None:
@@ -33,24 +34,33 @@ def find_system_dir(start_path=None) -> Path:
         return p.parent
     return p
 
+
 # 배포 패키지 폴더 이름. 경로에 "배포"라는 글자가 들어갔다는 이유만으로 배포본으로 보면,
 # 사용자가 상위 폴더를 "배포자료"로 두거나 범용 배포본을 그대로 쓸 때 대장 엑셀을 전혀
 # 찾지 못한다. (감사 R3-04)
-DISTRIBUTION_DIR_NAMES = ("배포용_자료요구_통합검색시스템", "국회자료요구_스마트시스템_범용배포용")
+DISTRIBUTION_DIR_NAMES = (
+    "배포용_자료요구_통합검색시스템",
+    "국회자료요구_스마트시스템_범용배포용",
+)
 DISTRIBUTION_MANIFEST = ".distribution_manifest.json"
 
 
 def is_distribution_dir(start_path=None) -> bool:
     """이 시스템 폴더가 배포 패키지(부서 배포본·범용 배포본)인가."""
     sys_dir = find_system_dir(start_path)
-    return sys_dir.name in DISTRIBUTION_DIR_NAMES or (sys_dir / DISTRIBUTION_MANIFEST).exists()
+    return (
+        sys_dir.name in DISTRIBUTION_DIR_NAMES
+        or (sys_dir / DISTRIBUTION_MANIFEST).exists()
+    )
 
 
 def is_data_distribution(start_path=None) -> bool:
     """원문 없이 파싱 데이터를 담아 배포한 패키지인가(부서 배포본)."""
     manifest = find_system_dir(start_path) / DISTRIBUTION_MANIFEST
     try:
-        return bool(json.loads(manifest.read_text(encoding="utf-8")).get("data_included"))
+        return bool(
+            json.loads(manifest.read_text(encoding="utf-8")).get("data_included")
+        )
     except (OSError, ValueError, TypeError, AttributeError):
         return False
 
@@ -77,15 +87,22 @@ def find_workspace_root(start_path=None) -> Path:
     if parent != sys_dir and parent.exists():
         try:
             for item in parent.iterdir():
-                if item.is_dir() and len(item.name) == 4 and item.name.isdigit() and item.name.startswith("20"):
+                if (
+                    item.is_dir()
+                    and len(item.name) == 4
+                    and item.name.isdigit()
+                    and item.name.startswith("20")
+                ):
                     return parent
         except OSError:
             pass
     return sys_dir
 
+
 def get_config_path(base_dir=None) -> Path:
     system_dir = find_system_dir(base_dir)
     return system_dir / "config.json"
+
 
 def read_user_config(cfg_path: Path):
     """config.json을 읽는다. (설정 dict 또는 None, 오류 메시지 또는 None)
@@ -123,6 +140,7 @@ def get_config(base_dir=None) -> dict:
         cfg.update(user_cfg)
     return cfg
 
+
 def save_config(new_config: dict, base_dir=None) -> bool:
     cfg_path = get_config_path(base_dir)
     try:
@@ -131,10 +149,13 @@ def save_config(new_config: dict, base_dir=None) -> bool:
         error = str(e)
     if error:
         # 읽지 못한 파일을 기본값 + 새 키로 덮어쓰면 사용자의 다른 설정이 사라진다.
-        print(f"[system_config] 설정 파일을 읽을 수 없어 저장하지 않습니다 ({cfg_path}): {error}")
+        print(
+            f"[system_config] 설정 파일을 읽을 수 없어 저장하지 않습니다 ({cfg_path}): {error}"
+        )
         return False
     try:
         from write_guard import ensure_writable
+
         ensure_writable(cfg_path, "설정 파일")
     except ImportError:
         pass

@@ -39,7 +39,7 @@ class TestMultiDepartmentAndPackaging(unittest.TestCase):
         custom = {
             "department_name": "테스트운영팀",
             "agency_name": "공공기관",
-            "system_title": "자료요구 통합 테스트 시스템"
+            "system_title": "자료요구 통합 테스트 시스템",
         }
         ok = system_config.save_config(custom, self.temp_dir)
         self.assertTrue(ok)
@@ -61,9 +61,15 @@ class TestMultiDepartmentAndPackaging(unittest.TestCase):
         self.assertTrue((dist_out / "04_부서명_간편설정.bat").exists())
         self.assertTrue((dist_out / "07_기존자료_안전마이그레이션.bat").exists())
         self.assertTrue((dist_out / "config.json").exists())
-        self.assertTrue((dist_out / "(양식)국회_요구자료_목록_대장_템플릿.xlsx").exists())
+        self.assertTrue(
+            (dist_out / "(양식)국회_요구자료_목록_대장_템플릿.xlsx").exists()
+        )
         self.assertTrue((dist_out / "새자료_투입폴더").is_dir())
-        self.assertTrue((dist_out / "새자료_투입폴더" / "README_여기에_파일을_넣으세요.txt").exists())
+        self.assertTrue(
+            (
+                dist_out / "새자료_투입폴더" / "README_여기에_파일을_넣으세요.txt"
+            ).exists()
+        )
         self.assertTrue((dist_out / "data_requests.db").exists())
         self.assertTrue((dist_out / "data_requests.json").exists())
         self.assertTrue((dist_out / "자료요구_통합검색_대시보드.html").exists())
@@ -87,8 +93,16 @@ class TestMultiDepartmentAndPackaging(unittest.TestCase):
     def test_html_only_dashboard_is_self_contained_with_full_text(self):
         """관리자가 HTML 한 파일만 전달해도 검색·전문 열람이 가능해야 한다."""
         raw = {
-            "documents": [{"doc_id": "DOC-1", "title": "테스트", "full_markdown": "문서 전문 전체"}],
-            "qa_items": [{"qa_id": "QA-1", "doc_id": "DOC-1", "answer_markdown": "Q&A 답변 전문"}],
+            "documents": [
+                {
+                    "doc_id": "DOC-1",
+                    "title": "테스트",
+                    "full_markdown": "문서 전문 전체",
+                }
+            ],
+            "qa_items": [
+                {"qa_id": "QA-1", "doc_id": "DOC-1", "answer_markdown": "Q&A 답변 전문"}
+            ],
             "request_ledger": [{"ledger_id": "REQ-1", "title": "대장"}],
         }
         renderer = DashboardRenderer()
@@ -117,11 +131,14 @@ class TestMultiDepartmentAndPackaging(unittest.TestCase):
 
         # Test insert ledger item with default department
         system_config.save_config({"department_name": "신규테스트부서"}, self.temp_dir)
-        insert_res = handler.insert_ledger_item(None, {
-            "title": "테스트 요구자료 제목",
-            "requester": "홍길동의원",
-            "year": "2026"
-        })
+        insert_res = handler.insert_ledger_item(
+            None,
+            {
+                "title": "테스트 요구자료 제목",
+                "requester": "홍길동의원",
+                "year": "2026",
+            },
+        )
         self.assertTrue(insert_res["success"])
         self.assertEqual(insert_res["item"]["department"], "신규테스트부서")
 
@@ -163,5 +180,6 @@ class TestMultiDepartmentAndPackaging(unittest.TestCase):
             extract_and_build_db.DB_PATH = orig_db
             extract_and_build_db.JSON_PATH = orig_json
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

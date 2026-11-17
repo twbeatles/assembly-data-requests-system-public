@@ -29,7 +29,14 @@ TESTS_DIR = SYSTEM_DIR / "tests"
 sys.path.insert(0, str(SCRIPTS_DIR))
 sys.path.insert(0, str(TESTS_DIR))
 
-PACKAGE_DIRS = ("services/excel_sync", "services/ledger", "extractors/ledger", "web", "gui", "pipeline/parse")
+PACKAGE_DIRS = (
+    "services/excel_sync",
+    "services/ledger",
+    "extractors/ledger",
+    "web",
+    "gui",
+    "pipeline/parse",
+)
 
 
 def module_name(path: Path) -> str:
@@ -73,7 +80,9 @@ def referenced_elsewhere(path: Path, bound_name: str, corpus) -> bool:
     """다른 파일이 이 모듈에서 그 이름을 가져가거나(import), 패치 문자열·속성으로 가리키는가."""
     mod = module_name(path)
     leaf = mod.split(".")[-1]
-    dotted = re.compile(rf"(?:{re.escape(mod)}|\b{re.escape(leaf)})\.{re.escape(bound_name)}\b")
+    dotted = re.compile(
+        rf"(?:{re.escape(mod)}|\b{re.escape(leaf)})\.{re.escape(bound_name)}\b"
+    )
     for other, text in corpus:
         if other == path or bound_name not in text:
             continue
@@ -84,7 +93,11 @@ def referenced_elsewhere(path: Path, bound_name: str, corpus) -> bool:
         except SyntaxError:
             return True
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module and (node.module == mod or node.module.endswith("." + mod)):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and (node.module == mod or node.module.endswith("." + mod))
+            ):
                 if any(a.name in (bound_name, "*") for a in node.names):
                     return True
     return False
@@ -100,7 +113,10 @@ def rewrite(source: str, removals: dict) -> str:
     lines = source.splitlines(keepends=True)
     edits = []
     for node in tree.body:
-        if not isinstance(node, (ast.Import, ast.ImportFrom)) or node.lineno not in removals:
+        if (
+            not isinstance(node, (ast.Import, ast.ImportFrom))
+            or node.lineno not in removals
+        ):
             continue
         drop = removals[node.lineno]
         kept = [a for a in node.names if bound(a) not in drop]
@@ -112,7 +128,9 @@ def rewrite(source: str, removals: dict) -> str:
         if not kept:
             new = ""
         else:
-            names = ", ".join(f"{a.name} as {a.asname}" if a.asname else a.name for a in kept)
+            names = ", ".join(
+                f"{a.name} as {a.asname}" if a.asname else a.name for a in kept
+            )
             if isinstance(node, ast.Import):
                 new = f"{indent}import {names}\n"
             else:
@@ -120,7 +138,11 @@ def rewrite(source: str, removals: dict) -> str:
                 new = f"{indent}from {module} import {names}\n"
                 if len(new) > 110:
                     body = "".join(
-                        f"    {a.name} as {a.asname},\n" if a.asname else f"    {a.name},\n" for a in kept)
+                        f"    {a.name} as {a.asname},\n"
+                        if a.asname
+                        else f"    {a.name},\n"
+                        for a in kept
+                    )
                     new = f"{indent}from {module} import (\n{body}{indent})\n"
         edits.append((start, end, new))
     for start, end, new in sorted(edits, reverse=True):
@@ -139,21 +161,32 @@ def main(argv=None) -> int:
         load_snapshot,
     )
 
-    corpus = [(p, p.read_text(encoding="utf-8", errors="replace"))
-              for root in (SCRIPTS_DIR, TESTS_DIR, SYSTEM_DIR / "tools")
-              for p in root.rglob("*.py") if "__pycache__" not in p.parts]
+    corpus = [
+        (p, p.read_text(encoding="utf-8", errors="replace"))
+        for root in (SCRIPTS_DIR, TESTS_DIR, SYSTEM_DIR / "tools")
+        for p in root.rglob("*.py")
+        if "__pycache__" not in p.parts
+    ]
     shim_files = {(SCRIPTS_DIR / rel).resolve() for rel in PYTHON_TARGETS.values()}
     snapshot = load_snapshot()
 
     plan = {}
     for pkg in PACKAGE_DIRS:
         for path in sorted((SCRIPTS_DIR / pkg).rglob("*.py")):
-            if path.name == "__init__.py" or path.resolve() in shim_files or "__pycache__" in path.parts:
+            if (
+                path.name == "__init__.py"
+                or path.resolve() in shim_files
+                or "__pycache__" in path.parts
+            ):
                 continue
             source = path.read_text(encoding="utf-8")
             tree = ast.parse(source)
             in_try = try_block_lines(tree)
-            top_level = {n.lineno: n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))}
+            top_level = {
+                n.lineno: n
+                for n in tree.body
+                if isinstance(n, (ast.Import, ast.ImportFrom))
+            }
             for lineno, dotted in unused_imports(path):
                 node = top_level.get(lineno)
                 if node is None or lineno in in_try:
@@ -192,7 +225,9 @@ def main(argv=None) -> int:
             names = sorted(set().union(*removals.values())) if removals else []
             if names:
                 print(f"{path.relative_to(SYSTEM_DIR)}: {', '.join(names)}")
-        print(f"정리 대상 {total}개" + ("" if args.apply else " (점검만, --apply로 반영)"))
+        print(
+            f"정리 대상 {total}개" + ("" if args.apply else " (점검만, --apply로 반영)")
+        )
         for p in [r.relative_to(SYSTEM_DIR) for r in plan]:
             compile((SYSTEM_DIR / p).read_text(encoding="utf-8"), str(p), "exec")
     finally:

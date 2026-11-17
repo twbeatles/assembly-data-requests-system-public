@@ -18,6 +18,7 @@ from agent_bridge.facade import AgentFacade
 
 def _run_cli(arg_list, base_dir):
     from agent_bridge.cli import main
+
     buffer = io.StringIO()
     with redirect_stdout(buffer):
         code = main(["--data-root", str(base_dir)] + list(arg_list))
@@ -36,15 +37,21 @@ def _stable_ids(items):
 def test_search_parity_with_ledger_service(tmp_path):
     agent_fixtures.build_synthetic_db(tmp_path)
     from services.ledger_service import LedgerService
-    service = LedgerService(db_path=tmp_path / "data_requests.db",
-                            json_path=tmp_path / "data_requests.json",
-                            base_dir=tmp_path)
-    with AgentFacade(base_dir=tmp_path, allowed_roots=[tmp_path]
-                     )._no_search_logging(service):
+
+    service = LedgerService(
+        db_path=tmp_path / "data_requests.db",
+        json_path=tmp_path / "data_requests.json",
+        base_dir=tmp_path,
+    )
+    with AgentFacade(base_dir=tmp_path, allowed_roots=[tmp_path])._no_search_logging(
+        service
+    ):
         expected = service.search_all(kw="딥페이크", slim=True)
-    expected_ids = ({r["ledger_id"] for r in expected["ledger"]}
-                    | {r["doc_id"] for r in expected["documents"]}
-                    | {r["qa_id"] for r in expected["qa_items"]})
+    expected_ids = (
+        {r["ledger_id"] for r in expected["ledger"]}
+        | {r["doc_id"] for r in expected["documents"]}
+        | {r["qa_id"] for r in expected["qa_items"]}
+    )
     envelope, code, _ = _run_cli(["search", "딥페이크", "--limit", "50"], tmp_path)
     assert code == 0
     assert _stable_ids(envelope["data"]["items"]) == expected_ids
@@ -52,8 +59,12 @@ def test_search_parity_with_ledger_service(tmp_path):
 
 def _fingerprints(base_dir):
     marks = {}
-    for name in ("data_requests.db", "data_requests.db-wal",
-                 "data_requests.db-shm", "data_requests.json"):
+    for name in (
+        "data_requests.db",
+        "data_requests.db-wal",
+        "data_requests.db-shm",
+        "data_requests.json",
+    ):
         path = base_dir / name
         if path.exists():
             digest = hashlib.sha256()

@@ -21,26 +21,29 @@ def auto_link_ledger_to_doc(conn, item):
             exists = True
         if exists:
             return linked_doc_id
-    
+
     seq_no = str(item.get("seq_no", "")).strip()
     requester = str(item.get("requester", "")).strip()
     req_date = str(item.get("request_date", "")).strip()
     year = str(item.get("year", "")).strip()
-    
+
     matched_doc_id = ""
-    
+
     # 1. Match by seq_no as a whole numeric token (not a substring of 10/11/100)
     variants = _seq_token_variants(seq_no)
     if variants and year:
         like_key = max(variants, key=len)
         try:
-            rows = cur.execute("""
+            rows = cur.execute(
+                """
                 SELECT doc_id, doc_number, original_path FROM documents
                 WHERE year = ? AND (
                     doc_number LIKE ? OR
                     original_path LIKE ?
                 )
-            """, (year, f"%{like_key}%", f"%{like_key}%")).fetchall()
+            """,
+                (year, f"%{like_key}%", f"%{like_key}%"),
+            ).fetchall()
             matched_ids = []
             for row in rows:
                 blob = f"{row['doc_number'] or ''} {row['original_path'] or ''}"
@@ -51,29 +54,35 @@ def auto_link_ledger_to_doc(conn, item):
                 matched_doc_id = matched_ids[0]
         except Exception:
             pass
-    
+
     # 2. Match by requester and request_date
     if not matched_doc_id and requester and req_date:
-        req_clean = re.sub(r'\s*(의원|처|실|팀|관)?$', '', requester).strip()
+        req_clean = re.sub(r"\s*(의원|처|실|팀|관)?$", "", requester).strip()
         if req_clean:
             try:
-                rows = cur.execute("""
+                rows = cur.execute(
+                    """
                     SELECT doc_id FROM documents
                     WHERE (year = ? OR ? = '') AND requester LIKE ? AND request_date = ?
                     LIMIT 1
-                """, (year, year, f"%{req_clean}%", req_date)).fetchall()
+                """,
+                    (year, year, f"%{req_clean}%", req_date),
+                ).fetchall()
                 if rows:
                     matched_doc_id = rows[0]["doc_id"]
             except Exception:
                 pass
-    
+
     if matched_doc_id:
         item["linked_doc_id"] = matched_doc_id
         try:
-            cur.execute("UPDATE documents SET linked_ledger_id = ? WHERE doc_id = ?", (item.get("ledger_id", ""), matched_doc_id))
+            cur.execute(
+                "UPDATE documents SET linked_ledger_id = ? WHERE doc_id = ?",
+                (item.get("ledger_id", ""), matched_doc_id),
+            )
         except Exception:
             pass
-    
+
     return matched_doc_id
 
 

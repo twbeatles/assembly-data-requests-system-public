@@ -17,9 +17,13 @@ def fingerprint_file(path):
             digest.update(chunk)
             size += len(chunk)
     stat = target.stat()
-    return {"available": True, "path": str(target),
-            "sha256": digest.hexdigest(), "size_bytes": size,
-            "mtime": int(stat.st_mtime)}
+    return {
+        "available": True,
+        "path": str(target),
+        "sha256": digest.hexdigest(),
+        "size_bytes": size,
+        "mtime": int(stat.st_mtime),
+    }
 
 
 def verify_manifest(entries):
@@ -32,6 +36,7 @@ def verify_manifest(entries):
         match = bool(current.get("sha256")) and current["sha256"].lower() == expected
         if not match:
             ok = False
-        results.append({"path": entry.get("path", ""), "match": match,
-                        "current": current})
+        results.append(
+            {"path": entry.get("path", ""), "match": match, "current": current}
+        )
     return {"ok": ok, "results": results}

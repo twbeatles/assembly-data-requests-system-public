@@ -25,8 +25,15 @@ if str(SYSTEM_DIR) not in sys.path:
 import tests as _tests_package  # noqa: E402,F401
 
 WATCHED_PATTERNS = (
-    "*.xlsm", "*.xlsx", "*.db", "*.json", "*.html",
-    ".excel_pending_queue.json", ".excel_pending_failed.json", ".pipeline.lock", ".web_server.lock",
+    "*.xlsm",
+    "*.xlsx",
+    "*.db",
+    "*.json",
+    "*.html",
+    ".excel_pending_queue.json",
+    ".excel_pending_failed.json",
+    ".pipeline.lock",
+    ".web_server.lock",
 )
 # 내용 대신 존재 여부만 본다. 테스트가 쓰기 연결을 열고 닫으면 사이드카가 생기거나 지워진다.
 SIDECAR_PATTERNS = ("*.db-wal", "*.db-shm")
@@ -58,11 +65,13 @@ class TestProductionFilesUntouched(unittest.TestCase):
     def test_suite_did_not_modify_production_data(self):
         after = fingerprint()
         changed = sorted(
-            name for name in set(BEFORE) | set(after)
+            name
+            for name in set(BEFORE) | set(after)
             if BEFORE.get(name) != after.get(name)
         )
         self.assertEqual(
-            changed, [],
+            changed,
+            [],
             f"테스트 실행이 운영 폴더의 데이터 파일을 바꿨습니다: {changed}\n"
             "테스트는 임시 디렉터리를 base_dir/DB 경로로 지정해야 합니다.",
         )
@@ -70,7 +79,8 @@ class TestProductionFilesUntouched(unittest.TestCase):
     def test_suite_did_not_open_production_db(self):
         PRODUCTION_DB_OPENS = _tests_package.PRODUCTION_DB_OPENS
         self.assertEqual(
-            PRODUCTION_DB_OPENS, [],
+            PRODUCTION_DB_OPENS,
+            [],
             "테스트가 운영 data_requests.db를 열었습니다(immutable 연결 제외). "
             "임시 DB 경로를 넘기거나 connect_readonly(..., immutable=True)를 쓰세요.\n"
             + "\n".join(PRODUCTION_DB_OPENS[:10]),

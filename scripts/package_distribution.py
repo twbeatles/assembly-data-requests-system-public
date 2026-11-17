@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-cast(Any, sys.stdout).reconfigure(encoding='utf-8')
+cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DIST_ROOT = ROOT_DIR / "배포용_자료요구_통합검색시스템"
@@ -23,6 +23,7 @@ def resolve_exe_src() -> Path:
     if not existing:
         return candidates[1]
     return max(existing, key=lambda p: p.stat().st_mtime)
+
 
 EXE_SRC = resolve_exe_src()
 
@@ -407,6 +408,7 @@ start "" "국회_대외기관_자료요구_통합DB.xlsx"
 exit
 """
 
+
 def main():
     print("=" * 60)
     print("타인 배포용 독립 패키지 폴더 구성")
@@ -414,6 +416,7 @@ def main():
 
     try:
         import write_all_bats
+
         write_all_bats.main()
     except Exception as e:
         print(f"배치파일 생성 건너뜀/오류: {e}")
@@ -445,7 +448,9 @@ def main():
     if EXE_SRC.exists():
         target_exe = DIST_ROOT / "자료요구_통합검색.exe"
         safe_copy_file(EXE_SRC, target_exe)
-        print(f"실행 파일 복사 완료: {target_exe.name} ({target_exe.stat().st_size:,} bytes)")
+        print(
+            f"실행 파일 복사 완료: {target_exe.name} ({target_exe.stat().st_size:,} bytes)"
+        )
         root_exe = ROOT_DIR / "자료요구_통합검색.exe"
         if not root_exe.exists() or root_exe != EXE_SRC:
             safe_copy_file(EXE_SRC, root_exe)
@@ -465,7 +470,7 @@ def main():
         "(양식)국회_요구자료_목록_대장_템플릿.xlsx",
         "kordoc_파싱_및_설치_가이드.md",
         "KorDoc.AI_1.5.1_x64_ko-KR.msi",
-        "배치파일_안전설계_및_운영가이드.md"
+        "배치파일_안전설계_및_운영가이드.md",
     ]
 
     for fname in files_to_copy:
@@ -492,7 +497,12 @@ def main():
             continue
         dst_item = scripts_dst / item.name
         if item.is_dir():
-            shutil.copytree(item, dst_item, dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+            shutil.copytree(
+                item,
+                dst_item,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
         else:
             shutil.copy2(item, dst_item)
     print("✓ 스크립트 및 모듈 서브패키지 동기화 완료")
@@ -508,18 +518,25 @@ def main():
     # This manifest lets the incremental parser distinguish that case from a real
     # source deletion and preserve the bundled full-text markdown.
     (DIST_ROOT / ".distribution_manifest.json").write_text(
-        json.dumps({"data_included": True, "source_documents_included": False}, ensure_ascii=False, indent=2),
+        json.dumps(
+            {"data_included": True, "source_documents_included": False},
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
     import system_config
+
     dept = system_config.get_config(ROOT_DIR).get("department_name", "자료요구담당부서")
     (DIST_ROOT / "사용설명서_및_안내.html").write_text(
         HTML_MANUAL_CONTENT.replace("__DEPT_NAME__", dept), encoding="utf-8"
     )
     print("사용설명서 HTML 생성: 사용설명서_및_안내.html")
 
-    (DIST_ROOT / "README_배포안내.txt").write_text(README_TXT_CONTENT, encoding="utf-8-sig")
+    (DIST_ROOT / "README_배포안내.txt").write_text(
+        README_TXT_CONTENT, encoding="utf-8-sig"
+    )
     print("배포 안내 텍스트 생성: README_배포안내.txt (UTF-8 BOM)")
 
     print("\n" + "=" * 60)
@@ -529,12 +546,14 @@ def main():
     # Build universal clean package for other departments
     try:
         import build_universal_package
+
         univ_dir = build_universal_package.build_universal_package()
         print(f" 2. 타 부서 전용 클린 배포 폴더: {univ_dir}")
     except Exception as e:
         print(f"타 부서 패키지 생성 건너뜀/오류: {e}")
 
     print("=" * 60)
+
 
 if __name__ == "__main__":
     main()

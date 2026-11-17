@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """파이프라인 중 웹 변경 병합(SRP: 스왑 전 동시성 병합)."""
+
 import sqlite3
 from pathlib import Path
 

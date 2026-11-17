@@ -5,6 +5,7 @@
     python scripts/datareq_cli.py doctor --json
     python scripts/datareq_cli.py search "딥페이크" --category qa --limit 10 --json
 """
+
 import sys
 from pathlib import Path
 

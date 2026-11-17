@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """투입 파일 분류·복사(SRP: 원문 투입)."""
+
 import hashlib
 import os
 import re
@@ -9,34 +10,47 @@ from pathlib import Path
 
 from write_guard import ensure_writable
 
-TARGET_EXTS = {'.hwp', '.hwpx', '.xlsx', '.xlsm', '.pdf'}
+TARGET_EXTS = {".hwp", ".hwpx", ".xlsx", ".xlsm", ".pdf"}
+
+
 def is_master_ledger_file(file_path: Path) -> bool:
     """Check if an excel file is a master ledger rather than an individual answer document."""
-    if file_path.suffix.lower() not in {'.xlsx', '.xlsm'}:
+    if file_path.suffix.lower() not in {".xlsx", ".xlsm"}:
         return False
     name = file_path.name
     # Explicit answer document exclusions
-    if any(k in name for k in ['답변', '회신', '(참고)', '요약본']):
+    if any(k in name for k in ["답변", "회신", "(참고)", "요약본"]):
         return False
-    clean_name = re.sub(r'[\s_\(\)]+', '', name)
-    ledger_keywords = ['관리대장', '요구자료목록', '자료요구목록', '요구자료대장', '자료요구대장', '마스터대장', '대장템플릿']
+    clean_name = re.sub(r"[\s_\(\)]+", "", name)
+    ledger_keywords = [
+        "관리대장",
+        "요구자료목록",
+        "자료요구목록",
+        "요구자료대장",
+        "자료요구대장",
+        "마스터대장",
+        "대장템플릿",
+    ]
     return any(k in clean_name for k in ledger_keywords)
+
+
 def determine_target_folder(file_path: Path) -> Path:
     import add_documents_smart as ad  # 지연 import: 진입점 전역 패치를 그대로 본다.
+
     name = file_path.name
     # If it's a master ledger excel file, place it directly in ad.SYSTEM_DIR
     if ad.is_master_ledger_file(file_path):
         return ad.SYSTEM_DIR
 
     # 1. Extract 4-digit year 2018~2039 from filename
-    m4 = re.search(r'(?:^|[^\d])(20[1-3]\d)(?:[^\d]|$)', name)
+    m4 = re.search(r"(?:^|[^\d])(20[1-3]\d)(?:[^\d]|$)", name)
 
     # 2. If not in filename, check parent subfolder names (e.g. 새자료_투입폴더/2025/문서.hwp)
     if not m4:
         for parent in file_path.parents:
             if any(parent == dd or parent in dd.parents for dd in ad.DROP_DIRS):
                 break
-            m_parent = re.search(r'(?:^|[^\d])(20[1-3]\d)(?:[^\d]|$)', parent.name)
+            m_parent = re.search(r"(?:^|[^\d])(20[1-3]\d)(?:[^\d]|$)", parent.name)
             if m_parent:
                 m4 = m_parent
                 break
@@ -45,7 +59,7 @@ def determine_target_folder(file_path: Path) -> Path:
         target_year = m4.group(1)
     else:
         # Extract 2-digit year at beginning of date like 260901, 251231
-        m2 = re.search(r'(?:^|[^\d])([1-3]\d)(?:0[1-9]|1[0-2])(?:[0-3]\d)', name)
+        m2 = re.search(r"(?:^|[^\d])([1-3]\d)(?:0[1-9]|1[0-2])(?:[0-3]\d)", name)
         if m2:
             target_year = f"20{m2.group(1)}"
         else:
@@ -56,6 +70,8 @@ def determine_target_folder(file_path: Path) -> Path:
     ensure_writable(target_dir, "원문 폴더")
     target_dir.mkdir(parents=True, exist_ok=True)
     return target_dir
+
+
 def _compute_sha256(path: Path) -> str:
     """Computes SHA-256 hash of a file efficiently."""
     hasher = hashlib.sha256()
@@ -63,6 +79,8 @@ def _compute_sha256(path: Path) -> str:
         for chunk in iter(lambda: f.read(65536), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
 def _is_in_use(path: Path) -> bool:
     """다른 프로그램(한글·Excel 등)이 열고 있어 옮길 수 없는 파일인가. Windows 전용 판정."""
     if sys.platform != "win32":
@@ -72,8 +90,11 @@ def _is_in_use(path: Path) -> bool:
         return False
     except OSError:
         return True
+
+
 def copy_or_move_files(file_paths, move=False, skipped=None):
     import add_documents_smart as ad  # 지연 import: 진입점 전역 패치를 그대로 본다.
+
     """투입 파일을 연도 폴더로 복사·이동한다.
 
     `skipped`(list)를 넘기면 사용 중이라 건너뛴 파일의 (파일명, 사유)를 담는다.
@@ -87,14 +108,18 @@ def copy_or_move_files(file_paths, move=False, skipped=None):
         if not src.exists() or src.suffix.lower() not in TARGET_EXTS:
             continue
         if move and ad._is_in_use(src):
-            print(f"⚠ 다른 프로그램에서 열려 있어 이번 실행에서 건너뜁니다: {src.name} (파일을 닫고 다시 실행하세요)")
+            print(
+                f"⚠ 다른 프로그램에서 열려 있어 이번 실행에서 건너뜁니다: {src.name} (파일을 닫고 다시 실행하세요)"
+            )
             if skipped is not None:
                 skipped.append((src.name, "사용 중"))
             continue
-        
+
         # If it's already inside ad.ROOT_DIR (and not in any ad.DROP_DIRS), keep it there
         try:
-            if src.is_relative_to(ad.ROOT_DIR) and not any(src.is_relative_to(dd) for dd in ad.DROP_DIRS):
+            if src.is_relative_to(ad.ROOT_DIR) and not any(
+                src.is_relative_to(dd) for dd in ad.DROP_DIRS
+            ):
                 processed.append(src)
                 continue
         except ValueError:
@@ -102,11 +127,15 @@ def copy_or_move_files(file_paths, move=False, skipped=None):
 
         target_dir = ad.determine_target_folder(src)
         dst = target_dir / src.name
-        
+
         # Check if identical file already exists at dst (same size and hash)
         if dst.exists() and dst.resolve() != src:
-            if dst.stat().st_size == src.stat().st_size and ad._compute_sha256(dst) == ad._compute_sha256(src):
-                print(f"ℹ️ 동일한 파일이 이미 존재하여 복사를 건너뜁니다: {src.name} ➔ {dst.parent.name}/{dst.name}")
+            if dst.stat().st_size == src.stat().st_size and ad._compute_sha256(
+                dst
+            ) == ad._compute_sha256(src):
+                print(
+                    f"ℹ️ 동일한 파일이 이미 존재하여 복사를 건너뜁니다: {src.name} ➔ {dst.parent.name}/{dst.name}"
+                )
                 if move:
                     try:
                         src.unlink()
@@ -114,7 +143,12 @@ def copy_or_move_files(file_paths, move=False, skipped=None):
                         pass
                     # Clean up any temporary markdown previously parsed in staging folder
                     for dd in ad.DROP_DIRS:
-                        stale_md = ad.SYSTEM_DIR / "_parsed_markdown" / dd.name / f"{src.name}.md"
+                        stale_md = (
+                            ad.SYSTEM_DIR
+                            / "_parsed_markdown"
+                            / dd.name
+                            / f"{src.name}.md"
+                        )
                         if stale_md.exists():
                             try:
                                 stale_md.unlink()
@@ -151,7 +185,9 @@ def copy_or_move_files(file_paths, move=False, skipped=None):
             print(f"📦 파일 이동 완료: {src.name} ➔ {dst.parent.name}/{dst.name}")
             # Clean up any temporary markdown previously parsed in staging folder
             for dd in ad.DROP_DIRS:
-                stale_md = ad.SYSTEM_DIR / "_parsed_markdown" / dd.name / f"{src.name}.md"
+                stale_md = (
+                    ad.SYSTEM_DIR / "_parsed_markdown" / dd.name / f"{src.name}.md"
+                )
                 if stale_md.exists():
                     try:
                         stale_md.unlink()
@@ -167,6 +203,6 @@ def copy_or_move_files(file_paths, move=False, skipped=None):
                     skipped.append((src.name, str(e)))
                 continue
             print(f"📋 파일 복사 완료: {src.name} ➔ {dst.parent.name}/{dst.name}")
-        
+
         processed.append(dst)
     return processed

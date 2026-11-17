@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """_parsed_markdown 연도별 정리 및 경로 판별 단위 테스트."""
+
 import shutil
 import sys
 import tempfile
@@ -64,12 +65,17 @@ class TestParsedMarkdownReorganization(unittest.TestCase):
             # Case 3: 비연도 하위 폴더의 26년 문서 -> output_dir / 2026 / 비연도폴더 / 파일명.md
             misc_folder_file = self.root / "홍길동 519" / "260901 요구자료.hwp"
             out_md3, _ = parse_all.parse_output_paths(misc_folder_file, self.output_dir)
-            self.assertEqual(out_md3, self.output_dir / "2026" / "홍길동 519" / "260901 요구자료.hwp.md")
+            self.assertEqual(
+                out_md3,
+                self.output_dir / "2026" / "홍길동 519" / "260901 요구자료.hwp.md",
+            )
 
             # Case 4: 연도 불명 파일 -> output_dir / 미분류 / 파일명.md
             undated = self.root / "질의서답변(양식).hwp"
             out_md4, _ = parse_all.parse_output_paths(undated, self.output_dir)
-            self.assertEqual(out_md4, self.output_dir / "미분류" / "질의서답변(양식).hwp.md")
+            self.assertEqual(
+                out_md4, self.output_dir / "미분류" / "질의서답변(양식).hwp.md"
+            )
 
     def test_ensure_source_header_injection(self):
         md_file = self.output_dir / "sample.md"

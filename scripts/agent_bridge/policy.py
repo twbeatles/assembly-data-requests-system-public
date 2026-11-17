@@ -22,11 +22,21 @@ PROFILES = ("reader", "analyst", "operator")
 # 대장 상세에서 프로파일별로 가리는 필드. reader/analyst는 연락성 필드를 마스킹한다.
 MASKED_LEDGER_FIELDS = ("contact_person", "aide", "note")
 
-READ_ONLY_OPERATIONS = frozenset({
-    "doctor", "search", "document_get", "qa_get", "ledger_list",
-    "ledger_get", "ledger_summary", "ledger_history", "reconcile",
-    "pipeline_plan", "evidence_pack",
-})
+READ_ONLY_OPERATIONS = frozenset(
+    {
+        "doctor",
+        "search",
+        "document_get",
+        "qa_get",
+        "ledger_list",
+        "ledger_get",
+        "ledger_summary",
+        "ledger_history",
+        "reconcile",
+        "pipeline_plan",
+        "evidence_pack",
+    }
+)
 
 
 def clamp_limit(limit, default=DEFAULT_LIMIT, maximum=MAX_LIMIT):
@@ -78,6 +88,7 @@ def mask_text(text):
         return ""
     try:
         from extractors.text_extractor import mask_pii
+
         return mask_pii(str(text))
     except Exception:
         return str(text)
@@ -113,10 +124,12 @@ def response_too_large(text):
 def budget_error(operation):
     """상한 초과 시의 명시적 오류. 무통보 잘림 대신 오류를 낸다."""
     from .errors import DataReqError
+
     return DataReqError(
         "policy_denied",
         "응답이 상한(%d 바이트)을 초과했습니다. "
-        "limit·max_chars·max_sources를 낮춰 다시 시도하세요." % MAX_RESPONSE_BYTES)
+        "limit·max_chars·max_sources를 낮춰 다시 시도하세요." % MAX_RESPONSE_BYTES,
+    )
 
 
 def describe_limits():

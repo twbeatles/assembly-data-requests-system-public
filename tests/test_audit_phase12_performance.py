@@ -34,14 +34,23 @@ def legacy_mask_pii(text):
     """성능 개선 전 구현 (감사 R3-11 반영본)."""
     if not text:
         return ""
-    t = re.sub(r'(?<![\d-])(01[016789])[-.\s)]?(\d{3,4})[-.\s]?(\d{4})(?!\d)', r'\1-****-\3', text)
-    t = re.sub(r'(?<![\d-])(\d{6})[-.\s]?([1-4])\d{6}(?!\d)', r'\1-\2******', t)
+    t = re.sub(
+        r"(?<![\d-])(01[016789])[-.\s)]?(\d{3,4})[-.\s]?(\d{4})(?!\d)",
+        r"\1-****-\3",
+        text,
+    )
+    t = re.sub(r"(?<![\d-])(\d{6})[-.\s]?([1-4])\d{6}(?!\d)", r"\1-\2******", t)
 
     def _mask_email(m):
         prefix, domain = m.group(1), m.group(2)
         masked = prefix[0] + "*" if len(prefix) <= 2 else prefix[:2] + "***"
         return f"{masked}@{domain}"
-    return re.sub(r'(?<![A-Za-z0-9._%+-])([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})(?![A-Za-z0-9-])', _mask_email, t)
+
+    return re.sub(
+        r"(?<![A-Za-z0-9._%+-])([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})(?![A-Za-z0-9-])",
+        _mask_email,
+        t,
+    )
 
 
 def age(path, seconds=60):
@@ -74,10 +83,14 @@ class FileHashCacheTests(unittest.TestCase):
         cache.sha256(self.src)
         self.src.write_bytes(b"hello WORLD")  # 같은 크기, 새 수정시각
         age(self.src, 30)
-        self.assertEqual(cache.sha256(self.src), hashlib.sha256(b"hello WORLD").hexdigest())
+        self.assertEqual(
+            cache.sha256(self.src), hashlib.sha256(b"hello WORLD").hexdigest()
+        )
         self.src.write_bytes(b"longer content")
         age(self.src, 20)
-        self.assertEqual(cache.sha256(self.src), hashlib.sha256(b"longer content").hexdigest())
+        self.assertEqual(
+            cache.sha256(self.src), hashlib.sha256(b"longer content").hexdigest()
+        )
         self.assertEqual(cache.misses, 3)
 
     def test_recently_modified_file_is_not_cached(self):
@@ -95,8 +108,12 @@ class FileHashCacheTests(unittest.TestCase):
         first.sha256(self.src)
         self.assertTrue(first.save())
         second = FileHashCache(self.cache_path)
-        with mock.patch.object(file_hash_cache, "compute_sha256", side_effect=AssertionError("재계산")):
-            self.assertEqual(second.sha256(self.src), hashlib.sha256(b"hello world").hexdigest())
+        with mock.patch.object(
+            file_hash_cache, "compute_sha256", side_effect=AssertionError("재계산")
+        ):
+            self.assertEqual(
+                second.sha256(self.src), hashlib.sha256(b"hello world").hexdigest()
+            )
         self.assertEqual(second.hits, 1)
 
     def test_save_drops_missing_files_and_skips_when_clean(self):
@@ -116,34 +133,53 @@ class FileHashCacheTests(unittest.TestCase):
         cache = FileHashCache(self.cache_path)
         cache.sha256(self.src)
         cache.trust_stat = False
-        with mock.patch.object(file_hash_cache, "compute_sha256", wraps=file_hash_cache.compute_sha256) as spy:
+        with mock.patch.object(
+            file_hash_cache, "compute_sha256", wraps=file_hash_cache.compute_sha256
+        ) as spy:
             cache.sha256(self.src)
         self.assertEqual(spy.call_count, 1)
 
     def test_corrupt_or_foreign_cache_is_ignored(self):
-        for payload in ("{not json", json.dumps({"version": 999, "files": {}}),
-                        json.dumps({"version": 1, "files": {"x": [1, 2, "short"]}})):
+        for payload in (
+            "{not json",
+            json.dumps({"version": 999, "files": {}}),
+            json.dumps({"version": 1, "files": {"x": [1, 2, "short"]}}),
+        ):
             with self.subTest(payload=payload[:20]):
                 self.cache_path.write_text(payload, encoding="utf-8")
                 cache = FileHashCache(self.cache_path)
-                self.assertEqual(cache.sha256(self.src), hashlib.sha256(b"hello world").hexdigest())
+                self.assertEqual(
+                    cache.sha256(self.src), hashlib.sha256(b"hello world").hexdigest()
+                )
 
     def test_blocked_write_is_silent(self):
         import write_guard
+
         cache = FileHashCache(self.cache_path)
         cache.sha256(self.src)
-        with mock.patch.object(write_guard, "ensure_writable", side_effect=write_guard.ProductionWriteBlocked("blocked")):
+        with mock.patch.object(
+            write_guard,
+            "ensure_writable",
+            side_effect=write_guard.ProductionWriteBlocked("blocked"),
+        ):
             self.assertFalse(cache.save())
         self.assertFalse(self.cache_path.exists())
-        self.assertFalse(self.cache_path.with_name(self.cache_path.name + ".tmp").exists())
+        self.assertFalse(
+            self.cache_path.with_name(self.cache_path.name + ".tmp").exists()
+        )
 
     def test_pipeline_modules_hash_through_cache(self):
         import extract_and_build_db
         import parse_all
-        with mock.patch.object(file_hash_cache, "sha256_file", return_value="c" * 64) as spy:
+
+        with mock.patch.object(
+            file_hash_cache, "sha256_file", return_value="c" * 64
+        ) as spy:
             self.assertEqual(extract_and_build_db.file_sha256(self.src), "c" * 64)
             out_file, hash_file = self.dir / "a.hwp.md", self.dir / "a.hwp.md.sha256"
-            with mock.patch.object(parse_all, "parse_output_paths", return_value=(out_file, hash_file)):
+            with mock.patch.object(
+                parse_all, "parse_output_paths", return_value=(out_file, hash_file)
+            ):
                 out_file.write_text("본문", encoding="utf-8")
                 hash_file.write_text("c" * 64, encoding="utf-8")
                 self.assertTrue(parse_all.is_parse_cache_fresh(self.src, self.dir))
@@ -152,11 +188,31 @@ class FileHashCacheTests(unittest.TestCase):
 
 class MaskPiiEquivalenceTests(unittest.TestCase):
     CASES = [
-        "담당자010-1234-5678", "010.1234.5678", "x-010-1234-5678", "(010)1234-5678", "010 1234 5678",
-        "0110-123-4567", "01012345678", "1010-1234-5678", "주민번호900101-1234567", "900101 2234567",
-        "-900101-1234567", "a900101-1234567", "9001011234567", "12345678901234",
-        "abc@gov.kr", "a@b.co", "x.y@c@d.com", "@@a.com", "홍길동abc@gov.kr입니다", "-ab@x.org-",
-        "%a@b.cc", "ab@c.d", "mail:first.last+tag@sub.example.com.", "", "문의 010-9999-0000, kim@example.kr",
+        "담당자010-1234-5678",
+        "010.1234.5678",
+        "x-010-1234-5678",
+        "(010)1234-5678",
+        "010 1234 5678",
+        "0110-123-4567",
+        "01012345678",
+        "1010-1234-5678",
+        "주민번호900101-1234567",
+        "900101 2234567",
+        "-900101-1234567",
+        "a900101-1234567",
+        "9001011234567",
+        "12345678901234",
+        "abc@gov.kr",
+        "a@b.co",
+        "x.y@c@d.com",
+        "@@a.com",
+        "홍길동abc@gov.kr입니다",
+        "-ab@x.org-",
+        "%a@b.cc",
+        "ab@c.d",
+        "mail:first.last+tag@sub.example.com.",
+        "",
+        "문의 010-9999-0000, kim@example.kr",
     ]
 
     def test_known_cases_match_legacy(self):

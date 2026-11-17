@@ -2,6 +2,7 @@
 
 임시 디렉터리·임시 DB에서만 실행한다. 운영 데이터에 쓰지 않는다.
 """
+
 import shutil
 import sqlite3
 import sys
@@ -24,8 +25,10 @@ from extractors.ledger import workbook
 def load_archive_tool():
     """tools/ 모듈을 sys.path 없이 읽는다(phase13_r4와 같은 방식)."""
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(
-        "archive_ledger_history", TOOLS_DIR / "archive_ledger_history.py")
+        "archive_ledger_history", TOOLS_DIR / "archive_ledger_history.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -55,7 +58,9 @@ class BracketNameMigrationTests(unittest.TestCase):
         self._write(self.new, "보고서[2026]__migrated_1.md", "본문 v2")
         for _ in range(2):
             result = migrate_existing_install.migrate_markdown(self.old, self.new)
-            self.assertEqual((result["copied"], result["skipped"], result["renamed"]), (0, 1, 0))
+            self.assertEqual(
+                (result["copied"], result["skipped"], result["renamed"]), (0, 1, 0)
+            )
         names = sorted(p.name for p in (self.new / "_parsed_markdown").glob("*.md"))
         self.assertEqual(names, ["보고서[2026].md", "보고서[2026]__migrated_1.md"])
 
@@ -64,8 +69,12 @@ class BracketNameMigrationTests(unittest.TestCase):
         self._write(self.old, "conflict.md", "이전 내용")
         self._write(self.new, "conflict.md", "현재 내용")
         result = migrate_existing_install.migrate_markdown(self.old, self.new)
-        self.assertEqual((result["copied"], result["skipped"], result["renamed"]), (1, 0, 1))
-        self.assertTrue((self.new / "_parsed_markdown" / "conflict__migrated_1.md").exists())
+        self.assertEqual(
+            (result["copied"], result["skipped"], result["renamed"]), (1, 0, 1)
+        )
+        self.assertTrue(
+            (self.new / "_parsed_markdown" / "conflict__migrated_1.md").exists()
+        )
 
 
 class BracketNameBackupTests(unittest.TestCase):
@@ -136,8 +145,10 @@ class PreRebuildRetentionTests(unittest.TestCase):
                 raise PermissionError("transient lock")
             return real_unlink(path, *args, **kwargs)
 
-        with mock.patch.object(Path, "unlink", flaky_unlink), \
-                mock.patch("db.preflight.time.sleep") as slept:
+        with (
+            mock.patch.object(Path, "unlink", flaky_unlink),
+            mock.patch("db.preflight.time.sleep") as slept,
+        ):
             _prune_pre_rebuild(backup_dir / names[-1])
         remaining = sorted(p.name for p in backup_dir.glob("*.db"))
         self.assertEqual(remaining, names[-PRE_REBUILD_KEEP:])

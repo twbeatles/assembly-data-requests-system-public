@@ -1,8 +1,29 @@
 # -*- coding: utf-8 -*-
 """GUI 검색어 초성·FTS 헬퍼."""
+
 import re
 
-CHOSEONG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
+CHOSEONG = [
+    "ㄱ",
+    "ㄲ",
+    "ㄴ",
+    "ㄷ",
+    "ㄸ",
+    "ㄹ",
+    "ㅁ",
+    "ㅂ",
+    "ㅃ",
+    "ㅅ",
+    "ㅆ",
+    "ㅇ",
+    "ㅈ",
+    "ㅉ",
+    "ㅊ",
+    "ㅋ",
+    "ㅌ",
+    "ㅍ",
+    "ㅎ",
+]
 
 
 def get_choseong(text: str) -> str:
@@ -15,18 +36,19 @@ def get_choseong(text: str) -> str:
             res.append(CHOSEONG[(code - 0xAC00) // (21 * 28)])
         else:
             res.append(ch.lower())
-    return ''.join(res)
+    return "".join(res)
 
 
 def is_choseong_only(text: str) -> bool:
-    return bool(re.match(r'^[ㄱ-ㅎ]+$', text.strip()))
+    return bool(re.match(r"^[ㄱ-ㅎ]+$", text.strip()))
 
 
 try:
     from search_query import build_fts_match as clean_fts_query
 except Exception:
+
     def clean_fts_query(kw: str) -> str:
-        tokens = [re.sub(r'[^\w]', '', t).strip() for t in kw.split()]
+        tokens = [re.sub(r"[^\w]", "", t).strip() for t in kw.split()]
         tokens = [t for t in tokens if len(t) >= 2]
         if not tokens:
             return ""
@@ -61,7 +83,9 @@ def target_key(label: str) -> str:
     return "qa"
 
 
-def service_search(db_path, base_dir, kw: str, year: str, target: str, limit: int = GUI_RESULT_LIMIT):
+def service_search(
+    db_path, base_dir, kw: str, year: str, target: str, limit: int = GUI_RESULT_LIMIT
+):
     """(행 목록, 전체 건수). 행은 dict: id·date·requester·title·num·deadline·status·snippet.
 
     DB 스키마 준비가 불가능한 환경(읽기 전용 공유 폴더 등)에서는 예외를 그대로 올린다.
@@ -73,23 +97,33 @@ def service_search(db_path, base_dir, kw: str, year: str, target: str, limit: in
 
     kind, key, id_f, title_f, num_f = GUI_TARGETS[target_key(target)]
     db_path = Path(db_path)
-    svc = LedgerService(db_path=db_path, json_path=db_path.with_name("data_requests.json"), base_dir=Path(base_dir))
-    year_arg = None if str(year or "").strip() in ("", "전체", "ALL") else str(year).strip()
+    svc = LedgerService(
+        db_path=db_path,
+        json_path=db_path.with_name("data_requests.json"),
+        base_dir=Path(base_dir),
+    )
+    year_arg = (
+        None if str(year or "").strip() in ("", "전체", "ALL") else str(year).strip()
+    )
     kw = (kw or "").strip()
-    res = svc.search_all(kw=kw, year=year_arg, search_type=kind, slim=True, with_snippet=bool(kw))
+    res = svc.search_all(
+        kw=kw, year=year_arg, search_type=kind, slim=True, with_snippet=bool(kw)
+    )
     items = res.get(key) or []
     rows = []
     for it in items[: max(1, int(limit))]:
-        rows.append({
-            "id": str(it.get(id_f) or ""),
-            "date": str(it.get("request_date") or it.get("year") or ""),
-            "requester": str(it.get("requester") or ""),
-            "title": str(it.get(title_f) or "").strip().replace("\n", " "),
-            "num": str(it.get(num_f) or ""),
-            "deadline": str(it.get("deadline") or ""),
-            "status": str(it.get("status") or ""),
-            "snippet": str(it.get("snippet") or "").replace("\n", " "),
-        })
+        rows.append(
+            {
+                "id": str(it.get(id_f) or ""),
+                "date": str(it.get("request_date") or it.get("year") or ""),
+                "requester": str(it.get("requester") or ""),
+                "title": str(it.get(title_f) or "").strip().replace("\n", " "),
+                "num": str(it.get(num_f) or ""),
+                "deadline": str(it.get("deadline") or ""),
+                "status": str(it.get("status") or ""),
+                "snippet": str(it.get("snippet") or "").replace("\n", " "),
+            }
+        )
     return rows, len(items)
 
 

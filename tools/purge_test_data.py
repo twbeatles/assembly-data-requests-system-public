@@ -70,9 +70,13 @@ def plan_database(db_path: Path) -> dict:
     conn.row_factory = sqlite3.Row
     try:
         ledger = [dict(r) for r in conn.execute("SELECT * FROM request_ledger")]
-        purge_ids = sorted(r["ledger_id"] for r in ledger if is_test_pair(r["requester"], r["title"]))
+        purge_ids = sorted(
+            r["ledger_id"] for r in ledger if is_test_pair(r["requester"], r["title"])
+        )
         history = []
-        for h in conn.execute("SELECT history_id, ledger_id, action, snapshot FROM ledger_history"):
+        for h in conn.execute(
+            "SELECT history_id, ledger_id, action, snapshot FROM ledger_history"
+        ):
             if h["ledger_id"] in purge_ids:
                 history.append(h["history_id"])
                 continue
@@ -83,18 +87,35 @@ def plan_database(db_path: Path) -> dict:
                     continue
                 if is_test_pair(snap.get("requester"), snap.get("title")):
                     history.append(h["history_id"])
-        docs = [r[0] for r in conn.execute(
-            f"SELECT doc_id FROM documents WHERE linked_ledger_id IN ({','.join('?' * len(purge_ids))})", purge_ids
-        )] if purge_ids else []
+        docs = (
+            [
+                r[0]
+                for r in conn.execute(
+                    f"SELECT doc_id FROM documents WHERE linked_ledger_id IN ({','.join('?' * len(purge_ids))})",
+                    purge_ids,
+                )
+            ]
+            if purge_ids
+            else []
+        )
         remaining = [r for r in ledger if r["ledger_id"] not in purge_ids]
-        return {"purge_ids": purge_ids, "history_ids": sorted(history), "unlink_docs": docs,
-                "remaining_records": remaining, "ledger_rows": ledger}
+        return {
+            "purge_ids": purge_ids,
+            "history_ids": sorted(history),
+            "unlink_docs": docs,
+            "remaining_records": remaining,
+            "ledger_rows": ledger,
+        }
     finally:
         conn.close()
 
 
 def header_index(values_row):
-    return {str(v).strip(): i for i, v in enumerate(values_row) if v is not None and str(v).strip()}
+    return {
+        str(v).strip(): i
+        for i, v in enumerate(values_row)
+        if v is not None and str(v).strip()
+    }
 
 
 def plan_workbook(excel_path: Path, remaining_records) -> dict:
@@ -112,13 +133,19 @@ def plan_workbook(excel_path: Path, remaining_records) -> dict:
             if req_col is None or title_col is None:
                 continue
             hits = [
-                rn for rn, row in enumerate(rows[1:], start=2)
-                if len(row) > max(req_col, title_col) and is_test_pair(row[req_col], row[title_col])
+                rn
+                for rn, row in enumerate(rows[1:], start=2)
+                if len(row) > max(req_col, title_col)
+                and is_test_pair(row[req_col], row[title_col])
             ]
             if hits:
                 plan["delete_rows"][name] = hits
             if name == CONSOLIDATED_SHEET and "No." in idx:
-                nos = [row[idx["No."]] for row in rows[1:] if any(v not in (None, "") for v in row)]
+                nos = [
+                    row[idx["No."]]
+                    for row in rows[1:]
+                    if any(v not in (None, "") for v in row)
+                ]
                 plan["renumber"] = nos == list(range(1, len(nos) + 1))
     finally:
         wb.close()
@@ -143,7 +170,13 @@ def plan_quarantine(path: Path) -> dict:
     if not path.exists():
         return {"remove": 0, "keep": 0}
     ops = json.loads(path.read_text(encoding="utf-8"))
-    remove = [op for op in ops if is_test_pair((op.get("item") or {}).get("requester"), (op.get("item") or {}).get("title"))]
+    remove = [
+        op
+        for op in ops
+        if is_test_pair(
+            (op.get("item") or {}).get("requester"), (op.get("item") or {}).get("title")
+        )
+    ]
     return {"remove": len(remove), "keep": len(ops) - len(remove)}
 
 
@@ -153,26 +186,36 @@ def plan_quarantine(path: Path) -> dict:
 def preconditions(excel_path: Path) -> list:
     problems = []
     if PipelineGuard(SYSTEM_DIR).is_locked():
-        problems.append("파이프라인 락(.pipeline.lock)이 있습니다. 00번 파이프라인이 끝난 뒤 실행하세요.")
+        problems.append(
+            "파이프라인 락(.pipeline.lock)이 있습니다. 00번 파이프라인이 끝난 뒤 실행하세요."
+        )
     if any(SYSTEM_DIR.glob("~$*.xls*")):
-        problems.append("Excel 소유자 파일(~$...)이 있습니다. 마스터 엑셀을 닫은 뒤 실행하세요.")
+        problems.append(
+            "Excel 소유자 파일(~$...)이 있습니다. 마스터 엑셀을 닫은 뒤 실행하세요."
+        )
     if ExcelSyncService(base_dir=SYSTEM_DIR).is_file_locked(excel_path):
         problems.append("마스터 엑셀이 다른 프로그램에서 열려 있습니다.")
     import socket
+
     with socket.socket() as s:
         s.settimeout(0.5)
         if s.connect_ex(("127.0.0.1", 8080)) == 0:
-            problems.append("127.0.0.1:8080에서 서버가 실행 중입니다. 02번 웹관리서버를 종료하세요.")
+            problems.append(
+                "127.0.0.1:8080에서 서버가 실행 중입니다. 02번 웹관리서버를 종료하세요."
+            )
     # 8080이 아닌 포트로 뜬 서버도 실행 락으로 잡는다. (감사 R4-05)
     web_lock = SYSTEM_DIR / ".web_server.lock"
     if web_lock.exists():
         from pipeline_guard import pid_is_alive
+
         try:
             pid = int(json.loads(web_lock.read_text(encoding="utf-8")).get("pid") or 0)
         except (OSError, ValueError, TypeError, AttributeError):
             pid = 0
         if pid and pid_is_alive(pid):
-            problems.append(f"02번 웹관리서버가 실행 중입니다(PID {pid}). 서버 창을 닫은 뒤 실행하세요.")
+            problems.append(
+                f"02번 웹관리서버가 실행 중입니다(PID {pid}). 서버 창을 닫은 뒤 실행하세요."
+            )
     return problems
 
 
@@ -181,8 +224,13 @@ def make_backup(excel_path: Path, db_path: Path) -> Path:
     dest = SYSTEM_DIR / ".maintenance_backup" / f"{stamp}_test_data_purge"
     dest.mkdir(parents=True)
     manifest = {}
-    for name in [excel_path.name, "data_requests.json", ".excel_pending_queue.json", ".excel_pending_failed.json",
-                 "config.json"]:
+    for name in [
+        excel_path.name,
+        "data_requests.json",
+        ".excel_pending_queue.json",
+        ".excel_pending_failed.json",
+        "config.json",
+    ]:
         src = SYSTEM_DIR / name
         if src.exists():
             shutil.copy2(src, dest / name)
@@ -203,8 +251,12 @@ def make_backup(excel_path: Path, db_path: Path) -> Path:
     finally:
         chk.close()
     manifest["data_requests.db"] = "sqlite backup API, integrity ok"
-    (dest / "MANIFEST.json").write_text(json.dumps({"created_at": stamp, "files": manifest}, ensure_ascii=False, indent=2),
-                                        encoding="utf-8")
+    (dest / "MANIFEST.json").write_text(
+        json.dumps(
+            {"created_at": stamp, "files": manifest}, ensure_ascii=False, indent=2
+        ),
+        encoding="utf-8",
+    )
     return dest
 
 
@@ -218,7 +270,9 @@ def apply_workbook(excel_path: Path, plan: dict):
     try:
         excel.Visible = False
         excel.DisplayAlerts = False
-        excel.AutomationSecurity = 3  # msoAutomationSecurityForceDisable: 열 때 매크로 실행 안 함
+        excel.AutomationSecurity = (
+            3  # msoAutomationSecurityForceDisable: 열 때 매크로 실행 안 함
+        )
         excel.EnableEvents = False
         wb = excel.Workbooks.Open(str(excel_path), 0, False)
         for name, hits in plan["delete_rows"].items():
@@ -230,14 +284,19 @@ def apply_workbook(excel_path: Path, plan: dict):
                 requester = ws.Cells(rn, idx["의원"] + 1).Value
                 title = ws.Cells(rn, idx["요구자료"] + 1).Value
                 if not is_test_pair(requester, title):
-                    raise RuntimeError(f"{name}!{rn} 행이 점검 때와 달라 중단합니다: {requester} / {title}")
+                    raise RuntimeError(
+                        f"{name}!{rn} 행이 점검 때와 달라 중단합니다: {requester} / {title}"
+                    )
                 ws.Rows(rn).Delete()
             if name == CONSOLIDATED_SHEET and plan.get("renumber") and "No." in idx:
                 col = idx["No."] + 1
                 last_row = ws.UsedRange.Rows.Count + ws.UsedRange.Row - 1
                 n = 0
                 for r in range(2, last_row + 1):
-                    if any(ws.Cells(r, c).Value not in (None, "") for c in range(2, min(last_col, 8) + 1)):
+                    if any(
+                        ws.Cells(r, c).Value not in (None, "")
+                        for c in range(2, min(last_col, 8) + 1)
+                    ):
                         n += 1
                         ws.Cells(r, col).Value = n
         for name, row, ledger_id in plan["id_assignments"]:
@@ -245,7 +304,9 @@ def apply_workbook(excel_path: Path, plan: dict):
             last_col = ws.UsedRange.Columns.Count + ws.UsedRange.Column - 1
             idx = header_index([ws.Cells(1, c).Value for c in range(1, last_col + 1)])
             if "대장ID" not in idx:
-                raise RuntimeError(f"{name} 시트에 대장ID 열이 없습니다. 00번 파이프라인이 열을 추가하게 두세요.")
+                raise RuntimeError(
+                    f"{name} 시트에 대장ID 열이 없습니다. 00번 파이프라인이 열을 추가하게 두세요."
+                )
             ws.Cells(row, idx["대장ID"] + 1).Value = ledger_id
         wb.Save()
     finally:
@@ -263,17 +324,33 @@ def apply_database(db_path: Path, plan: dict, backup_dir: Path):
         conn.execute("BEGIN IMMEDIATE")
         q = ",".join("?" * len(ids))
         if plan["history_ids"]:
-            conn.execute(f"DELETE FROM ledger_history WHERE history_id IN ({','.join('?' * len(plan['history_ids']))})",
-                         plan["history_ids"])
+            conn.execute(
+                f"DELETE FROM ledger_history WHERE history_id IN ({','.join('?' * len(plan['history_ids']))})",
+                plan["history_ids"],
+            )
         if ids:
-            conn.execute(f"UPDATE documents SET linked_ledger_id = '' WHERE linked_ledger_id IN ({q})", ids)
+            conn.execute(
+                f"UPDATE documents SET linked_ledger_id = '' WHERE linked_ledger_id IN ({q})",
+                ids,
+            )
             conn.execute(f"DELETE FROM request_ledger WHERE ledger_id IN ({q})", ids)
         conn.execute(
             "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES (?, ?, ?, ?)",
-            ("MAINTENANCE", "TEST_DATA_PURGE", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-             json.dumps({"reason": "감사 R3-01 테스트 데이터 정리", "backup": str(backup_dir.relative_to(SYSTEM_DIR)),
-                         "purged_ledger_ids": ids, "purged_history_rows": len(plan["history_ids"]),
-                         "unlinked_documents": plan["unlink_docs"]}, ensure_ascii=False)),
+            (
+                "MAINTENANCE",
+                "TEST_DATA_PURGE",
+                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                json.dumps(
+                    {
+                        "reason": "감사 R3-01 테스트 데이터 정리",
+                        "backup": str(backup_dir.relative_to(SYSTEM_DIR)),
+                        "purged_ledger_ids": ids,
+                        "purged_history_rows": len(plan["history_ids"]),
+                        "unlinked_documents": plan["unlink_docs"],
+                    },
+                    ensure_ascii=False,
+                ),
+            ),
         )
         conn.commit()
     except Exception:
@@ -287,7 +364,13 @@ def apply_quarantine(path: Path, backup_dir: Path):
     if not path.exists():
         return
     ops = json.loads(path.read_text(encoding="utf-8"))
-    keep = [op for op in ops if not is_test_pair((op.get("item") or {}).get("requester"), (op.get("item") or {}).get("title"))]
+    keep = [
+        op
+        for op in ops
+        if not is_test_pair(
+            (op.get("item") or {}).get("requester"), (op.get("item") or {}).get("title")
+        )
+    ]
     if keep:
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(keep, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -297,8 +380,12 @@ def apply_quarantine(path: Path, backup_dir: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--apply", action="store_true", help="점검 결과대로 실제 정리를 수행한다")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--apply", action="store_true", help="점검 결과대로 실제 정리를 수행한다"
+    )
     args = parser.parse_args()
 
     sync = ExcelSyncService(base_dir=SYSTEM_DIR)
@@ -311,14 +398,29 @@ def main():
     db_plan = plan_database(db_path)
     wb_plan = plan_workbook(excel_path, db_plan["remaining_records"])
     q_plan = plan_quarantine(SYSTEM_DIR / ".excel_pending_failed.json")
-    pending = json.loads((SYSTEM_DIR / ".excel_pending_queue.json").read_text(encoding="utf-8")) \
-        if (SYSTEM_DIR / ".excel_pending_queue.json").exists() else []
-    pending_test = [op for op in pending if is_test_pair((op.get("item") or {}).get("requester"), (op.get("item") or {}).get("title"))]
+    pending = (
+        json.loads(
+            (SYSTEM_DIR / ".excel_pending_queue.json").read_text(encoding="utf-8")
+        )
+        if (SYSTEM_DIR / ".excel_pending_queue.json").exists()
+        else []
+    )
+    pending_test = [
+        op
+        for op in pending
+        if is_test_pair(
+            (op.get("item") or {}).get("requester"), (op.get("item") or {}).get("title")
+        )
+    ]
 
     print("=" * 70)
     print(f"마스터 엑셀: {excel_path.name}")
-    print(f"[DB] 삭제할 테스트 대장 행 {len(db_plan['purge_ids'])}건: {', '.join(db_plan['purge_ids'])}")
-    print(f"[DB] 삭제할 테스트 이력 {len(db_plan['history_ids'])}건, 연결 해제할 문서 {db_plan['unlink_docs']}")
+    print(
+        f"[DB] 삭제할 테스트 대장 행 {len(db_plan['purge_ids'])}건: {', '.join(db_plan['purge_ids'])}"
+    )
+    print(
+        f"[DB] 삭제할 테스트 이력 {len(db_plan['history_ids'])}건, 연결 해제할 문서 {db_plan['unlink_docs']}"
+    )
     for name, hits in wb_plan["delete_rows"].items():
         print(f"[엑셀] {name}: 테스트 행 {len(hits)}건 삭제 (행 {hits[0]}~{hits[-1]})")
     if wb_plan["renumber"]:
@@ -326,10 +428,16 @@ def main():
     for name, row, lid in wb_plan["id_assignments"]:
         print(f"[엑셀] {name}!{row}: 비어 있는 대장ID에 {lid} 기록")
     if wb_plan["sheets_without_id_column"]:
-        print(f"[엑셀] 대장ID 열이 없는 시트: {wb_plan['sheets_without_id_column']} (00번 파이프라인이 추가)")
-    print(f"[격리 파일] 테스트 작업 {q_plan['remove']}건 삭제, 나머지 {q_plan['keep']}건 유지")
+        print(
+            f"[엑셀] 대장ID 열이 없는 시트: {wb_plan['sheets_without_id_column']} (00번 파이프라인이 추가)"
+        )
+    print(
+        f"[격리 파일] 테스트 작업 {q_plan['remove']}건 삭제, 나머지 {q_plan['keep']}건 유지"
+    )
     if pending_test:
-        print(f"⚠️ 보류 큐에 테스트 작업 {len(pending_test)}건이 남아 있습니다. 먼저 큐를 확인하세요.")
+        print(
+            f"⚠️ 보류 큐에 테스트 작업 {len(pending_test)}건이 남아 있습니다. 먼저 큐를 확인하세요."
+        )
     print("=" * 70)
 
     if not args.apply:
@@ -358,9 +466,19 @@ def main():
 
     after_db = plan_database(db_path)
     after_wb = plan_workbook(excel_path, after_db["remaining_records"])
-    ok = not after_db["purge_ids"] and not after_wb["delete_rows"] and not after_wb["id_assignments"]
-    print("✓ 사후 점검: 남은 테스트 데이터 없음" if ok else f"⚠️ 사후 점검에서 남은 항목이 있습니다: {after_db['purge_ids']} {after_wb}")
-    print("다음 단계: 00_새자료_추가_및_DB동기화.bat을 실행해 엑셀 수정을 DB에 반영하고 산출물·배포본을 다시 만드세요.")
+    ok = (
+        not after_db["purge_ids"]
+        and not after_wb["delete_rows"]
+        and not after_wb["id_assignments"]
+    )
+    print(
+        "✓ 사후 점검: 남은 테스트 데이터 없음"
+        if ok
+        else f"⚠️ 사후 점검에서 남은 항목이 있습니다: {after_db['purge_ids']} {after_wb}"
+    )
+    print(
+        "다음 단계: 00_새자료_추가_및_DB동기화.bat을 실행해 엑셀 수정을 DB에 반영하고 산출물·배포본을 다시 만드세요."
+    )
     return 0 if ok else 1
 
 

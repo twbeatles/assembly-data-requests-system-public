@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """관리대장 마감 판정. 대시보드 ledgerDueInfo와 같은 규칙."""
+
 import datetime
 import re
 
@@ -14,7 +15,10 @@ def ledger_due_state(item, today=None):
     status = str((item or {}).get("status") or "").strip()
     if status in LEDGER_DONE_STATUSES:
         return "done", None
-    m = re.match(r"^(\d{4})[-./](\d{1,2})[-./](\d{1,2})", str((item or {}).get("deadline") or "").strip())
+    m = re.match(
+        r"^(\d{4})[-./](\d{1,2})[-./](\d{1,2})",
+        str((item or {}).get("deadline") or "").strip(),
+    )
     if not m:
         return "none", None
     try:

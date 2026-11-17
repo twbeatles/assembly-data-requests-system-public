@@ -63,7 +63,7 @@ class TestAuditPhase2(unittest.TestCase):
             staging_file.write_text("# Staging Content", encoding="utf-8")
 
             pruned = parse_all.prune_orphan_markdowns(root_p, md_dir)
-            
+
             # ghost and staging md must be pruned
             self.assertTrue(md1.exists(), "Valid markdown must be preserved")
             self.assertFalse(md_orphan.exists(), "Orphan markdown must be removed")
@@ -100,12 +100,19 @@ class TestAuditPhase2(unittest.TestCase):
     def test_5_excel_sheet_names_and_bidirectional_links(self):
         """Verify Excel sheet names match formulas and bidirectional links exist"""
         import openpyxl
+
         excel_file = PROJECT_DIR / "국회_대외기관_자료요구_통합DB.xlsx"
         if not excel_file.exists():
             self.skipTest("생성 Excel 산출물은 소스 체크아웃에 포함되지 않습니다.")
-        
+
         wb = openpyxl.load_workbook(excel_file, read_only=False, data_only=False)
-        expected_sheets = ["📊 대시보드", "📋 자료요구_통합목록", "📑 Q&A_상세DB", "📋 국회_요구자료_관리대장", "📈 주요통계_색인표"]
+        expected_sheets = [
+            "📊 대시보드",
+            "📋 자료요구_통합목록",
+            "📑 Q&A_상세DB",
+            "📋 국회_요구자료_관리대장",
+            "📈 주요통계_색인표",
+        ]
         for s in expected_sheets:
             self.assertIn(s, wb.sheetnames)
 
@@ -118,7 +125,7 @@ class TestAuditPhase2(unittest.TestCase):
         # Check Ledger sheet column 17 references '📋 자료요구_통합목록'
         ws_ledger = wb["📋 국회_요구자료_관리대장"]
         self.assertEqual(ws_ledger.cell(1, 17).value, "답변문서 연결")
-        
+
         # Check linked formula references the correct sheet
         found_link = False
         for r in range(2, min(100, ws_ledger.max_row + 1)):
@@ -128,12 +135,18 @@ class TestAuditPhase2(unittest.TestCase):
                 self.assertNotIn("전체_자료요구_목록", str(v))
                 found_link = True
                 break
-        self.assertTrue(found_link, "Expected at least one linked doc hyperlink in ledger sheet")
+        self.assertTrue(
+            found_link, "Expected at least one linked doc hyperlink in ledger sheet"
+        )
 
     def test_6_web_dashboard_hash_deep_links(self):
         """Verify web dashboard JavaScript template contains #ledger= and #req= hash routing"""
         tpl_file = SCRIPTS_DIR / "templates" / "dashboard_template.html"
-        gen_script = tpl_file.read_text(encoding="utf-8") if tpl_file.exists() else (SCRIPTS_DIR / "generate_web_dashboard.py").read_text(encoding="utf-8")
+        gen_script = (
+            tpl_file.read_text(encoding="utf-8")
+            if tpl_file.exists()
+            else (SCRIPTS_DIR / "generate_web_dashboard.py").read_text(encoding="utf-8")
+        )
         self.assertIn("applyDeepLink", gen_script)
         self.assertIn("hashchange", gen_script)
         self.assertIn("startsWith('ledger=')", gen_script)
@@ -163,13 +176,24 @@ class TestAuditPhase2(unittest.TestCase):
 □ 대외기관의 딥페이크 성범죄 영상물 대응 현황 및 향후 계획은?
 ○ 이에 대해 신속한 모니터링을 진행하고 있습니다.
 """
-        meta = {"year": "2026", "requester": "의원실", "title": "딥페이크 질의", "institution": "국회"}
-        qa_items = extract_and_build_db.split_into_qa_items("DOC-TEST-001", meta, question_md)
-        self.assertTrue(any("대응 현황 및 향후 계획은?" in q["question_title"] for q in qa_items))
+        meta = {
+            "year": "2026",
+            "requester": "의원실",
+            "title": "딥페이크 질의",
+            "institution": "국회",
+        }
+        qa_items = extract_and_build_db.split_into_qa_items(
+            "DOC-TEST-001", meta, question_md
+        )
+        self.assertTrue(
+            any("대응 현황 및 향후 계획은?" in q["question_title"] for q in qa_items)
+        )
 
     def test_8_pii_masking_in_request_ledger(self):
         """Verify mask_pii masks phone numbers and emails in ledger fields"""
-        test_text = "보좌관 연락처 010-9876-5432, 이메일 aide_kim@example.org 문의 요망"
+        test_text = (
+            "보좌관 연락처 010-9876-5432, 이메일 aide_kim@example.org 문의 요망"
+        )
         masked = extract_and_build_db.mask_pii(test_text)
         self.assertNotIn("010-9876-5432", masked)
         self.assertIn("010-****-5432", masked)
@@ -209,6 +233,7 @@ class TestAuditPhase2(unittest.TestCase):
             finally:
                 add_documents_smart.ROOT_DIR = orig_root
                 add_documents_smart.DROP_DIRS = orig_drop
+
 
 if __name__ == "__main__":
     unittest.main()

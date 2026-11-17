@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """원본 공문서 다운로드 및 탐색기 열기 경로 검증."""
+
 import os
 import subprocess
 import sys
@@ -20,7 +21,9 @@ def resolve_download_target(req_file: str):
         return False, None, "파일 경로가 지정되지 않았습니다."
     ws_root = system_config.find_workspace_root(ws.BASE_DIR)
     clean_rel = unquote(req_file).replace("\\", "/").lstrip("/")
-    if any(part in ("scripts", "__pycache__", ".git") for part in Path(clean_rel).parts):
+    if any(
+        part in ("scripts", "__pycache__", ".git") for part in Path(clean_rel).parts
+    ):
         return False, None, "접근이 거부된 파일 경로입니다."
     cfg_excludes = set(system_config.get_config(ws.BASE_DIR).get("exclude_dirs") or [])
     for part in Path(clean_rel).parts[:-1]:
@@ -61,14 +64,25 @@ def open_in_system(target: Path, mode: str = "explorer") -> dict:
         try:
             if mode == "file":
                 os.startfile(target_abs)
-                return {"success": True, "message": "파일을 열었습니다.", "path": target_abs}
+                return {
+                    "success": True,
+                    "message": "파일을 열었습니다.",
+                    "path": target_abs,
+                }
             else:
                 # explorer /select,"경로" (파일이 있는 폴더를 열고 해당 파일을 선택 상태로 표시)
                 subprocess.Popen(["explorer.exe", f"/select,{target_abs}"])
-                return {"success": True, "message": "탐색기에서 파일 위치를 열었습니다.", "path": target_abs}
+                return {
+                    "success": True,
+                    "message": "탐색기에서 파일 위치를 열었습니다.",
+                    "path": target_abs,
+                }
         except Exception as e:
             return {"success": False, "error": f"탐색기 실행 실패: {str(e)}"}
     else:
         # 비Windows 환경(테스트 등):
-        return {"success": True, "message": f"[시뮬레이션] 파일 위치를 열었습니다: {target_abs}", "path": target_abs}
-
+        return {
+            "success": True,
+            "message": f"[시뮬레이션] 파일 위치를 열었습니다: {target_abs}",
+            "path": target_abs,
+        }

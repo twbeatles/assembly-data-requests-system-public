@@ -40,17 +40,21 @@ else:
 class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportGeneralTypeIssues]  # static-only cycle; runtime base is object
     def _outbox_operations(self):
         from db.ledger_outbox import read_operations
+
         return read_operations(self.db_path)
 
     def _recover_outbox(self):
         # Caller holds _flush_lock; persist JSON before acknowledging SQLite.
         from db.ledger_outbox import acknowledge
+
         operations = self._outbox_operations()
         if not operations:
             return True
         with self._pending_lock:
             known = {op.get("operation_id") for op in self._pending_queue}
-            self._pending_queue.extend(op for op in operations if op["operation_id"] not in known)
+            self._pending_queue.extend(
+                op for op in operations if op["operation_id"] not in known
+            )
             if not self._save_pending_queue():
                 return False
             acknowledge(self.db_path, [op["operation_id"] for op in operations])
@@ -62,14 +66,29 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         with self._pending_lock:
             operations += list(self._pending_queue)
         pending = any(op.get("operation_id") == operation_id for op in operations)
-        failed = any(op.get("operation_id") == operation_id for op in self._quarantined_operations())
+        failed = any(
+            op.get("operation_id") == operation_id
+            for op in self._quarantined_operations()
+        )
         if operation_id in self._missing_delete_ids:
             self._missing_delete_ids.discard(operation_id)
-            return {"excel_synced": False, "pending": False,
-                    "message": "엑셀에서 해당 행을 찾지 못해 DB 삭제만 반영했습니다."}
-        return {"excel_synced": not pending and not failed, "pending": pending, "quarantined": failed,
-                "message": ("DB 저장 완료. 엑셀 반영을 안전하게 보관했으며 자동 재시도합니다." if pending else
-                            "DB 저장 완료. 엑셀 행은 덮어쓰지 않았습니다. 반영 작업이 격리되어 동기화 배너에서 확인이 필요합니다." if failed else "엑셀 반영 완료.")}
+            return {
+                "excel_synced": False,
+                "pending": False,
+                "message": "엑셀에서 해당 행을 찾지 못해 DB 삭제만 반영했습니다.",
+            }
+        return {
+            "excel_synced": not pending and not failed,
+            "pending": pending,
+            "quarantined": failed,
+            "message": (
+                "DB 저장 완료. 엑셀 반영을 안전하게 보관했으며 자동 재시도합니다."
+                if pending
+                else "DB 저장 완료. 엑셀 행은 덮어쓰지 않았습니다. 반영 작업이 격리되어 동기화 배너에서 확인이 필요합니다."
+                if failed
+                else "엑셀 반영 완료."
+            ),
+        }
 
     def _pending_path(self) -> Path:
         return self.base_dir / ".excel_pending_queue.json"
@@ -88,7 +107,9 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             self._pending_queue = data
         else:
             self._pending_queue = []
-            self._handle_corrupt_queue(p, ValueError("최상위 값이 목록([ ])이 아닙니다"))
+            self._handle_corrupt_queue(
+                p, ValueError("최상위 값이 목록([ ])이 아닙니다")
+            )
 
     def _handle_corrupt_queue(self, path: Path, error: Exception):
         """깨진 보류 큐를 보존하고 알린다.
@@ -103,10 +124,13 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         try:
             ensure_writable(backup, "손상된 보류 큐 보존본")
             import shutil
+
             shutil.copy2(str(path), str(backup))
             saved = backup
         except Exception as copy_error:
-            print(f"[엑셀 동기화 큐 경고] 손상된 보류 큐를 보존하지 못했습니다: {copy_error}")
+            print(
+                f"[엑셀 동기화 큐 경고] 손상된 보류 큐를 보존하지 못했습니다: {copy_error}"
+            )
         self._queue_corrupt = {
             "path": str(path),
             "backup": str(saved) if saved else None,
@@ -130,7 +154,9 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         tmp = p.with_suffix(".json.tmp")
         try:
             ensure_writable(p, "엑셀 보류 큐")
-            tmp.write_text(json.dumps(self._pending_queue, ensure_ascii=False), encoding="utf-8")
+            tmp.write_text(
+                json.dumps(self._pending_queue, ensure_ascii=False), encoding="utf-8"
+            )
             os.replace(tmp, p)
             return True
         except Exception as e:
@@ -177,7 +203,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
                 return {
                     "success": False,
                     "skipped": True,
-                    "message": "문서 동기화 파이프라인이 실행 중입니다. 완료 후 자동으로 다시 시도합니다."
+                    "message": "문서 동기화 파이프라인이 실행 중입니다. 완료 후 자동으로 다시 시도합니다.",
                 }
         except Exception:
             return None
@@ -224,7 +250,8 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             operations = list(self._pending_queue)
         operations += self._outbox_operations()
         operations += [
-            op for op in self._quarantined_operations()
+            op
+            for op in self._quarantined_operations()
             if op.get("quarantine_reason") != QUARANTINE_CONFLICT
         ]
         result: Dict[str, Optional[set]] = {}
@@ -234,7 +261,11 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             if not lid:
                 continue
             changed = item.get("_changed_fields")
-            fields = set(changed) if op.get("action") == "update" and isinstance(changed, list) else None
+            fields = (
+                set(changed)
+                if op.get("action") == "update" and isinstance(changed, list)
+                else None
+            )
             if lid in result and (result[lid] is None or fields is None):
                 result[lid] = None
             elif lid in result:
@@ -275,7 +306,8 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             if not exists:
                 return []
             return [
-                dict(r) for r in conn.execute(
+                dict(r)
+                for r in conn.execute(
                     "SELECT ledger_id, year, title, requester, status FROM request_ledger"
                 )
             ]
@@ -303,10 +335,15 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             return 0
 
         from extractors.ledger_parser import stamp_ledger_ids
+
         try:
-            written = stamp_ledger_ids(master_excel, self._ledger_db_records(), base_dir=self.base_dir)
+            written = stamp_ledger_ids(
+                master_excel, self._ledger_db_records(), base_dir=self.base_dir
+            )
         except PermissionError:
-            print("[관리대장 ID 고정 보류] 엑셀 파일이 사용 중이라 ID 스탬핑을 건너뜁니다.")
+            print(
+                "[관리대장 ID 고정 보류] 엑셀 파일이 사용 중이라 ID 스탬핑을 건너뜁니다."
+            )
             return 0
         except Exception as e:
             print(f"[관리대장 ID 고정 알림] {e}")
@@ -315,7 +352,11 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         try:
             before_mtime = fingerprint[1]
             stat = master_excel.stat()
-            self._id_stamp_fingerprint = (str(master_excel.resolve()), stat.st_mtime, stat.st_size)
+            self._id_stamp_fingerprint = (
+                str(master_excel.resolve()),
+                stat.st_mtime,
+                stat.st_size,
+            )
             if written:
                 # 우리가 기록한 변경을 watcher가 외부 편집으로 오인하지 않게 한다.
                 self._mark_own_write(before_mtime, stat.st_mtime)
@@ -343,11 +384,17 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         try:
             ensure_writable(self.db_path, "SQLite DB")
             conn = sqlite3.connect(str(self.db_path), timeout=5.0)
-            clean = {k: v for k, v in (snapshot or {}).items() if not str(k).startswith("_")}
+            clean = {
+                k: v for k, v in (snapshot or {}).items() if not str(k).startswith("_")
+            }
             conn.execute(
                 "INSERT INTO ledger_history (ledger_id, action, changed_at, snapshot) VALUES (?, ?, ?, ?)",
-                (ledger_id, action, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                 json.dumps(clean, ensure_ascii=False)),
+                (
+                    ledger_id,
+                    action,
+                    datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    json.dumps(clean, ensure_ascii=False),
+                ),
             )
             conn.commit()
         except (sqlite3.Error, ProductionWriteBlocked):
@@ -355,6 +402,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         finally:
             if conn:
                 conn.close()
+
     def flush_pending_queue(self) -> int:
         with self._flush_lock:
             if self._pipeline_block():
@@ -395,6 +443,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             # 여러 작업을 한꺼번에 재생하므로 60초 간격 제한과 무관하게 직전 본을 남긴다.
             try:
                 from extractors.ledger_parser import backup_master_excel
+
                 backup_master_excel(master_excel, self.base_dir, force=True)
             except ProductionWriteBlocked:
                 return 0
@@ -411,17 +460,23 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
                     # 대장 행이 파괴된다. 바로 격리하고 다음 작업으로 넘어간다. (감사 R3-02)
                     op["quarantine_detail"] = str(conflict)
                     conflicts.append(op)
-                    print(f"[보류 큐 충돌] {op.get('action')} {item.get('ledger_id')}: {conflict}")
+                    print(
+                        f"[보류 큐 충돌] {op.get('action')} {item.get('ledger_id')}: {conflict}"
+                    )
                     continue
                 except ProductionWriteBlocked:
                     break
                 except Exception as e:
                     ok = False
-                    print(f"[보류 큐 반영 오류] {op.get('action')} {item.get('ledger_id')}: {e}")
+                    print(
+                        f"[보류 큐 반영 오류] {op.get('action')} {item.get('ledger_id')}: {e}"
+                    )
                 if ok:
                     applied += 1
                     applied_ids.add(op.get("operation_id"))
-                    self._record_history(str(item.get("ledger_id") or ""), "EXCEL_APPLIED", item)
+                    self._record_history(
+                        str(item.get("ledger_id") or ""), "EXCEL_APPLIED", item
+                    )
                     continue
                 if op.get("action") == "delete":
                     # 지울 행이 이미 없다. 재시도해도 할 일이 없으므로 완료로 처리한다.
@@ -447,33 +502,50 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             print(f"✓ 대기 중이던 엑셀 동기화 {applied}건 일괄 반영 완료!")
         return applied
 
-    def _retire_pending_operations(self, applied_ids: set, deferred: List[Dict[str, Any]],
-                                   conflicts: Optional[List[Dict[str, Any]]] = None):
+    def _retire_pending_operations(
+        self,
+        applied_ids: set,
+        deferred: List[Dict[str, Any]],
+        conflicts: Optional[List[Dict[str, Any]]] = None,
+    ):
         """반영에 성공한 작업을 큐에서 제거하고, 충돌·재시도 한도 초과 작업은 격리한다."""
         conflicts = conflicts or []
         if not applied_ids and not deferred and not conflicts:
             return
         with self._pending_lock:
-            expired = [op for op in self._pending_queue
-                       if op.get("operation_id") not in applied_ids
-                       and int(op.get("attempts", 0)) >= MAX_PENDING_ATTEMPTS
-                       and op not in conflicts]
-        if conflicts and not self._quarantine_pending_operations(conflicts, QUARANTINE_CONFLICT):
+            expired = [
+                op
+                for op in self._pending_queue
+                if op.get("operation_id") not in applied_ids
+                and int(op.get("attempts", 0)) >= MAX_PENDING_ATTEMPTS
+                and op not in conflicts
+            ]
+        if conflicts and not self._quarantine_pending_operations(
+            conflicts, QUARANTINE_CONFLICT
+        ):
             return
-        if expired and not self._quarantine_pending_operations(expired, QUARANTINE_RETRY_LIMIT):
+        if expired and not self._quarantine_pending_operations(
+            expired, QUARANTINE_RETRY_LIMIT
+        ):
             return
         retired = applied_ids | {op.get("operation_id") for op in conflicts + expired}
         with self._pending_lock:
             previous_queue = self._pending_queue
-            self._pending_queue = [op for op in previous_queue if op.get("operation_id") not in retired]
+            self._pending_queue = [
+                op for op in previous_queue if op.get("operation_id") not in retired
+            ]
             if not self._save_pending_queue():
                 self._pending_queue = previous_queue
 
     def _failed_path(self) -> Path:
         return self.base_dir / ".excel_pending_failed.json"
 
-    def _quarantine_pending_operations(self, operations: List[Dict[str, Any]],
-                                       reason: str = QUARANTINE_RETRY_LIMIT, detail: str = ""):
+    def _quarantine_pending_operations(
+        self,
+        operations: List[Dict[str, Any]],
+        reason: str = QUARANTINE_RETRY_LIMIT,
+        detail: str = "",
+    ):
         """반영할 수 없는 작업을 별도 파일로 옮긴다. 큐 선두가 영원히 막히는 것을 막는다."""
         path = self._failed_path()
         stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -491,14 +563,20 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             with self._failed_lock:
                 existing = self._quarantined_operations()
                 known = {op.get("operation_id") for op in existing}
-                existing.extend(op for op in records if op.get("operation_id") not in known)
+                existing.extend(
+                    op for op in records if op.get("operation_id") not in known
+                )
                 tmp = path.with_suffix(".json.tmp")
-                tmp.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+                tmp.write_text(
+                    json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
                 os.replace(tmp, path)
         except Exception as e:
             print(f"[보류 큐 격리 경고] 실패 작업 기록 실패 ({path}): {e}")
             return False
-        ids = ", ".join(str((op.get("item") or {}).get("ledger_id") or "?") for op in operations)
+        ids = ", ".join(
+            str((op.get("item") or {}).get("ledger_id") or "?") for op in operations
+        )
         if reason == QUARANTINE_CONFLICT:
             print(
                 f"⚠️ [보류 큐] 엑셀의 같은 대장ID 행이 다른 요구자료라서 반영하지 않은 작업 "
@@ -546,7 +624,10 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         try:
             ensure_writable(path, "엑셀 격리 작업 파일")
             if operations:
-                tmp.write_text(json.dumps(operations, ensure_ascii=False, indent=2), encoding="utf-8")
+                tmp.write_text(
+                    json.dumps(operations, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
                 os.replace(tmp, path)
             elif path.exists():
                 path.unlink()
@@ -563,7 +644,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         operations = self._quarantined_operations()
         for idx, op in enumerate(operations):
             if op.get("operation_id") == operation_id:
-                return op, operations[:idx] + operations[idx + 1:]
+                return op, operations[:idx] + operations[idx + 1 :]
         return None, operations
 
     def retry_quarantined(self, operation_id: str) -> Dict[str, Any]:
@@ -576,8 +657,11 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             op, rest = self._take_quarantined(str(operation_id or ""))
             if op is None:
                 return {"success": False, "error": "해당 격리 작업을 찾을 수 없습니다."}
-            revived = {k: v for k, v in op.items()
-                       if k not in ("quarantine_reason", "quarantine_detail", "quarantined_at")}
+            revived = {
+                k: v
+                for k, v in op.items()
+                if k not in ("quarantine_reason", "quarantine_detail", "quarantined_at")
+            }
             revived["attempts"] = 0
             with self._pending_lock:
                 self._pending_queue.append(revived)
@@ -585,9 +669,15 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
                     self._pending_queue.remove(revived)
                     return {"success": False, "error": "보류 큐를 저장하지 못했습니다."}
             if not self._write_quarantine_file(rest):
-                return {"success": False, "error": "보류 큐에는 넣었지만 격리 파일을 갱신하지 못했습니다."}
+                return {
+                    "success": False,
+                    "error": "보류 큐에는 넣었지만 격리 파일을 갱신하지 못했습니다.",
+                }
         self.bump_version()
-        return {"success": True, "message": "보류 큐로 되돌렸습니다. 마스터 엑셀이 닫혀 있으면 곧 반영됩니다."}
+        return {
+            "success": True,
+            "message": "보류 큐로 되돌렸습니다. 마스터 엑셀이 닫혀 있으면 곧 반영됩니다.",
+        }
 
     def dismiss_quarantined(self, operation_id: str) -> Dict[str, Any]:
         """격리 작업을 버린다. 재시도 한도 초과 작업이면 그 필드의 DB 보호도 함께 풀린다."""
@@ -598,6 +688,8 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             if not self._write_quarantine_file(rest):
                 return {"success": False, "error": "격리 파일을 갱신하지 못했습니다."}
         item = op.get("item") or {}
-        self._record_history(str(item.get("ledger_id") or ""), "EXCEL_QUARANTINE_DISMISSED", item)
+        self._record_history(
+            str(item.get("ledger_id") or ""), "EXCEL_QUARANTINE_DISMISSED", item
+        )
         self.bump_version()
         return {"success": True, "message": "격리 작업을 삭제했습니다."}

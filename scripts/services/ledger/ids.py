@@ -40,11 +40,11 @@ def row_fingerprint(record) -> Dict[str, str]:
 
 def _seq_token_variants(seq_no: str):
     """연번에서 숫자 토큰 집합을 만든다. 선행 0을 제거한 값과 원문을 모두 담는다."""
-    digits = re.sub(r'\D', '', str(seq_no or ""))
+    digits = re.sub(r"\D", "", str(seq_no or ""))
     if not digits:
         return set()
     variants = {digits}
-    stripped = digits.lstrip('0')
+    stripped = digits.lstrip("0")
     if stripped:
         variants.add(stripped)
     return variants
@@ -54,7 +54,6 @@ def _has_seq_token(text: str, variants) -> bool:
     """숫자 토큰이 다른 숫자에 붙어 있지 않은 경우에만 일치로 본다."""
     blob = str(text or "")
     for v in variants:
-        if re.search(rf'(?<!\d){re.escape(v)}(?!\d)', blob):
+        if re.search(rf"(?<!\d){re.escape(v)}(?!\d)", blob):
             return True
     return False
-

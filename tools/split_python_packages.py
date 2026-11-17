@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """대형 단일 모듈을 패키지로 나눈다. 함수 본문은 줄 단위로 그대로 옮긴다."""
+
 from __future__ import annotations
 
 import sys
@@ -16,7 +17,7 @@ def read_lines(rel: str) -> list:
 def slice_lines(lines: list, ranges) -> str:
     out = []
     for start, end in ranges:
-        out.extend(lines[start - 1:end])
+        out.extend(lines[start - 1 : end])
     return "".join(out)
 
 
@@ -29,7 +30,7 @@ def write(rel: str, content: str) -> None:
     print("wrote", rel, "chars", len(content))
 
 
-EXCEL_IMPORTS = '''# -*- coding: utf-8 -*-
+EXCEL_IMPORTS = """# -*- coding: utf-8 -*-
 import os
 import sys
 import re
@@ -67,7 +68,7 @@ from services.excel_sync.identity import (
     identity_matches,
     _norm_identity,
 )
-'''
+"""
 
 
 def split_excel_sync() -> None:
@@ -81,16 +82,17 @@ def split_excel_sync() -> None:
         "from typing import Dict, Any, Optional\n\n"
         "SCRIPTS_DIR = Path(__file__).resolve().parents[2]\n"
         "DEFAULT_SYSTEM_DIR = SCRIPTS_DIR.parent\n"
-        "DEFAULT_DB_PATH = DEFAULT_SYSTEM_DIR / \"data_requests.db\"\n"
-        "DEFAULT_JSON_PATH = DEFAULT_SYSTEM_DIR / \"data_requests.json\"\n"
+        'DEFAULT_DB_PATH = DEFAULT_SYSTEM_DIR / "data_requests.db"\n'
+        'DEFAULT_JSON_PATH = DEFAULT_SYSTEM_DIR / "data_requests.json"\n'
         "if str(SCRIPTS_DIR) not in sys.path:\n"
-        "    sys.path.insert(0, str(SCRIPTS_DIR))\n\n"
-        + slice_lines(lines, [(44, 81)])
+        "    sys.path.insert(0, str(SCRIPTS_DIR))\n\n" + slice_lines(lines, [(44, 81)])
     )
     write("services/excel_sync/identity.py", identity)
     write(
         "services/excel_sync/pending.py",
-        EXCEL_IMPORTS + "\nclass PendingQueueMixin:\n" + slice_lines(lines, [(134, 373), (860, 1008)]),
+        EXCEL_IMPORTS
+        + "\nclass PendingQueueMixin:\n"
+        + slice_lines(lines, [(134, 373), (860, 1008)]),
     )
     write(
         "services/excel_sync/apply.py",
@@ -98,11 +100,15 @@ def split_excel_sync() -> None:
     )
     write(
         "services/excel_sync/excel_to_db.py",
-        EXCEL_IMPORTS + "\nclass ExcelToDbMixin:\n" + slice_lines(lines, [(1013, 1244)]),
+        EXCEL_IMPORTS
+        + "\nclass ExcelToDbMixin:\n"
+        + slice_lines(lines, [(1013, 1244)]),
     )
     write(
         "services/excel_sync/watcher.py",
-        EXCEL_IMPORTS + "\nclass ExcelWatcherMixin:\n" + slice_lines(lines, [(1249, 1340)]),
+        EXCEL_IMPORTS
+        + "\nclass ExcelWatcherMixin:\n"
+        + slice_lines(lines, [(1249, 1340)]),
     )
     service = (
         EXCEL_IMPORTS
@@ -123,7 +129,7 @@ def split_excel_sync() -> None:
         "from services.excel_sync.identity import ExcelApplyConflict, identity_matches\n"
         "from services.excel_sync.service import ExcelSyncService\n"
         "\n"
-        "__all__ = [\"ExcelApplyConflict\", \"identity_matches\", \"ExcelSyncService\"]\n",
+        '__all__ = ["ExcelApplyConflict", "identity_matches", "ExcelSyncService"]\n',
     )
     write(
         "services/excel_sync_service.py",
@@ -144,17 +150,17 @@ def split_excel_sync() -> None:
         "from services.excel_sync.service import ExcelSyncService\n"
         "\n"
         "__all__ = [\n"
-        "    \"DEFAULT_SYSTEM_DIR\",\n"
-        "    \"DEFAULT_DB_PATH\",\n"
-        "    \"DEFAULT_JSON_PATH\",\n"
-        "    \"MAX_PENDING_ATTEMPTS\",\n"
-        "    \"QUARANTINE_CONFLICT\",\n"
-        "    \"QUARANTINE_RETRY_LIMIT\",\n"
-        "    \"ROW_IDENTITY_FIELDS\",\n"
-        "    \"ExcelApplyConflict\",\n"
-        "    \"identity_matches\",\n"
-        "    \"_norm_identity\",\n"
-        "    \"ExcelSyncService\",\n"
+        '    "DEFAULT_SYSTEM_DIR",\n'
+        '    "DEFAULT_DB_PATH",\n'
+        '    "DEFAULT_JSON_PATH",\n'
+        '    "MAX_PENDING_ATTEMPTS",\n'
+        '    "QUARANTINE_CONFLICT",\n'
+        '    "QUARANTINE_RETRY_LIMIT",\n'
+        '    "ROW_IDENTITY_FIELDS",\n'
+        '    "ExcelApplyConflict",\n'
+        '    "identity_matches",\n'
+        '    "_norm_identity",\n'
+        '    "ExcelSyncService",\n'
         "]\n",
     )
 
@@ -166,15 +172,13 @@ def split_ledger() -> None:
         "# -*- coding: utf-8 -*-\n"
         '"""관리대장 마감 판정. 대시보드 ledgerDueInfo와 같은 규칙."""\n'
         "import datetime\n"
-        "import re\n\n"
-        + slice_lines(lines, [(41, 83)]),
+        "import re\n\n" + slice_lines(lines, [(41, 83)]),
     )
     write(
         "services/ledger/ids.py",
         "# -*- coding: utf-8 -*-\n"
         "import re\n"
-        "from typing import Dict\n\n"
-        + slice_lines(lines, [(85, 140)]),
+        "from typing import Dict\n\n" + slice_lines(lines, [(85, 140)]),
     )
     write(
         "services/ledger/autolink.py",
@@ -199,8 +203,8 @@ def split_ledger() -> None:
         "from typing import Dict, Any, List, Optional, Tuple\n\n"
         "SCRIPTS_DIR = Path(__file__).resolve().parents[2]\n"
         "DEFAULT_BASE_DIR = SCRIPTS_DIR.parent\n"
-        "DEFAULT_DB_PATH = DEFAULT_BASE_DIR / \"data_requests.db\"\n"
-        "DEFAULT_JSON_PATH = DEFAULT_BASE_DIR / \"data_requests.json\"\n"
+        'DEFAULT_DB_PATH = DEFAULT_BASE_DIR / "data_requests.db"\n'
+        'DEFAULT_JSON_PATH = DEFAULT_BASE_DIR / "data_requests.json"\n'
         "if str(SCRIPTS_DIR) not in sys.path:\n"
         "    sys.path.insert(0, str(SCRIPTS_DIR))\n"
         "import system_config\n"
@@ -229,9 +233,9 @@ def split_ledger() -> None:
         "from services.ledger.service import LedgerService\n"
         "\n"
         "__all__ = [\n"
-        "    \"ledger_due_state\", \"matches_due_filter\", \"LEDGER_DONE_STATUSES\",\n"
-        "    \"DUE_SOON_DAYS\", \"DUE_FILTERS\", \"next_ledger_id\", \"row_fingerprint\",\n"
-        "    \"auto_link_ledger_to_doc\", \"LedgerService\",\n"
+        '    "ledger_due_state", "matches_due_filter", "LEDGER_DONE_STATUSES",\n'
+        '    "DUE_SOON_DAYS", "DUE_FILTERS", "next_ledger_id", "row_fingerprint",\n'
+        '    "auto_link_ledger_to_doc", "LedgerService",\n'
         "]\n",
     )
     write(
@@ -256,7 +260,7 @@ def split_ledger() -> None:
     )
 
 
-PARSER_HEADER = '''# -*- coding: utf-8 -*-
+PARSER_HEADER = """# -*- coding: utf-8 -*-
 import os
 import sys
 import re
@@ -276,7 +280,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import system_config
 from write_guard import ensure_writable
 from extractors.text_extractor import mask_pii
-'''
+"""
 
 
 def split_ledger_parser() -> None:

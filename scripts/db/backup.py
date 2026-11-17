@@ -28,7 +28,9 @@ def backup_dir(base_dir) -> Path:
     return Path(base_dir) / BACKUP_DIR_NAME
 
 
-def snapshot_database(db_path, base_dir=None, keep_daily: int = DEFAULT_KEEP_DAILY) -> dict:
+def snapshot_database(
+    db_path, base_dir=None, keep_daily: int = DEFAULT_KEEP_DAILY
+) -> dict:
     """하루 한 본 스냅숏을 뜨고 오래된 것을 지운다. 같은 날 다시 부르면 덮어쓴다."""
     db_path = Path(db_path)
     if not db_path.exists():
@@ -64,7 +66,9 @@ def snapshot_database(db_path, base_dir=None, keep_daily: int = DEFAULT_KEEP_DAI
     }
 
 
-def snapshot_ledger_history(db_path, base_dir=None, keep: int = DEFAULT_KEEP_HISTORY) -> dict:
+def snapshot_ledger_history(
+    db_path, base_dir=None, keep: int = DEFAULT_KEEP_HISTORY
+) -> dict:
     """대장 이력만 가볍게 덤프한다.
 
     전체 스냅숏은 수백 MB라 매일 여러 본을 두기 어렵다. 그런데 정작 **다시 만들 수 없는
@@ -80,10 +84,12 @@ def snapshot_ledger_history(db_path, base_dir=None, keep: int = DEFAULT_KEEP_HIS
     target = out_dir / f"ledger_history_{stamp}.jsonl"
 
     import json
+
     conn = None
     rows = 0
     try:
         from extractors.ledger.workbook import connect_readonly
+
         conn = connect_readonly(db_path)
         conn.row_factory = sqlite3.Row
         with open(target, "w", encoding="utf-8") as fp:

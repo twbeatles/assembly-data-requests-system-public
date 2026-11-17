@@ -16,8 +16,11 @@ from .errors import DataReqError
 
 
 def _utcnow_iso():
-    return (datetime.datetime.now(datetime.timezone.utc)
-            .astimezone().isoformat(timespec="seconds"))
+    return (
+        datetime.datetime.now(datetime.timezone.utc)
+        .astimezone()
+        .isoformat(timespec="seconds")
+    )
 
 
 def _fetch_source(facade, source_id):
@@ -41,26 +44,37 @@ def _fetch_source(facade, source_id):
         row = facade.ledger_get(stable)
         text = str(row.get("details") or row.get("title") or "")
         return {
-            "source_id": source_id, "doc_id": row.get("linked_doc_id") or None,
-            "qa_id": None, "title": str(row.get("title") or ""),
+            "source_id": source_id,
+            "doc_id": row.get("linked_doc_id") or None,
+            "qa_id": None,
+            "title": str(row.get("title") or ""),
             "document_year": str(row.get("year") or ""),
-            "excerpt": policy.mask_text(text[:policy.MAX_EXCERPT_CHARS]),
-            "locator": {"field": "details", "start": 0,
-                        "end": min(len(text), policy.MAX_EXCERPT_CHARS)},
+            "excerpt": policy.mask_text(text[: policy.MAX_EXCERPT_CHARS]),
+            "locator": {
+                "field": "details",
+                "start": 0,
+                "end": min(len(text), policy.MAX_EXCERPT_CHARS),
+            },
             "content_sha256": search_adapter.content_hash(text),
             "verification": "source_text_match",
         }
     else:
-        raise DataReqError("invalid_input", "알 수 없는 source 종류입니다: %s" % (kind,))
+        raise DataReqError(
+            "invalid_input", "알 수 없는 source 종류입니다: %s" % (kind,)
+        )
     # 단건 조회는 마스킹된 발췌만 주므로, 해시 검증용 정본은 내부 연결로 다시 읽는다.
     full_text = _read_full_text(facade, kind, stable)
     excerpt = detail.get("excerpt", "")
-    locator = {"field": "full_markdown" if kind == "doc" else "answer_markdown",
-               "start": detail.get("offset", 0),
-               "end": detail.get("offset", 0) + len(excerpt)}
-    verification = ("source_text_match"
-                    if full_text and excerpt and excerpt.replace("…", "") in full_text
-                    else "unverified")
+    locator = {
+        "field": "full_markdown" if kind == "doc" else "answer_markdown",
+        "start": detail.get("offset", 0),
+        "end": detail.get("offset", 0) + len(excerpt),
+    }
+    verification = (
+        "source_text_match"
+        if full_text and excerpt and excerpt.replace("…", "") in full_text
+        else "unverified"
+    )
     return {
         "source_id": source_id,
         "doc_id": doc_id,
@@ -165,6 +179,7 @@ def verify_pack(facade, pack):
             results.append({"source_id": source_id, "state": "verification_failed"})
             ok = False
         else:
-            results.append({"source_id": source_id, "state": "source_text_match",
-                            "field": field})
+            results.append(
+                {"source_id": source_id, "state": "source_text_match", "field": field}
+            )
     return {"ok": ok, "results": results}

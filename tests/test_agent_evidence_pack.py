@@ -16,8 +16,11 @@ def _facade(tmp_path):
 
 def test_pack_tracks_sources_and_hashes(tmp_path):
     facade = _facade(tmp_path)
-    pack = build_pack(facade, "딥페이크 대응 방안은?",
-                      selected_ids=["doc:DOC-2026-001", "qa:QA-2026-001"])
+    pack = build_pack(
+        facade,
+        "딥페이크 대응 방안은?",
+        selected_ids=["doc:DOC-2026-001", "qa:QA-2026-001"],
+    )
     assert pack["schema"] == "datareq-evidence-pack/v1"
     assert pack["claims"][0]["state"] == "needs_review"
     assert len(pack["sources"]) == 2
@@ -34,8 +37,10 @@ def test_pack_detects_stale_source(tmp_path):
     pack = build_pack(facade, "딥페이크 대응", selected_ids=["doc:DOC-2026-001"])
     conn = sqlite3.connect(str(tmp_path / "data_requests.db"))
     try:
-        conn.execute("UPDATE documents SET full_markdown = ? WHERE doc_id = ?",
-                     ("전면 개정된 본문이다.", "DOC-2026-001"))
+        conn.execute(
+            "UPDATE documents SET full_markdown = ? WHERE doc_id = ?",
+            ("전면 개정된 본문이다.", "DOC-2026-001"),
+        )
         conn.commit()
     finally:
         conn.close()

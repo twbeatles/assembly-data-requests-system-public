@@ -36,9 +36,12 @@ def set_version(conn: sqlite3.Connection, version: int):
 
 
 def _table_exists(conn, name: str) -> bool:
-    return conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
-    ).fetchone() is not None
+    return (
+        conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
+        ).fetchone()
+        is not None
+    )
 
 
 def _columns(conn, table: str) -> set:
@@ -80,6 +83,7 @@ def _migrate_to_2(conn) -> list:
 # 버전 -> (설명, 적용 함수). 키는 "이 단계를 적용하면 도달하는 버전"이다.
 def _migrate_to_3(conn):
     from .ledger_outbox import ensure_tables
+
     ensure_tables(conn)
     return ["대장 엑셀 재시도·등록 멱등성 저장소"]
 
@@ -112,8 +116,9 @@ def rebuild_fts(conn: sqlite3.Connection) -> bool:
         return False
 
 
-def apply_migrations(conn: sqlite3.Connection, verbose: bool = True,
-                     fresh_hint: bool | None = None) -> dict:
+def apply_migrations(
+    conn: sqlite3.Connection, verbose: bool = True, fresh_hint: bool | None = None
+) -> dict:
     """필요한 마이그레이션을 순서대로 적용하고 결과를 돌려준다.
 
     `fresh_hint`: 호출자가 테이블을 만들기 **전에** 본 상태. `ensure_schema`는 테이블을
@@ -153,4 +158,9 @@ def apply_migrations(conn: sqlite3.Connection, verbose: bool = True,
             for s in steps:
                 print(f"    - {s}")
 
-    return {"from": current, "to": get_version(conn), "applied": applied, "fresh": False}
+    return {
+        "from": current,
+        "to": get_version(conn),
+        "applied": applied,
+        "fresh": False,
+    }
