@@ -1,3 +1,6 @@
 # datareq CLI/MCP 선택 의존성. 기본 requirements.txt는 건드리지 않는다.
 # 공식 MCP Python SDK v2 (FastMCP -> MCPServer 개명 반영). 버전 고정 필수.
 mcp==2.2.0
+# pyjwt[crypto]가 끌어오는 cryptography는 sdist만 있으면 Rust 빌드가
+# 필요해 설치가 깨진다. 바이너리 휠이 있는 버전으로 고정 (3.14·3.15 확인).
+cryptography==46.0.3

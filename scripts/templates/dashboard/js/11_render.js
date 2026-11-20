@@ -88,6 +88,7 @@ async function render() {
 
         const bodyText = doc.full_markdown || doc.answer_full_text || doc.question_list;
         let snippet = highlightTokens.length ? getSnippet(bodyText, highlightTokens, 160, cardPreviewText) : getSnippet(cardPreviewText(bodyText), highlightTokens);
+        if (!snippet && bodiesLoading()) snippet = '<span class="snippet-loading muted">답변 내용 불러오는 중...</span>';
         if (currentMode === 'tables' && doc.table_summary) {
           snippet = `<div class="table-summary-note"><strong>들어 있는 표:</strong> ${highlightTextString(doc.table_summary, highlightTokens)}</div>` + snippet;
         }
@@ -250,7 +251,9 @@ async function render() {
         card.className = 'card';
         card.onclick = openParent;
 
-        const snippet = highlightTokens.length ? getSnippet(qa.answer_full, highlightTokens, 160, cardPreviewText) : getSnippet(cardPreviewText(qa.answer_full), highlightTokens);
+        const rawText = qa.answer_full || qa.answer_markdown || '';
+        const rawSnippet = getSnippet(highlightTokens.length ? cleanSnippetText(rawText) : cardPreviewText(rawText), highlightTokens);
+        const snippet = rawSnippet || (bodiesLoading() ? '<span class="snippet-loading muted">답변 내용 불러오는 중...</span>' : '');
 
         card.innerHTML = `
           <div class="card-header-actions">
@@ -275,6 +278,8 @@ async function render() {
       }
 
       if (!wantCards) {
+        const rawClip = cardPreviewText(qa.answer_full || qa.answer_markdown).slice(0, 200);
+        const clipHtml = rawClip ? escapeHtml(rawClip) : (bodiesLoading() ? '<span class="snippet-loading muted">답변 내용 불러오는 중...</span>' : '-');
         const tr = document.createElement('tr');
         tr.onclick = openParent;
         tr.innerHTML = `
@@ -283,7 +288,7 @@ async function render() {
           <td class="cell-nowrap">${dateText}</td>
           <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
           <td class="cell-title">${qTitleHighlighted}</td>
-          <td class="cell-clip">${escapeHtml(cardPreviewText(qa.answer_full).slice(0, 200))}</td>
+          <td class="cell-clip">${clipHtml}</td>
           <td class="cell-center">${qa.has_tables === 'Y' ? '있음' : '-'}</td>
           <td class="cell-nowrap" onclick="event.stopPropagation();">
             <a href="${escapeHtml(getDocMdUrl(qa.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a>
@@ -295,20 +300,28 @@ async function render() {
   }
   cardContainer.replaceChildren(cardSink);
   tableBody.replaceChildren(rowSink);
+  Array.from(cardContainer.children).forEach(card => { card.tabIndex = 0; });
+  Array.from(tableBody.children).forEach(row => { row.tabIndex = 0; });
 }
 
 // 카드 미리보기용: 마크다운 기호(#, |, ---, ** 등)와 HTML 태그를 걷어 낸 앞부분 글.
 // 미리보기에만 쓴다. 문서를 열면 full_markdown 전문을 그대로 보여 준다(전문 보존 정책 5).
-function cardPreviewText(text) {
-  return String(text || '').slice(0, 1500)
+function cleanSnippetText(text, maxLen = 0) {
+  let s = String(text || '');
+  if (maxLen > 0) s = s.slice(0, maxLen);
+  return s
     .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<[^>]{0,200}>/g, ' ')
+    .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*\b[^>]*>/g, ' ')
     .replace(/^\s{0,3}#{1,6}\s*/gm, '')
     .replace(/^\s*\|?[\s:|-]*-{3,}[\s:|-]*\|?\s*$/gm, ' ')
     .replace(/\|/g, ' ')
     .replace(/(\*\*|__|`)/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function cardPreviewText(text) {
+  return cleanSnippetText(text, 1500);
 }
 
 // Favorite Toggle

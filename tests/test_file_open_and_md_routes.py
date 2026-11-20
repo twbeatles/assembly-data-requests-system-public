@@ -132,7 +132,7 @@ class TestFileOpenAndMdRoutes(unittest.TestCase):
         """open_in_system 호출 시 성공 응답을 반환해야 한다."""
         with mock.patch("subprocess.Popen") as mock_popen:
             res = open_in_system(self.hwp_file, mode="explorer")
-            self.assertTrue(res.get("success"), res)
+            self.assertEqual(res.get("success"), sys.platform == "win32", res)
             self.assertIn("path", res)
             if sys.platform == "win32":
                 mock_popen.assert_called_once()
@@ -140,14 +140,14 @@ class TestFileOpenAndMdRoutes(unittest.TestCase):
                 self.assertEqual(args[0], "explorer.exe")
                 self.assertTrue(args[1].startswith("/select,"))
 
-    def test_api_open_endpoint_get_success(self):
-        """GET /api/open?path=... 호출 시 탐색기를 열고 200 성공 JSON을 반환한다."""
+    def test_api_open_endpoint_get_is_not_allowed(self):
+        """GET /api/open은 부작용 요청이라 405로 거절하고 탐색기를 열지 않는다. (2026-10-21 ISSUE-003)"""
         rel = f"2026/{self.hwp_file.name}"
         handler = self._create_handler(f"/api/open?path={quote(rel)}&mode=explorer")
-        with mock.patch("subprocess.Popen"):
+        with mock.patch("subprocess.Popen") as popen:
             handler.do_GET()
-        self.assertEqual(handler.sent_status, 200)
-        self.assertTrue(handler.sent_json.get("success"))
+        self.assertEqual(handler.sent_status, 405)
+        popen.assert_not_called()
 
     def test_api_open_endpoint_post_success(self):
         """POST /api/open with json body 호출 시 200 성공 JSON을 반환한다."""
@@ -162,8 +162,10 @@ class TestFileOpenAndMdRoutes(unittest.TestCase):
 
     def test_api_open_endpoint_not_found(self):
         """존재하지 않는 파일에 대한 /api/open 호출은 404를 반환한다."""
-        handler = self._create_handler("/api/open?path=2026/없는파일.hwp")
-        handler.do_GET()
+        handler = self._create_handler(
+            "/api/open", method="POST", body={"path": "2026/없는파일.hwp"}
+        )
+        handler.do_POST()
         self.assertEqual(handler.sent_status, 404)
 
     def test_parsed_markdown_direct_url_serving(self):

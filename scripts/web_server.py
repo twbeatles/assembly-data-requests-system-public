@@ -25,12 +25,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from web.security import SecurityMixin
-from web.pagination import (  # noqa: F401 # shim re-export (identity contract)
-    MAX_PAGE_LIMIT,
-    parse_page_params,
-    page_slice,
-    paged_response,
-)
+from web.pagination import MAX_PAGE_LIMIT, parse_page_params, page_slice, paged_response  # noqa: F401 # shim re-export (routes_get.py, test_audit_phase11_features.py)
 from web.body import JsonBodyMixin
 from web.static import StaticPolicyMixin
 from web.ledger_api import LedgerApiMixin
@@ -64,6 +59,8 @@ CONFIG_ALLOWED_KEYS = {
     "system_subtitle",
     "default_contact",
 }
+CONFIG_VALUE_MAX_LEN = 200
+OPEN_MODES = {"explorer", "file"}
 DOWNLOAD_ALLOWED_EXTS = {
     ".hwp",
     ".hwpx",
@@ -74,6 +71,13 @@ DOWNLOAD_ALLOWED_EXTS = {
     ".md",
     ".txt",
     ".csv",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".gif",
+    ".svg",
+    ".bmp",
 }
 DOWNLOAD_DENIED_EXTS = {".db", ".py", ".json", ".bat", ".exe", ".ps1", ".cmd"}
 PUBLIC_STATIC_EXTS = {".html", ".ico"}
@@ -156,6 +160,7 @@ def wait_last_sync(timeout=3.0):
 RESULT_CODE_STATUS = {
     "not_found": 404,
     "pipeline_busy": 409,
+    "storage_busy": 409,
     "conflict": 409,
     "invalid": 400,
 }
@@ -223,6 +228,19 @@ class RequestLedgerHandler(
                     400, f"허용되지 않은 설정 키입니다: {', '.join(unknown)}"
                 )
                 return
+            # 화면 표시·대장 기본 부서에 그대로 쓰이는 문자열 설정이다. 객체·숫자가 저장되면
+            # 이후 등록이 SQLite 바인딩 오류로 실패한다.
+            invalid = [
+                k
+                for k, v in data.items()
+                if not isinstance(v, str) or len(v) > CONFIG_VALUE_MAX_LEN
+            ]
+            if invalid:
+                self.send_error_response(
+                    400,
+                    f"설정 값은 {CONFIG_VALUE_MAX_LEN}자 이하의 글자여야 합니다: {', '.join(invalid)}",
+                )
+                return
             ok = system_config.save_config(data, BASE_DIR)
             if ok:
                 self.send_json_response(
@@ -280,9 +298,17 @@ class RequestLedgerHandler(
             return
 
         if path in ("/api/open", "/api/open_explorer"):
-            data = self.read_json_body() or {}
-            req_file = data.get("path", "")
+            if self.reject_cross_site_request():
+                return
+            data = self.read_json_body()
+            if not isinstance(data, dict):
+                self.send_error_response(400, "잘못된 데이터 형식입니다.")
+                return
+            req_file = str(data.get("path") or "")
             mode = data.get("mode", "explorer")
+            if mode not in OPEN_MODES:
+                self.send_error_response(400, f"지원하지 않는 열기 방식입니다: {mode}")
+                return
             ok, target, err = self.resolve_download_target(req_file)
             if not ok or target is None:
                 self.send_error_response(403 if "거부" in (err or "") else 400, err)

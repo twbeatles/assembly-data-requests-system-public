@@ -82,7 +82,7 @@ def build_golden_db(base_dir):
             "5",
             "심의위 안내",
             "질의",
-            "대외위원회 신속심의 절차 안내다. " + LONG_FILLER,
+            "대외심의위원회 신속심의 절차 안내다. " + LONG_FILLER,
         ),
         (
             "G-SPACING",
@@ -91,9 +91,9 @@ def build_golden_db(base_dir):
             "국회",
             "이영희",
             "6",
-            "통신망 대응",
+            "범죄 대응",
             "질의",
-            "정보통신망 대응 절차다. " + LONG_FILLER,
+            "디지털성범죄 대응 절차다. " + LONG_FILLER,
         ),
         (
             "G-PARTICLE",
@@ -339,7 +339,7 @@ GOLDEN_QUERIES = [
     },
     {
         "name": "spacing",
-        "query": "정보 통신망",
+        "query": "디지털 성범죄",
         "category": "all",
         "year": None,
         "must_include": {"doc:G-SPACING"},

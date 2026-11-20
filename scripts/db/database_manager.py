@@ -11,6 +11,7 @@ import os
 import sqlite3
 import sys
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -89,6 +90,19 @@ class DatabaseManager:
 
     @staticmethod
     def ensure_schema(conn: sqlite3.Connection):
+        if get_version(conn) > SCHEMA_VERSION:
+            raise SchemaTooNewError("지원하지 않는 최신 DB 버전입니다.")
+        from storage_activity import storage_activity
+
+        filename = conn.execute("PRAGMA database_list").fetchone()[2]
+        activity = (
+            storage_activity(Path(filename).parent) if filename else nullcontext()
+        )
+        with activity:
+            return DatabaseManager._ensure_schema_locked(conn)
+
+    @staticmethod
+    def _ensure_schema_locked(conn: sqlite3.Connection):
         """Initializes tables, FTS5 virtual tables, triggers, and indexes IF NOT EXISTS (non-destructive)."""
         if get_version(conn) > SCHEMA_VERSION:
             raise SchemaTooNewError("지원하지 않는 최신 DB 버전입니다.")
@@ -233,6 +247,9 @@ class DatabaseManager:
 
         DatabaseManager._create_indexes(cur)
 
+        from .revision import ensure_revision
+
+        ensure_revision(conn)
         conn.commit()
 
         # 스키마 버전 확인과 마이그레이션. 구 스키마 DB를 조용히 쓰지 않는다(제안서 D1).
@@ -305,6 +322,7 @@ class DatabaseManager:
             cur.execute("DROP TABLE IF EXISTS request_ledger")
             cur.execute("DROP TABLE IF EXISTS qa_items")
             cur.execute("DROP TABLE IF EXISTS documents")
+            cur.execute("DROP TABLE IF EXISTS dataset_revision")
             # 새 DB로 취급되도록 버전을 되돌린다. ensure_schema가 현재 버전을 다시 찍는다.
             set_version(conn, 0)
             conn.commit()

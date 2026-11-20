@@ -212,7 +212,7 @@ class MaskPiiEquivalenceTests(unittest.TestCase):
         "ab@c.d",
         "mail:first.last+tag@sub.example.com.",
         "",
-        "문의 010-9999-0000, kim@example.kr",
+        "문의 010-9999-0000, fixture@example.org",
     ]
 
     def test_known_cases_match_legacy(self):

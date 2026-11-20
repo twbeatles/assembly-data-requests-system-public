@@ -139,6 +139,12 @@ async function loadDeferredBodies() {
     }
     BODY_CHUNKS_LOADED += 1;
     updateBodyLoadStatus();
+    // 첫 청크가 도착했을 때 현재 질문-답변 모드이고 검색어가 없으면 즉시 1차 렌더링
+    const isQaMode = typeof currentMode !== 'undefined' && currentMode === 'qa';
+    const hasQuery = typeof activeFilters !== 'undefined' && !!activeFilters.query;
+    if (BODY_CHUNKS_LOADED === 1 && isQaMode && !hasQuery && typeof render === 'function') {
+      render();
+    }
     await new Promise(r => setTimeout(r, 0));
   }
   BODY_CHUNKS_LOADED = BODY_CHUNKS_TOTAL;
@@ -151,8 +157,8 @@ async function loadDeferredBodies() {
   if (resolveBodiesReady) resolveBodiesReady();
   updateBodyLoadStatus();
   warmSearchCache();
-  // 본문이 오기 전에 한 검색은 제목·요약만 봤다. 전문으로 다시 평가한다.
-  if (activeFilters.query) render();
+  // 본문 청크 로딩 완료 후 반드시 렌더링을 갱신한다 (질문-답변 스니펫 등 본문 반영).
+  if (typeof render === 'function') render();
 }
 
 async function loadAndDecompressDatabase() {

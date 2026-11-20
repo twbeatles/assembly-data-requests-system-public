@@ -27,12 +27,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
-      // 새 검색어면 결과 앞쪽부터 보여 준다(앞 검색에서 [더 보기]로 늘린 한도를 이어 쓰지 않는다).
-      currentRenderLimit = 40;
       render();
     }, 200);
     clearTimeout(recentSearchTimer);
     recentSearchTimer = setTimeout(() => rememberSearch(activeFilters.query), 1500);
+  });
+
+  // Enter는 기다리지 않고 바로 찾고 최근 검색어에 남긴다. Esc는 검색어를 지운다. ↓는 첫 결과로 간다.
+  document.getElementById('search-input').addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) return; // 한글 조합 중 Enter는 글자 확정용이다.
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(searchDebounceTimer);
+      clearTimeout(recentSearchTimer);
+      activeFilters.query = e.target.value.trim();
+      render();
+      rememberSearch(activeFilters.query);
+    } else if (e.key === 'Escape' && e.target.value) {
+      e.preventDefault();
+      e.stopPropagation();
+      clearOneFilter('query');
+    } else if (e.key === 'ArrowDown') {
+      if (typeof focusResultAt === 'function' && focusResultAt(0)) e.preventDefault();
+    }
   });
 
   // 연도·진행상태 칩은 데이터로 다시 만들어지므로 개별 등록 대신 이벤트 위임을 쓴다.
@@ -66,19 +83,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     render();
   });
 
-  // 지금 보기 방식만 그리므로(11_render.js) 바꾸면 다시 그린다.
   document.getElementById('btn-view-card').addEventListener('click', () => {
-    if (currentView === 'card') return;
     setView('card');
     saveViewPrefs();
-    render();
   });
 
   document.getElementById('btn-view-table').addEventListener('click', () => {
-    if (currentView === 'table') return;
     setView('table');
     saveViewPrefs();
-    render();
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -102,12 +114,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.addEventListener('keydown', (e) => {
-    // 답변서 창이 열려 있으면 F3 / Shift+F3으로 검색어 위치를 옮긴다(브라우저 찾기 대신).
-    if (e.key === 'F3' && isModalOpen('modal-backdrop') && SEARCH_HITS.length) {
-      e.preventDefault();
-      gotoSearchHit(e.shiftKey ? -1 : 1);
-      return;
-    }
     if (e.key === 'Escape') {
       if (typeof closeTopModal === 'function' && closeTopModal()) return;
       closeModal();

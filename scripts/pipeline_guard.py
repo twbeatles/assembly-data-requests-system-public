@@ -7,6 +7,8 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+from storage_activity import storage_activity
+
 LOCK_NAME = ".pipeline.lock"
 STALE_SECONDS = 4 * 3600
 _OWNERS = {}
@@ -61,8 +63,9 @@ class PipelineGuard:
     def __init__(self, base_dir: Path):
         self.base_dir = Path(base_dir)
         self.path = self.base_dir / LOCK_NAME
-        self._key = str(self.path.resolve())
+        self._key = os.path.normcase(str(self.path.resolve()))
         self._identity = None
+        self._activity_context = None
 
     def _lock_pid(self):
         """락 파일의 PID. 없거나 깨졌으면 None."""
@@ -102,8 +105,12 @@ class PipelineGuard:
             finally:
                 stream.seek(0)
                 if os.name == "nt":
+                    import msvcrt
+
                     msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
                 else:
+                    import fcntl
+
                     fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
     def _signature(self):
@@ -140,6 +147,26 @@ class PipelineGuard:
             return True
 
     def acquire(self, allow_reentrant: bool = True) -> bool:
+        if self.is_locked() and not (allow_reentrant and self.is_mine()):
+            raise RuntimeError(
+                "문서 동기화 파이프라인이 실행 중입니다. 완료 후 다시 시도해주세요."
+            )
+        # Drain mutations admitted before the pipeline flag was published. Keep
+        # the same OS gate until release, including snapshot/transfer/swap.
+        activity = storage_activity(self.base_dir)
+        activity.__enter__()
+        try:
+            acquired = self._acquire_metadata(allow_reentrant)
+        except BaseException:
+            activity.__exit__(None, None, None)
+            raise
+        if acquired:
+            self._activity_context = activity
+        else:
+            activity.__exit__(None, None, None)
+        return acquired
+
+    def _acquire_metadata(self, allow_reentrant):
         with self._metadata_lock():
             if self.path.exists():
                 if self.is_stale():
@@ -162,13 +189,21 @@ class PipelineGuard:
     def release(self):
         if self._identity is None:
             return
-        with self._metadata_lock():
-            if (
-                self.path.exists()
-                and self._signature() == self._identity
-                and self._lock_pid() == os.getpid()
-            ):
-                self.path.unlink()
-            if _OWNERS.get(self._key) == (threading.get_ident(), self._identity):
+        # An instance passed to another thread cannot release its owner's gate.
+        owner = _OWNERS.get(self._key)
+        if not owner or owner[0] != threading.get_ident():
+            return
+        try:
+            with self._metadata_lock():
+                if (
+                    self.path.exists()
+                    and self._signature() == self._identity
+                    and self._lock_pid() == os.getpid()
+                ):
+                    self.path.unlink()
                 _OWNERS.pop(self._key, None)
-            self._identity = None
+                self._identity = None
+        finally:
+            activity, self._activity_context = self._activity_context, None
+            if activity is not None:
+                activity.__exit__(None, None, None)

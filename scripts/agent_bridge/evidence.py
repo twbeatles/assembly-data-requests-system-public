@@ -51,7 +51,7 @@ def _fetch_source(facade, source_id):
             "document_year": str(row.get("year") or ""),
             "excerpt": policy.mask_text(text[: policy.MAX_EXCERPT_CHARS]),
             "locator": {
-                "field": "details",
+                "field": "details" if row.get("details") else "title",
                 "start": 0,
                 "end": min(len(text), policy.MAX_EXCERPT_CHARS),
             },
@@ -98,6 +98,13 @@ def _read_full_text(facade, kind, stable):
 
 
 def build_pack(facade, question, selected_ids=None, max_sources=None):
+    if not (question or "").strip():
+        raise DataReqError("invalid_input", "question은 비어 있을 수 없습니다.")
+    with facade.read_snapshot() as snapshot:
+        return _build_pack(snapshot, question, selected_ids, max_sources)
+
+
+def _build_pack(facade, question, selected_ids=None, max_sources=None):
     """근거 패키지를 만든다. 저장은 호출자가 담당하며 여기서는 dict만 반환한다."""
     if not (question or "").strip():
         raise DataReqError("invalid_input", "question은 비어 있을 수 없습니다.")

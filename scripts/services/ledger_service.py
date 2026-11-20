@@ -1,29 +1,16 @@
 # -*- coding: utf-8 -*-
+import json  # noqa: F401 # shim re-export (tests access ledger_service.json)
+
 """호환 진입점. 구현은 services.ledger."""
-
-import json  # noqa: F401 # compat re-export shim
-import os  # noqa: F401 # compat re-export shim
-import threading  # noqa: F401 # compat re-export shim
-from pathlib import Path  # noqa: F401 # compat re-export shim
-
-from services.ledger.autolink import auto_link_ledger_to_doc  # noqa: F401 # compat re-export shim
-from services.ledger.due import (  # noqa: F401 # compat re-export shim
+from services.ledger.autolink import auto_link_ledger_to_doc  # noqa: F401 # shim re-export (web_server.py, test_audit_scope2.py)
+from services.ledger.due import (  # noqa: F401 # shim re-export (test_audit_phase11_features.py, test_audit_phase12_ledger_status.py)
     DUE_FILTERS,
     DUE_SOON_DAYS,
     LEDGER_DONE_STATUSES,
     ledger_due_state,
     matches_due_filter,
 )
-from services.ledger.ids import (  # noqa: F401 # compat re-export shim
-    LEDGER_TEXT_FIELDS,
-    ROW_FINGERPRINT_FIELDS,
-    _clean,
-    _has_seq_token,
-    _seq_token_variants,
-    next_ledger_id,
-    row_fingerprint,
-)
-from services.ledger.service import (  # noqa: F401 # compat re-export shim
+from services.ledger.service import (  # noqa: F401 # shim re-export (facade.py, reconcile_storage.py, excel_to_db.py)
     _JSON_DIRTY,
     _JSON_RUNNING,
     _JSON_STATE_LOCK,

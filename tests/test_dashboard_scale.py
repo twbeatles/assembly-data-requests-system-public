@@ -221,6 +221,58 @@ function render() {{}}
             self.assertEqual(out["qas"][q["qa_id"]], q["answer_markdown"], q["qa_id"])
         self.assertTrue(out["cleared"], "푼 블록 문자열은 비워 메모리를 돌려줘야 한다")
 
+    def test_deferred_bodies_renders_qa_without_query_regression(self):
+        """회귀방지: 검색어가 없는 기본 상태에서도 본문 청크 완료 시 render()가 반드시 호출되어 QA 스니펫이 갱신되는지 검증."""
+        raw = sample_payload()
+        r = DashboardRenderer()
+        slim = r.build_slim_payload(raw)
+        meta_b64, bodies = r.encode_payload_parts(
+            slim, threshold=1000, chunk_chars=2500
+        )
+        blocks = {"COMPRESSED_DATA": meta_b64}
+        blocks.update({f"COMPRESSED_BODY_{i}": b for i, b in enumerate(bodies)})
+        boot = BOOT_JS.read_text(encoding="utf-8")
+        code = f"""
+const BLOCKS = {json.dumps(blocks)};
+const ELS = {{}};
+for (const id of Object.keys(BLOCKS)) ELS[id] = {{ id, textContent: BLOCKS[id] }};
+const document = {{
+  getElementById: (id) => ELS[id] || null,
+  querySelectorAll: () => Object.values(ELS).filter(e => e.id.startsWith('COMPRESSED_BODY_')).reverse(),
+}};
+const window = {{ location: {{ protocol: 'file:' }} }};
+let REQUEST_LEDGER = []; let LEDGER_MAP = {{}};
+const activeFilters = {{ query: '' }};
+let currentMode = 'qa';
+let renderCalls = 0;
+function mergeLocalLedger(x) {{ return x; }}
+function checkAndNotifyOfflineSync() {{}}
+function warmSearchCache() {{}}
+function render() {{ renderCalls++; }}
+{boot}
+(async () => {{
+  await loadAndDecompressDatabase();
+  const initialCalls = renderCalls;
+  await loadDeferredBodies();
+  const finalCalls = renderCalls;
+  const qas = {{}}; QA_ITEMS.forEach(q => qas[q.qa_id] = q.answer_markdown || q.answer_full);
+  console.log(JSON.stringify({{ initialCalls, finalCalls, renderCalls, qas }}));
+}})();
+"""
+        out = run_node(code)
+        self.assertEqual(out["initialCalls"], 0)
+        self.assertGreaterEqual(
+            out["finalCalls"],
+            1,
+            "검색어가 없더라도 본문 완료 시 반드시 render()가 최소 1회 이상 호출되어야 함",
+        )
+        for q in raw["qa_items"]:
+            self.assertEqual(
+                out["qas"][q["qa_id"]],
+                q["answer_markdown"],
+                f"Q&A {q['qa_id']} 본문이 정상 복원되어야 함",
+            )
+
     def test_single_block_payload_still_boots(self):
         raw = sample_payload(3, 60)
         slim = DashboardRenderer.build_slim_payload(raw)

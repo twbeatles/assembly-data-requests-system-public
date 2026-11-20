@@ -42,7 +42,7 @@ import generate_excel_db
 import generate_web_dashboard
 import parse_all
 import sync_distributions
-from ingest.files import (  # noqa: F401 # re-export (ingest/files + tests import via shim)
+from ingest.files import (  # noqa: F401 # shim re-export (files.py, test_audit_phase3.py)
     TARGET_EXTS,
     _compute_sha256,
     _is_in_use,
@@ -62,6 +62,9 @@ def _failure_result(error, elapsed_seconds):
         "elapsed_seconds": elapsed_seconds,
         "warnings": [],
         "error": str(error),
+        "completed_steps": [],
+        "failed_step": None,
+        "artifacts_may_be_partial": False,
     }
 
 
@@ -174,6 +177,8 @@ def _run_smart_add_body(input_files=None, status_callback=None):
         )
 
     pipeline_ok = True
+    completed_steps = []
+    failed_step = None
     step_error = None
     warnings = []
     if skipped_inputs:
@@ -195,7 +200,10 @@ def _run_smart_add_body(input_files=None, status_callback=None):
             status_callback(desc, pct)
         print(f"\n[실행 중] {desc}...")
         t0 = time.time()
-        result = func()
+        try:
+            result = func()
+        except Exception as exc:
+            result = {"success": False, "error": str(exc)}
         step_success = (
             result.get("success", True)
             if isinstance(result, dict)
@@ -203,6 +211,7 @@ def _run_smart_add_body(input_files=None, status_callback=None):
         )
         if not step_success:
             pipeline_ok = False
+            failed_step = desc
             if isinstance(result, dict) and result.get("error"):
                 step_error = f"{desc}: {result['error']}"
             print(f"✗ {desc} 검증 실패 ({time.time() - t0:.2f}초)")
@@ -219,6 +228,7 @@ def _run_smart_add_body(input_files=None, status_callback=None):
                 + (f" ({preview})" if preview else "")
             )
         print(f"✓ {desc} 완료 ({time.time() - t0:.2f}초)")
+        completed_steps.append(desc)
 
     if status_callback:
         status_callback("완료 처리 중...", 100)
@@ -259,6 +269,10 @@ def _run_smart_add_body(input_files=None, status_callback=None):
         "elapsed_seconds": t_total,
         "warnings": warnings,
         "error": step_error,
+        "completed_steps": completed_steps,
+        "failed_step": failed_step,
+        "artifacts_may_be_partial": not pipeline_ok
+        and any(step.startswith("2.") for step in completed_steps),
     }
 
 
@@ -279,6 +293,10 @@ def main():
     if not res.get("success"):
         print(f"✗ 신규 요구자료 추가 및 DB 갱신 실패 (소요시간: {elapsed:.2f}초)")
         print(res.get("error") or "파이프라인 단계 실패로 기존 산출물을 유지했습니다.")
+        if res.get("artifacts_may_be_partial"):
+            print(
+                "DB는 갱신됐지만 일부 출력 파일은 이전 상태일 수 있습니다. 00번을 다시 실행해 출력 파일을 다시 만드세요."
+            )
         print("=" * 65)
         return 1
     if res.get("warnings"):

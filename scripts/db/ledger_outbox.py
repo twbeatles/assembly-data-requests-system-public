@@ -35,11 +35,17 @@ def enqueue(conn, item, action):
 
 
 def read_operations(db_path):
+    """Read committed delivery intent, including frames still in the live WAL.
+
+    immutable is only suitable for offline diagnostic images: using it here
+    hides pending writes while another connection keeps the WAL open.
+    """
     if not Path(db_path).exists():
         return []
     from extractors.ledger.workbook import connect_readonly
 
     with closing(connect_readonly(db_path)) as conn:
+        conn.execute("BEGIN")
         if not conn.execute(
             "SELECT 1 FROM sqlite_master WHERE name='ledger_outbox'"
         ).fetchone():

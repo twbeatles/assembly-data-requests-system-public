@@ -2,6 +2,7 @@
 """대시보드 조립 믹스인(SRP: 파트→단일 HTML)."""
 
 import json
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -48,7 +49,7 @@ class AssembleMixin(_HostBase_AssembleMixin):  # pyright: ignore[reportGeneralTy
 
         css = self._join_parts(src_dir, manifest.get("css") or [])
         js = self._join_parts(src_dir, manifest.get("js") or [])
-        js = self.inject_synonyms(js)
+        js = self.escape_inline_script(self.inject_synonyms(js))
         html = shell.replace(
             "<!-- __DASHBOARD_CSS__ -->", "<style>" + css + "</style>", 1
         )
@@ -60,6 +61,16 @@ class AssembleMixin(_HostBase_AssembleMixin):  # pyright: ignore[reportGeneralTy
                 "조립된 대시보드에 외부 스크립트 또는 스타일시트 의존성이 있습니다"
             )
         return html
+
+    @staticmethod
+    def escape_inline_script(source: str) -> str:
+        # HTML's script parser runs before JavaScript. Comment-open tokens can
+        # enter its double-escaped state; a literal closing tag ends the element
+        # even inside a JS string. Preserve the JS string/regex value.
+        source = source.replace("<!--", r"\x3c!--")
+        return re.sub(
+            r"</script", lambda match: "<\\/" + match.group(0)[2:], source, flags=re.I
+        )
 
     @staticmethod
     def inject_synonyms(js: str) -> str:

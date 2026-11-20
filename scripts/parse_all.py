@@ -10,6 +10,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Optional, cast
 
+from write_guard import ensure_writable
+
 KORDOC_CMD = shutil.which("kordoc.cmd") or shutil.which("kordoc") or "kordoc.cmd"
 # MCP parse_document와 동일한 엔진 옵션: 스캔본 OCR, 표 빈칸·빈 문단 보존
 KORDOC_PARSE_FLAGS = ["--ocr", "--keep-empty-cols", "--keep-empty-paragraphs"]
@@ -88,7 +90,7 @@ from pipeline.parse.layout import (
     expected_output_path,
     write_text_atomic,
 )
-from pipeline.parse.safe_copy import (  # noqa: F401 # shim re-export (identity contract)
+from pipeline.parse.safe_copy import (  # noqa: F401 # shim re-export (test_audit_phase9_fixes.py)
     CMD_UNSAFE_CHARS,
     kordoc_paths,
     needs_safe_copy,
@@ -118,6 +120,67 @@ def kordoc_cmd(*args) -> str:
     return f'cmd.exe /s /c "{quoted}"'
 
 
+def _kill_process_tree(proc: subprocess.Popen):
+    """변환기와 그 자식(node 등)을 함께 끝낸다. `Popen.kill`은 cmd.exe만 끝낸다."""
+    try:
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                shell=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=30,
+            )
+        else:
+            import signal
+
+            os.killpg(proc.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
+def run_converter(command: str, timeout: float) -> subprocess.CompletedProcess:
+    """KorDoc 명령을 실행한다. timeout이면 프로세스 트리째 끝내고 TimeoutExpired를 낸다.
+
+    `subprocess.run(capture_output=True, timeout=...)`은 Windows에서 timeout에 직계
+    자식(cmd.exe)만 끝내고, 파이프를 쥔 손자(실제 변환기)가 끝날 때까지 `communicate`에서
+    기다린다. 변환기가 멈추면 timeout이 무력해지고 파이프라인 락이 웹 쓰기를 무기한 막았다.
+    출력은 파이프 대신 임시 파일로 받는다. (2026-10-21 감사 ISSUE-002)
+    """
+    popen_kwargs: dict = {}
+    if sys.platform == "win32":
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen_kwargs["start_new_session"] = True
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        proc = subprocess.Popen(
+            command,
+            shell=False,
+            stdin=subprocess.DEVNULL,
+            stdout=out,
+            stderr=err,
+            **popen_kwargs,
+        )
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _kill_process_tree(proc)
+            raise
+        out.seek(0)
+        err.seek(0)
+        return subprocess.CompletedProcess(
+            command,
+            proc.returncode,
+            out.read().decode("utf-8", errors="replace"),
+            err.read().decode("utf-8", errors="replace"),
+        )
+
+
 def parse_timeout_seconds(file_path: Path) -> int:
     size = file_path.stat().st_size
     if size > 40 * 1024 * 1024:
@@ -144,12 +207,8 @@ def enrich_image_only_markdown(file_path: Path, out_file: Path) -> bool:
     try:
         tmp_md = tmp / "extract.md"
         with safe_kordoc_target(file_path) as safe_src:
-            subprocess.run(
+            run_converter(
                 kordoc_cmd(str(safe_src), *KORDOC_PARSE_FLAGS, "-o", str(tmp_md)),
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
                 timeout=180,
             )
         images = _collect_extract_images(tmp)
@@ -165,13 +224,8 @@ def enrich_image_only_markdown(file_path: Path, out_file: Path) -> bool:
             except Exception:
                 continue
             ocr_md = tmp / f"{img.stem}.ocr.md"
-            subprocess.run(
-                kordoc_cmd(str(target), "--ocr-force", "-o", str(ocr_md)),
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=120,
+            run_converter(
+                kordoc_cmd(str(target), "--ocr-force", "-o", str(ocr_md)), timeout=120
             )
             if ocr_md.exists() and ocr_md.stat().st_size > 0:
                 part = ocr_md.read_text(encoding="utf-8", errors="replace").strip()
@@ -236,6 +290,9 @@ def parse_single_file(file_path: Path, output_dir: Path, force: bool = False):
 
     # Target output path under output_dir: centralized path calculation
     out_file, hash_file = parse_output_paths(file_path, output_dir)
+    from pipeline.parse.output import recover_parse_output
+
+    recover_parse_output(out_file, hash_file)
     out_file.parent.mkdir(parents=True, exist_ok=True)
 
     src_hash = file_hash_cache.sha256_file(file_path)
@@ -267,84 +324,111 @@ def parse_single_file(file_path: Path, output_dir: Path, force: bool = False):
                 "cached": True,
             }
 
-    timeout_sec = parse_timeout_seconds(file_path)
+    from pipeline.parse.output import parse_output_transaction
 
-    start_time = time.time()
-    try:
-        # 파일명에 `&`·`%` 등이 있으면 cmd.exe가 해석해 버린다. 안전 경로로 우회한다.
-        with kordoc_paths(file_path, out_file) as (safe_src, safe_out):
-            res = subprocess.run(
-                kordoc_cmd(str(safe_src), *KORDOC_PARSE_FLAGS, "-o", str(safe_out)),
-                shell=False,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout_sec,
-            )
-        elapsed = time.time() - start_time
-        if res.returncode == 0 and out_file.exists() and out_file.stat().st_size > 0:
-            ocr_note = None
-            if enrich_image_only_markdown(file_path, out_file):
-                ocr_note = "이미지 OCR 본문 보강"
-            _ensure_source_header(out_file, rel_path)
-            _store_hash()
-            result = {
-                "file": str(rel_path),
-                "out_file": str(out_file.relative_to(ROOT_DIR)),
-                "success": True,
-                "elapsed": elapsed,
-                "size_bytes": out_file.stat().st_size,
-            }
-            if ocr_note:
-                result["note"] = ocr_note
-            return result
+    with parse_output_transaction(out_file, hash_file) as accept_output:
+        timeout_sec = parse_timeout_seconds(file_path)
 
-        if file_path.suffix.lower() == ".xlsx":
-            ok, err = handle_large_xlsx_fallback(file_path, out_file)
-            if ok:
+        start_time = time.time()
+        try:
+            # 파일명에 `&`·`%` 등이 있으면 cmd.exe가 해석해 버린다. 안전 경로로 우회한다.
+            with kordoc_paths(file_path, out_file) as (safe_src, safe_out):
+                res = run_converter(
+                    kordoc_cmd(str(safe_src), *KORDOC_PARSE_FLAGS, "-o", str(safe_out)),
+                    timeout=timeout_sec,
+                )
+            elapsed = time.time() - start_time
+            if (
+                res.returncode == 0
+                and out_file.exists()
+                and out_file.stat().st_size > 0
+            ):
+                ocr_note = None
+                if (
+                    file_path.suffix.lower() == ".xlsx"
+                    and out_file.stat().st_size > 500 * 1024
+                ):
+                    fallback_ok, _ = handle_large_xlsx_fallback(
+                        file_path, out_file, max_rows=500, max_cols=30
+                    )
+                    if fallback_ok:
+                        ocr_note = "대형 엑셀 요약 수록(상위 500행)"
+                elif enrich_image_only_markdown(file_path, out_file):
+                    ocr_note = "이미지 OCR 본문 보강"
                 _ensure_source_header(out_file, rel_path)
                 _store_hash()
-                return {
-                    "file": str(rel_path),
-                    "out_file": str(out_file.relative_to(ROOT_DIR)),
-                    "success": True,
-                    "elapsed": time.time() - start_time,
-                    "size_bytes": out_file.stat().st_size,
-                    "note": "kordoc 실패 후 대체 파싱",
-                }
-
-        return {
-            "file": str(rel_path),
-            "out_file": str(out_file.relative_to(ROOT_DIR)),
-            "success": False,
-            "elapsed": elapsed,
-            "error": (res.stderr.strip() or res.stdout.strip() or "Empty output file")[
-                :300
-            ],
-        }
-    except Exception as e:
-        elapsed = time.time() - start_time
-        if file_path.suffix.lower() == ".xlsx":
-            ok, err = handle_large_xlsx_fallback(file_path, out_file)
-            if ok:
-                _ensure_source_header(out_file, rel_path)
-                _store_hash()
-                return {
+                accept_output()
+                result = {
                     "file": str(rel_path),
                     "out_file": str(out_file.relative_to(ROOT_DIR)),
                     "success": True,
                     "elapsed": elapsed,
                     "size_bytes": out_file.stat().st_size,
-                    "note": f"kordoc 예외 후 대체 파싱: {e}",
                 }
+                if ocr_note:
+                    result["note"] = ocr_note
+                return result
+
+            if file_path.suffix.lower() == ".xlsx":
+                ok, err = handle_large_xlsx_fallback(file_path, out_file)
+                if ok:
+                    _ensure_source_header(out_file, rel_path)
+                    _store_hash()
+                    accept_output()
+                    return {
+                        "file": str(rel_path),
+                        "out_file": str(out_file.relative_to(ROOT_DIR)),
+                        "success": True,
+                        "elapsed": time.time() - start_time,
+                        "size_bytes": out_file.stat().st_size,
+                        "note": "kordoc 실패 후 대체 파싱",
+                    }
+
+            return {
+                "file": str(rel_path),
+                "out_file": str(out_file.relative_to(ROOT_DIR)),
+                "success": False,
+                "elapsed": elapsed,
+                "error": (
+                    res.stderr.strip() or res.stdout.strip() or "Empty output file"
+                )[:300],
+            }
+        except Exception as e:
+            elapsed = time.time() - start_time
+            if file_path.suffix.lower() == ".xlsx":
+                ok, err = handle_large_xlsx_fallback(file_path, out_file)
+                if ok:
+                    _ensure_source_header(out_file, rel_path)
+                    _store_hash()
+                    accept_output()
+                    return {
+                        "file": str(rel_path),
+                        "out_file": str(out_file.relative_to(ROOT_DIR)),
+                        "success": True,
+                        "elapsed": elapsed,
+                        "size_bytes": out_file.stat().st_size,
+                        "note": f"kordoc 예외 후 대체 파싱: {e}",
+                    }
+            return {
+                "file": str(rel_path),
+                "out_file": str(out_file.relative_to(ROOT_DIR)),
+                "success": False,
+                "elapsed": elapsed,
+                "error": str(e),
+            }
+
+
+def _previous_engine_versions(report_path: Path) -> dict:
+    """지난 파싱 리포트의 문서별 kordoc 버전. 없거나 읽을 수 없으면 빈 dict."""
+    try:
+        data = json.loads(Path(report_path).read_text(encoding="utf-8"))
         return {
-            "file": str(rel_path),
-            "out_file": str(out_file.relative_to(ROOT_DIR)),
-            "success": False,
-            "elapsed": elapsed,
-            "error": str(e),
+            r["file"]: r["kordoc_version"]
+            for r in data.get("results", [])
+            if isinstance(r, dict) and r.get("file") and r.get("kordoc_version")
         }
+    except (OSError, ValueError, TypeError, KeyError):
+        return {}
 
 
 def is_data_distribution() -> bool:
@@ -500,6 +584,7 @@ def consolidate_markdown_layout(files, dry_run: bool = False):
 
 
 def main():
+    ensure_writable(OUTPUT_DIR, "파싱 출력 폴더")
     print("=" * 60)
     print("kordoc 일괄 파싱 시작 (스레드풀)")
     print(f"기준 디렉토리: {ROOT_DIR}")
@@ -556,6 +641,7 @@ def main():
         print("알림: 변환 대상 문서(HWP, HWPX, XLSX, PDF)가 없습니다.")
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         report_path = SYSTEM_DIR / "parsing_report.json"
+        ensure_writable(report_path, "파싱 리포트")
         with open(report_path, "w", encoding="utf-8") as fp:
             json.dump(
                 {
@@ -596,7 +682,7 @@ def main():
     elif not (shutil.which("kordoc.cmd") or shutil.which("kordoc")):
         converter_problem = (
             "KorDoc AI 변환기(kordoc.cmd)를 PATH에서 찾을 수 없습니다. "
-            "KorDoc.AI MSI를 설치한 뒤 다시 실행하세요. (kordoc_파싱_및_설치_가이드.md 참고)",
+            "KorDoc.AI를 설치한 뒤 다시 실행하세요. (kordoc_파싱_및_설치_가이드.md 참고)",
             "필수 구성요소 없음",
         )
     else:
@@ -633,7 +719,20 @@ def main():
 
     max_workers = 4
     print(f"동시 처리 프로세스 수: {max_workers}")
+    print(f"kordoc 엔진 경로: {KORDOC_CMD}")
+    engine_version = ""
+    try:
+        ver_res = run_converter(kordoc_cmd("--version"), timeout=30)
+        if ver_res.returncode == 0 and ver_res.stdout.strip():
+            engine_version = ver_res.stdout.strip().splitlines()[-1].strip()
+            # 캐시(원문 해시 동일)로 건너뛴 문서는 예전 엔진 결과 그대로다. 새 엔진은 새로·바뀐 문서에만 쓰인다.
+            print(
+                f"kordoc 엔진 버전: {engine_version} (새로 변환하는 문서에 적용, 기존 결과는 --force로 다시 변환)"
+            )
+    except Exception:
+        pass
     print(f"kordoc 옵션: {' '.join(KORDOC_PARSE_FLAGS)}")
+    previous_engines = _previous_engine_versions(SYSTEM_DIR / "parsing_report.json")
     print("-" * 60)
 
     cached_count = 0
@@ -647,6 +746,15 @@ def main():
         for future in as_completed(future_to_file):
             idx += 1
             res = future.result()
+            # 문서마다 어떤 엔진으로 변환했는지 남긴다. 캐시 적중 문서는 이전 기록을 물려받는다.
+            if res.get("success"):
+                if res.get("cached"):
+                    if previous_engines.get(res.get("file")):
+                        res["kordoc_version"] = previous_engines[res["file"]]
+                elif engine_version and not str(res.get("note", "")).startswith(
+                    "kordoc"
+                ):
+                    res["kordoc_version"] = engine_version
             results.append(res)
 
             if res["success"]:
@@ -681,6 +789,7 @@ def main():
     print("=" * 60)
 
     report_path = SYSTEM_DIR / "parsing_report.json"
+    ensure_writable(report_path, "파싱 리포트")
     with open(report_path, "w", encoding="utf-8") as fp:
         json.dump(
             {
@@ -688,6 +797,8 @@ def main():
                 "success_count": success_count,
                 "fail_count": fail_count,
                 "total_time_seconds": total_time,
+                "kordoc_version": engine_version,
+                "kordoc_flags": KORDOC_PARSE_FLAGS,
                 "results": results,
             },
             fp,

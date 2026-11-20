@@ -144,26 +144,19 @@ class GetRoutesMixin(_HostBase_GetRoutesMixin):  # pyright: ignore[reportGeneral
 
         if path == "/api/db/health":
             # 무결성 점검(제안서 D2). 인덱스가 본체와 어긋나도 증상은 '검색이 좀 이상하다'
-            # 뿐이라, 물어볼 수 있게 해 둔다.
+            # 뿐이라, 물어볼 수 있게 해 둔다. 수백 MB를 훑으므로 다른 사이트가 부르지 못하게 한다.
+            if self.reject_cross_site_request():
+                return
             from db.health import check_database
 
             self.send_json_response(check_database(ws.DB_PATH))
             return
 
         if path in ("/api/open", "/api/open_explorer"):
-            query = parse_qs(parsed.query)
-            req_file = query.get("path", [""])[0]
-            mode = query.get("mode", ["explorer"])[0]
-            ok, target, err = self.resolve_download_target(req_file)
-            if not ok or target is None:
-                self.send_error_response(403 if "거부" in (err or "") else 400, err)
-                return
-            if not target.exists() or not target.is_file():
-                self.send_error_response(404, f"파일을 찾을 수 없습니다: {req_file}")
-                return
-
-            res = self.open_in_system(target, mode=mode)
-            self.send_json_response(res)
+            # 탐색기·기본 앱을 띄우는 부작용 요청이라 GET으로 받지 않는다. GET은 `<img src>`
+            # 하나로 다른 사이트가 보낼 수 있다. POST(JSON)만 출처를 검사한 뒤 처리한다.
+            # (2026-10-21 감사 ISSUE-003)
+            self.send_error_response(405, "파일 열기는 POST 요청으로만 할 수 있습니다.")
             return
 
         if path in ("/api/file", "/api/download") or path.startswith(
@@ -194,6 +187,13 @@ class GetRoutesMixin(_HostBase_GetRoutesMixin):  # pyright: ignore[reportGeneral
                 ".json": "application/json; charset=utf-8",
                 ".txt": "text/plain; charset=utf-8",
                 ".csv": "text/csv; charset=utf-8",
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".gif": "image/gif",
+                ".webp": "image/webp",
+                ".svg": "image/svg+xml",
+                ".bmp": "image/bmp",
             }
             content_type = mime_map.get(ext, "application/octet-stream")
 

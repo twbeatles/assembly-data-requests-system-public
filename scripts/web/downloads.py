@@ -27,7 +27,11 @@ def resolve_download_target(req_file: str):
         return False, None, "접근이 거부된 파일 경로입니다."
     cfg_excludes = set(system_config.get_config(ws.BASE_DIR).get("exclude_dirs") or [])
     for part in Path(clean_rel).parts[:-1]:
-        if part in cfg_excludes or part.startswith(".") or part.startswith("★"):
+        if (
+            part in cfg_excludes
+            or part.startswith(".")
+            or (not clean_rel.startswith("_parsed_markdown") and part.startswith("★"))
+        ):
             return False, None, "접근이 거부된 파일 경로입니다."
     ext = Path(clean_rel).suffix.lower()
     if ext in ws.DOWNLOAD_DENIED_EXTS or ext not in ws.DOWNLOAD_ALLOWED_EXTS:
@@ -80,9 +84,9 @@ def open_in_system(target: Path, mode: str = "explorer") -> dict:
         except Exception as e:
             return {"success": False, "error": f"탐색기 실행 실패: {str(e)}"}
     else:
-        # 비Windows 환경(테스트 등):
         return {
-            "success": True,
-            "message": f"[시뮬레이션] 파일 위치를 열었습니다: {target_abs}",
+            "success": False,
+            "code": "unsupported_platform",
+            "error": "파일 위치 열기는 Windows에서만 지원됩니다.",
             "path": target_abs,
         }

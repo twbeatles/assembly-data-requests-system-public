@@ -129,7 +129,7 @@ console.log(JSON.stringify({
 @needs_node
 def test_card_preview_strips_markdown_only_for_preview():
     res = run_node(
-        ["cardPreviewText"],
+        ["cleanSnippetText", "cardPreviewText"],
         r"""
 const md = '<!-- source: a.hwp -->\n# 답변서\n\n## 1. 현황\n\n| 연도 | 건수 |\n| --- | --- |\n| 2024 | **10** |\n';
 console.log(JSON.stringify({ out: cardPreviewText(md), same: md.includes('| --- |') }));

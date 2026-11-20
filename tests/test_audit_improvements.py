@@ -117,18 +117,16 @@ class TestAuditImprovements(unittest.TestCase):
         security_code = (SCRIPTS_DIR / "web" / "security.py").read_text(
             encoding="utf-8"
         )
-        self.assertRegex(server_code, r"server_address\s*=\s*\(['\"]127\.0\.0\.1['\"]\s*,\s*p\)")
+        self.assertRegex(
+            server_code, r"server_address\s*=\s*\(['\"\"]127\.0\.0\.1['\"]\s*,\s*p\)"
+        )
         self.assertNotIn("server_address = ('', port)", server_code)
         self.assertNotIn('server_address = ("", port)', server_code)
         self.assertIn("http://127.0.0.1:", security_code)
 
-    def test_5_web_server_concurrency_protection(self):
-        """Audit Item 5: Verify POST /api/sync concurrency protection."""
-        server_code = (SCRIPTS_DIR / "web_server.py").read_text(encoding="utf-8")
-        self.assertIn("SYNC_LOCK", server_code)
-        self.assertIn("IS_SYNCING", server_code)
-        self.assertIn("409", server_code)
-        self.assertIn("JSON_LOCK", server_code)
+    # POST /api/sync concurrency and completion are exercised over actual HTTP
+    # and a child process in test_http_storage_workflows.py. Source token
+    # presence could pass even when the request started two pipelines.
 
     def test_6_parse_all_uses_safe_subprocess(self):
         """Audit Item 6: Verify parse_all uses shell=False."""

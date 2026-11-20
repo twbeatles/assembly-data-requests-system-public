@@ -13,6 +13,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 from pipeline_guard import PipelineGuard
+from storage_activity import guarded_write
 from write_guard import ProductionWriteBlocked, ensure_writable
 
 try:
@@ -51,6 +52,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         if not operations:
             return True
         with self._pending_lock:
+            self._refresh_pending_queue()
             known = {op.get("operation_id") for op in self._pending_queue}
             self._pending_queue.extend(
                 op for op in operations if op["operation_id"] not in known
@@ -61,9 +63,11 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         return True
 
     def _sync_durable_operation(self, operation_id):
-        self.flush_pending_queue()
+        applied_ids = set()
+        self.flush_pending_queue(applied_operation_ids=applied_ids)
         operations = self._outbox_operations()
         with self._pending_lock:
+            self._refresh_pending_queue()
             operations += list(self._pending_queue)
         pending = any(op.get("operation_id") == operation_id for op in operations)
         failed = any(
@@ -77,8 +81,9 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
                 "pending": False,
                 "message": "엑셀에서 해당 행을 찾지 못해 DB 삭제만 반영했습니다.",
             }
+        synced = operation_id in applied_ids and not pending and not failed
         return {
-            "excel_synced": not pending and not failed,
+            "excel_synced": synced,
             "pending": pending,
             "quarantined": failed,
             "message": (
@@ -87,20 +92,32 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
                 else "DB 저장 완료. 엑셀 행은 덮어쓰지 않았습니다. 반영 작업이 격리되어 동기화 배너에서 확인이 필요합니다."
                 if failed
                 else "엑셀 반영 완료."
+                if synced
+                else "DB 저장 완료. 엑셀 반영 결과를 확인하지 못했습니다. 목록과 엑셀을 확인해 주세요."
             ),
         }
 
     def _pending_path(self) -> Path:
         return self.base_dir / ".excel_pending_queue.json"
 
+    def _queue_file_signature(self):
+        try:
+            stat = self._pending_path().stat()
+        except OSError:
+            return None
+        return (stat.st_mtime_ns, stat.st_size)
+
     def _load_pending_queue(self):
         p = self._pending_path()
+        self._queue_signature = self._queue_file_signature()
         if not p.exists():
+            self._persisted_operation_ids = set()
             return
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
         except Exception as e:
             self._pending_queue = []
+            self._persisted_operation_ids = set()
             self._handle_corrupt_queue(p, e)
             return
         if isinstance(data, list):
@@ -110,6 +127,31 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             self._handle_corrupt_queue(
                 p, ValueError("최상위 값이 목록([ ])이 아닙니다")
             )
+        self._persisted_operation_ids = {
+            op.get("operation_id") for op in self._pending_queue
+        }
+
+    def _refresh_pending_queue(self):
+        """다른 프로세스가 큐 파일을 바꿨으면 디스크 내용을 정본으로 다시 읽는다.
+
+        큐 파일은 00번·"새 문서 반영" 파이프라인 프로세스도 flush한다. 메모리 목록만 믿으면
+        그 프로세스가 이미 엑셀에 반영한 작업을 다시 적용하고, 다음 저장에서 파일에 되살린다.
+        한 번도 저장하지 못한 이 프로세스의 작업만 메모리에서 이어 붙인다. `_pending_lock`을
+        쥔 상태에서 부른다. (2026-10-21 감사 ISSUE-001)
+        """
+        if self._queue_file_signature() == getattr(self, "_queue_signature", None):
+            return
+        unsaved = [
+            op
+            for op in self._pending_queue
+            if op.get("operation_id")
+            not in getattr(self, "_persisted_operation_ids", set())
+        ]
+        self._load_pending_queue()
+        known = {op.get("operation_id") for op in self._pending_queue}
+        self._pending_queue.extend(
+            op for op in unsaved if op.get("operation_id") not in known
+        )
 
     def _handle_corrupt_queue(self, path: Path, error: Exception):
         """깨진 보류 큐를 보존하고 알린다.
@@ -158,6 +200,10 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
                 json.dumps(self._pending_queue, ensure_ascii=False), encoding="utf-8"
             )
             os.replace(tmp, p)
+            self._queue_signature = self._queue_file_signature()
+            self._persisted_operation_ids = {
+                op.get("operation_id") for op in self._pending_queue
+            }
             return True
         except Exception as e:
             print(f"[엑셀 동기화 큐 경고] 보류 큐 저장 실패 ({p}): {e}")
@@ -178,6 +224,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         }
 
     def _enqueue_pending(self, item: Dict[str, Any], action: str) -> bool:
+        self._refresh_pending_queue()
         self._pending_queue.append(self._new_operation(item, action))
         return self._save_pending_queue()
 
@@ -212,6 +259,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
     def _pending_ledger_ids(self) -> set:
         """보류 큐에 남아 있는 ledger_id 집합. Excel에 아직 없는 웹 변경을 보호한다."""
         with self._pending_lock:
+            self._refresh_pending_queue()
             ids = {
                 str((op.get("item") or {}).get("ledger_id") or "").strip()
                 for op in self._pending_queue
@@ -247,6 +295,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         등록·삭제·필드 정보가 없는 과거 작업은 행 전체를 보호한다.
         """
         with self._pending_lock:
+            self._refresh_pending_queue()
             operations = list(self._pending_queue)
         operations += self._outbox_operations()
         operations += [
@@ -279,10 +328,12 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
     def pending_count(self) -> int:
         """보류 큐에 남은 엑셀 반영 작업 수. 상태 API/UI 노출용."""
         with self._pending_lock:
+            self._refresh_pending_queue()
             ids = {op.get("operation_id") for op in self._pending_queue}
         ids.update(op.get("operation_id") for op in self._outbox_operations())
         return len(ids)
 
+    @guarded_write("count")
     def ensure_ledger_ids(self) -> int:
         """마스터 엑셀을 찾아 `대장ID`를 고정한다. 파이프라인 등 외부 호출용."""
         master_excel = self.find_master_excel()
@@ -403,15 +454,22 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             if conn:
                 conn.close()
 
-    def flush_pending_queue(self) -> int:
+    @guarded_write("count")
+    def flush_pending_queue(
+        self, *, applied_operation_ids: Optional[set] = None
+    ) -> int:
         with self._flush_lock:
             if self._pipeline_block():
                 return 0
             if not self._recover_outbox():
                 return 0
-            return self._flush_pending_queue_locked()
+            return self._flush_pending_queue_locked(
+                applied_operation_ids=applied_operation_ids
+            )
 
-    def _flush_pending_queue_locked(self) -> int:
+    def _flush_pending_queue_locked(
+        self, *, applied_operation_ids: Optional[set] = None
+    ) -> int:
         """Flushes any pending operations waiting on an Excel file lock.
 
         락 규칙: `_pending_lock`은 큐 자료구조만 보호하고, 워크북 쓰기는 `self.lock`
@@ -427,6 +485,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             return 0
 
         with self._pending_lock:
+            self._refresh_pending_queue()
             if not self._pending_queue:
                 return 0
             queue_snapshot = list(self._pending_queue)
@@ -474,6 +533,10 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
                 if ok:
                     applied += 1
                     applied_ids.add(op.get("operation_id"))
+                    # Report only workbook writes observed in this delivery call.
+                    # Absence from outbox/pending alone is not an application receipt.
+                    if applied_operation_ids is not None:
+                        applied_operation_ids.add(op.get("operation_id"))
                     self._record_history(
                         str(item.get("ledger_id") or ""), "EXCEL_APPLIED", item
                     )
@@ -513,6 +576,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
         if not applied_ids and not deferred and not conflicts:
             return
         with self._pending_lock:
+            self._refresh_pending_queue()
             expired = [
                 op
                 for op in self._pending_queue
@@ -647,6 +711,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
                 return op, operations[:idx] + operations[idx + 1 :]
         return None, operations
 
+    @guarded_write()
     def retry_quarantined(self, operation_id: str) -> Dict[str, Any]:
         """격리 작업을 보류 큐로 되돌린다(시도 횟수 초기화). 반영은 다음 flush에서 한다.
 
@@ -664,6 +729,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             }
             revived["attempts"] = 0
             with self._pending_lock:
+                self._refresh_pending_queue()
                 self._pending_queue.append(revived)
                 if not self._save_pending_queue():
                     self._pending_queue.remove(revived)
@@ -679,6 +745,7 @@ class PendingQueueMixin(_HostBase_PendingQueueMixin):  # pyright: ignore[reportG
             "message": "보류 큐로 되돌렸습니다. 마스터 엑셀이 닫혀 있으면 곧 반영됩니다.",
         }
 
+    @guarded_write()
     def dismiss_quarantined(self, operation_id: str) -> Dict[str, Any]:
         """격리 작업을 버린다. 재시도 한도 초과 작업이면 그 필드의 DB 보호도 함께 풀린다."""
         with self._failed_lock:

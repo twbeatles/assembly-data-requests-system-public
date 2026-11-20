@@ -3,6 +3,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="img-src 'self' data:; object-src 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>__PAGE_TITLE__</title>
 <!-- __DASHBOARD_CSS__ -->
@@ -93,9 +94,8 @@
     <div class="search-row">
       <div class="search-input-wrapper">
         <span class="search-icon" id="search-icon" aria-hidden="true">🔍</span>
-        <input type="text" id="search-input" list="recent-searches" autocomplete="off" aria-label="통합 검색어" placeholder="제목·본문·의원명으로 검색 (Ctrl+K)">
+        <input type="text" id="search-input" autocomplete="off" aria-label="통합 검색어" placeholder="제목·본문·의원명으로 검색 (Ctrl+K)" enterkeyhint="search">
         <button type="button" class="search-clear" id="search-clear" onclick="clearOneFilter('query')" aria-label="검색어 지우기" title="검색어 지우기" hidden>&times;</button>
-        <datalist id="recent-searches"></datalist>
       </div>
       <button class="btn btn-secondary" id="btn-export" title="지금 목록에 보이는 결과를 엑셀에서 열 수 있는 CSV 파일로 저장합니다">목록 내려받기 (CSV)</button>
       <a href="국회_대외기관_자료요구_통합DB.xlsx" id="link-excel-db" class="btn btn-secondary" download title="전체 자료가 정리된 엑셀 파일을 엽니다">엑셀 파일 열기</a>
@@ -104,6 +104,8 @@
       <span id="search-spinner" class="search-spinner" style="display:none;" role="status">검색 중…</span>
       <span id="search-scope-hint" class="search-scope-hint" style="display:none;"></span>
     </div>
+    <!-- 최근 검색어: 검색창이 비어 있을 때 한 번 눌러 다시 찾는다(이 브라우저에만 저장). -->
+    <div class="recent-chips" id="recent-chips" role="group" aria-label="최근 검색어" hidden></div>
     <div class="grammar-chips" id="grammar-chips" aria-label="검색 방법 바로 넣기">
       <span class="grammar-label">검색 팁</span>
       <button type="button" class="g-chip" data-insert=" OR " title="둘 중 하나라도 들어간 자료">A 또는 B</button>
@@ -112,7 +114,7 @@
       <button type="button" class="g-chip" data-insert="요구자:" title="이 사람이 요구한 자료만 (예: 요구자:홍길동)">요구자로</button>
       <button type="button" class="g-chip" data-insert="기간:" title="요구일 기간으로 거르기 (예: 기간:2025-01..2025-06)">기간으로</button>
       <button type="button" class="g-chip" data-jump="search-help" title="검색 방법 전체 보기">검색 방법 더 보기</button>
-      <label class="option-check" title="‘과기부’로 찾으면 ‘과학기술정보통신부’도, ‘트위터’로 찾으면 ‘엑스’도 함께 찾습니다">
+      <label class="option-check" title="‘트위터’로 찾으면 ‘엑스’도, ‘심의위’로 찾으면 ‘대외심의위원회’도 함께 찾습니다">
         <input type="checkbox" id="chk-synonyms" checked> 비슷한 말도 함께 찾기
       </label>
     </div>
@@ -145,7 +147,7 @@
         <div class="filter-chips" id="inst-chips">
           <span class="chip active" data-filter="inst" data-val="ALL">전체</span>
           <span class="chip" data-filter="inst" data-val="국회">국회</span>
-          <span class="chip" data-filter="inst" data-val="상급감독기관">상급감독기관/대외기관</span>
+          <span class="chip" data-filter="inst" data-val="대외기관">대외기관</span>
           <span class="chip" data-filter="inst" data-val="국회입법조사처">입법조사처</span>
         </div>
       </div>
@@ -219,6 +221,7 @@
       <div class="active-chips" id="active-filter-chips" aria-live="polite"></div>
     </div>
     <div class="results-tools">
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-search-link" onclick="copySearchLink()" title="지금 검색어·탭을 그대로 다시 여는 주소를 복사합니다 (같은 화면 파일을 쓰는 동료와 공유)" hidden>검색 링크 복사</button>
       <label class="option-check" id="select-all-wrap">
         <input type="checkbox" id="chk-select-all" onchange="toggleSelectAll(this.checked)"> 전체 선택
       </label>
@@ -245,6 +248,7 @@
     <h3>조건에 맞는 자료가 없습니다</h3>
     <div id="empty-state-reason"></div>
     <ul id="empty-state-hints"></ul>
+    <div class="empty-jumps" id="empty-state-jumps"></div>
     <div class="empty-actions">
       <button type="button" class="btn btn-secondary" id="empty-clear-filters" onclick="clearAllFilters()">검색어·필터 모두 지우기</button>
     </div>
@@ -670,12 +674,11 @@
       <button class="modal-tab-btn" data-tab="qa" onclick="switchModalTab('qa')">질문별로 보기</button>
       <button class="modal-tab-btn" data-tab="text" onclick="switchModalTab('text')">글자만 보기</button>
       <span class="modal-tabs-spacer"></span>
-      <span class="hit-nav" id="hit-nav" role="group" aria-label="검색어 위치 이동" hidden>
-        <span class="hit-nav-label">검색어</span>
-        <button type="button" class="hit-nav-btn" id="hit-prev" onclick="gotoSearchHit(-1)" title="앞 검색어로 (Shift+F3)" aria-label="앞 검색어로">▲</button>
-        <span class="hit-pos" id="hit-pos" aria-live="polite">0/0</span>
-        <button type="button" class="hit-nav-btn" id="hit-next" onclick="gotoSearchHit(1)" title="다음 검색어로 (F3)" aria-label="다음 검색어로">▼</button>
-      </span>
+      <div class="hit-nav" id="hit-nav" role="group" aria-label="본문에서 검색어 위치 이동" hidden>
+        <span class="hit-nav-label" id="hit-nav-label" aria-live="polite"></span>
+        <button type="button" class="hit-nav-btn" id="hit-nav-prev" onclick="gotoModalHit(-1)" title="이전 검색어 위치 (Shift+F3)" aria-label="이전 검색어 위치">▲</button>
+        <button type="button" class="hit-nav-btn" id="hit-nav-next" onclick="gotoModalHit(1)" title="다음 검색어 위치 (F3)" aria-label="다음 검색어 위치">▼</button>
+      </div>
       <button class="modal-tab-action" onclick="openComparePicker()" title="다른 답변서와 나란히 놓고 비교합니다">다른 답변서와 비교</button>
     </div>
 

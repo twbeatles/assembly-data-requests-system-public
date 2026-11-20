@@ -19,7 +19,7 @@ import sqlite3
 
 from . import fts_spec
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class SchemaTooNewError(RuntimeError):
@@ -88,7 +88,15 @@ def _migrate_to_3(conn):
     return ["대장 엑셀 재시도·등록 멱등성 저장소"]
 
 
+def _migrate_to_4(conn):
+    from .revision import ensure_revision
+
+    ensure_revision(conn)
+    return ["내용 revision 및 재빌드 식별자 추가"]
+
+
 MIGRATIONS = {
+    4: ("교체 방식과 독립적인 데이터셋 버전", _migrate_to_4),
     3: ("대장 변경의 내구성 보장", _migrate_to_3),
     2: ("FTS 정본 컬럼 전환 및 대장 이력 필드 확장", _migrate_to_2),
 }

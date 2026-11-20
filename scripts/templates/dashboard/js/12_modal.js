@@ -1,3 +1,25 @@
+function fixDocMediaPaths(md, doc) {
+  if (!md || !doc || !doc.parsed_md_path) return md || '';
+  const rel = String(doc.parsed_md_path).replace(/\\/g, '/').replace(/^\/+/, '');
+  const lastSlash = rel.lastIndexOf('/');
+  const baseDir = lastSlash !== -1 ? rel.slice(0, lastSlash) : '';
+  if (!baseDir) return md;
+
+  return String(md)
+    .replace(/!\[([^\]]*)\]\((?!https?:\/\/|data:|\/)([^)]+)\)/g, (match, alt, rawSrc) => {
+      const src = String(rawSrc || '').trim().replace(/\\/g, '/');
+      if (src.startsWith('_parsed_markdown/') || src.startsWith(baseDir + '/')) return match;
+      const cleanSrc = src.replace(/^\.\//, '');
+      return `![${alt}](${baseDir}/${cleanSrc})`;
+    })
+    .replace(/<img\b([^>]*?)\bsrc=["'](?!https?:\/\/|data:|\/)([^"']+)["']([^>]*?)>/gi, (match, p1, rawSrc, p2) => {
+      const src = String(rawSrc || '').trim().replace(/\\/g, '/');
+      if (src.startsWith('_parsed_markdown/') || src.startsWith(baseDir + '/')) return match;
+      const cleanSrc = src.replace(/^\.\//, '');
+      return `<img${p1}src="${baseDir}/${cleanSrc}"${p2}>`;
+    });
+}
+
 function docDisplayBody(doc) {
   // 전문 보존: 모달·인쇄·비교는 full_markdown 전체를 쓴다. 요약/엑셀 잘림본으로 대체하지 않는다.
   return (doc && (doc.full_markdown || doc.answer_full_text)) || '';
@@ -111,7 +133,7 @@ async function openDocModal(doc, targetQNum = null) {
   // 1. Markdown & Tables Rendering with marked.js
   const formattedContainer = document.getElementById('modal-view-formatted');
   try {
-    let parsedHtml = safeMarkedParse(displayBody);
+    let parsedHtml = safeMarkedParse(fixDocMediaPaths(displayBody, doc));
     formattedContainer.innerHTML = incompleteBanner + parsedHtml;
 
     enhanceTablesInElement(formattedContainer);
@@ -139,12 +161,12 @@ async function openDocModal(doc, targetQNum = null) {
       const rawContent = q.answer_markdown || q.answer_full || '';
       let qHtml = '';
       try {
-        qHtml = safeMarkedParse(rawContent);
+        qHtml = safeMarkedParse(fixDocMediaPaths(rawContent, doc));
       } catch (e) {
         qHtml = '<pre>' + escapeHtml(rawContent) + '</pre>';
       }
 
-      const hasTbl = q.has_tables === 'Y' || rawContent.includes('<table') || rawContent.includes('| --- |');
+      const hasTbl = q.has_tables === 'Y' || rawContent.includes('<table') || /\|[\s:\-]+\|[\s:\-]+\|/.test(rawContent);
 
       qBox.innerHTML = `
         <div class="qa-head">
@@ -185,8 +207,6 @@ async function openDocModal(doc, targetQNum = null) {
     }, 150);
   } else {
     switchModalTab('formatted');
-    // 검색해서 연 답변서면 첫 검색어 자리를 바로 보여 준다.
-    if (highlightTokens.length) refreshSearchHits(true);
   }
 
   const isWebMode = window.location.protocol.startsWith('http');
@@ -236,7 +256,8 @@ function setupModalCopyButtons(doc) {
 
   // 2. Official Korean Doc Format (□ ○ -)
   document.getElementById('btn-copy-gov').onclick = () => {
-    const govText = `□ [${doc.requester}] ${doc.title}\n  ○ 질의내용:\n${(doc.question_list || '').split('\n').map(l => '    - ' + l).join('\n')}\n\n  ○ 답변내용:\n${(doc.answer_summary || doc.full_markdown || doc.answer_full_text || '').slice(0, 800)}\n\n  * 담당: ${doc.contact_person || doc.department || appConfig.department_name || '__DEFAULT_DEPT__'}`;
+    const ansText = doc.answer_summary || cleanSnippetText(doc.full_markdown || doc.answer_full_text || '', 800);
+    const govText = `□ [${doc.requester}] ${doc.title}\n  ○ 질의내용:\n${(doc.question_list || '').split('\n').map(l => '    - ' + l).join('\n')}\n\n  ○ 답변내용:\n${ansText.slice(0, 800)}\n\n  * 담당: ${doc.contact_person || doc.department || appConfig.department_name || '__DEFAULT_DEPT__'}`;
     copyText(govText, '보고용 개조식(□ ○ -)으로 복사했습니다.');
   };
 
@@ -248,7 +269,7 @@ function setupModalCopyButtons(doc) {
       notify('이 답변서에는 표가 없습니다.');
       return;
     }
-    const htmlToCopy = Array.from(tables).map(t => t.outerHTML).join('<br><br>');
+    const htmlToCopy = Array.from(tables).map(t => t.outerHTML.replace(/<mark class="highlight">([\s\S]*?)<\/mark>/gi, '$1')).join('<br><br>');
     const plainToCopy = Array.from(tables).map(t => t.innerText).join('\n\n');
 
     if (navigator.clipboard && window.ClipboardItem) {
@@ -294,7 +315,7 @@ function copyQaTable(qIdx) {
     notify('이 질문에는 복사할 표가 없습니다.');
     return;
   }
-  const htmlToCopy = Array.from(tables).map(t => t.outerHTML).join('<br><br>');
+  const htmlToCopy = Array.from(tables).map(t => t.outerHTML.replace(/<mark class="highlight">([\s\S]*?)<\/mark>/gi, '$1')).join('<br><br>');
   const plainToCopy = Array.from(tables).map(t => t.innerText).join('\n\n');
 
   if (navigator.clipboard && window.ClipboardItem) {
@@ -326,50 +347,6 @@ function switchModalTab(tab) {
   document.getElementById('modal-view-formatted').style.display = tab === 'formatted' ? 'block' : 'none';
   document.getElementById('modal-view-text').style.display = tab === 'text' ? 'block' : 'none';
   document.getElementById('modal-view-qa').style.display = tab === 'qa' ? 'block' : 'none';
-  refreshSearchHits(false);
-}
-
-// ---------------------------------------------------------------------------
-// 열린 답변서 안에서 검색어 위치로 옮겨 다닌다(▲/▼, F3/Shift+F3). 수십 쪽짜리 답변서에서
-// 검색어가 어디 있는지 스크롤로 찾지 않아도 된다. 강조(mark.highlight)가 있는 보기에서만 뜬다.
-// ---------------------------------------------------------------------------
-let SEARCH_HITS = [];
-let SEARCH_HIT_IDX = -1;
-
-function visibleModalView() {
-  for (const id of ['modal-view-formatted', 'modal-view-qa']) {
-    const el = document.getElementById(id);
-    if (el && el.style.display !== 'none') return el;
-  }
-  return null;
-}
-
-function updateSearchHitPos() {
-  const pos = document.getElementById('hit-pos');
-  if (pos) pos.textContent = SEARCH_HITS.length ? `${Math.max(SEARCH_HIT_IDX + 1, 0)}/${SEARCH_HITS.length}` : '0/0';
-}
-
-function refreshSearchHits(autoJump) {
-  SEARCH_HITS.forEach(m => m.classList.remove('hit-current'));
-  const view = visibleModalView();
-  SEARCH_HITS = view ? Array.from(view.querySelectorAll('mark.highlight')) : [];
-  SEARCH_HIT_IDX = -1;
-  const nav = document.getElementById('hit-nav');
-  if (nav) nav.hidden = !SEARCH_HITS.length;
-  updateSearchHitPos();
-  if (autoJump && SEARCH_HITS.length) gotoSearchHit(1, true);
-}
-
-function gotoSearchHit(delta, gentle) {
-  if (!SEARCH_HITS.length) return;
-  const n = SEARCH_HITS.length;
-  if (SEARCH_HITS[SEARCH_HIT_IDX]) SEARCH_HITS[SEARCH_HIT_IDX].classList.remove('hit-current');
-  SEARCH_HIT_IDX = SEARCH_HIT_IDX < 0 ? (delta > 0 ? 0 : n - 1) : (SEARCH_HIT_IDX + delta + n) % n;
-  const el = SEARCH_HITS[SEARCH_HIT_IDX];
-  el.classList.add('hit-current');
-  // 처음 열 때는 이미 보이는 자리면 화면을 움직이지 않는다. 직접 누르면 가운데로 가져온다.
-  try { el.scrollIntoView({ block: gentle ? 'nearest' : 'center' }); } catch (e) { el.scrollIntoView(); }
-  updateSearchHitPos();
 }
 
 function closeModal() {
@@ -404,9 +381,13 @@ function openComparePicker() {
       <h3>${escapeHtml(currentSelectedDoc.title)}</h3>
       <div class="sub">${escapeHtml(currentSelectedDoc.requester)} · ${escapeHtml(currentSelectedDoc.request_date || currentSelectedDoc.year)}</div>
     </div>
-    <div class="modal-rendered-view">${safeMarkedParse(docDisplayBody(currentSelectedDoc))}</div>
+    <div class="modal-rendered-view">${safeMarkedParse(fixDocMediaPaths(docDisplayBody(currentSelectedDoc), currentSelectedDoc))}</div>
   `;
 
+  enhanceTablesInElement(leftPane);
+  if (typeof highlightTokens !== 'undefined' && highlightTokens.length) {
+    applyDomHighlight(leftPane, highlightTokens);
+  }
   updateCompareRightPane();
   document.getElementById('compare-backdrop').classList.add('open');
 }
@@ -427,8 +408,12 @@ async function updateCompareRightPane() {
       <h3>${escapeHtml(docB.title)}</h3>
       <div class="sub">${escapeHtml(docB.requester)} · ${escapeHtml(docB.request_date || docB.year)}</div>
     </div>
-    <div class="modal-rendered-view">${safeMarkedParse(docDisplayBody(docB))}</div>
+    <div class="modal-rendered-view">${safeMarkedParse(fixDocMediaPaths(docDisplayBody(docB), docB))}</div>
   `;
+  enhanceTablesInElement(rightPane);
+  if (typeof highlightTokens !== 'undefined' && highlightTokens.length) {
+    applyDomHighlight(rightPane, highlightTokens);
+  }
 }
 
 function gotoLinkedLedgerFromDoc() {

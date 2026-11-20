@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple  # noqa: F401 # snapshot public surface (refactor-split contract)
+from typing import Any, Dict, Optional, Tuple, cast  # noqa: F401 # snapshot public surface (refactor-split contract)
 
 from db.ledger_outbox import enqueue as enqueue_excel
 
@@ -34,6 +34,7 @@ from search_query import (
     score_row,
     strip_particle,
 )
+from storage_activity import StorageBusyError, guarded_write, storage_activity
 from write_guard import ensure_writable
 
 from services.ledger.autolink import auto_link_ledger_to_doc
@@ -44,6 +45,13 @@ from services.ledger.ids import (
     _clean,
     next_ledger_id,
     row_fingerprint,
+)
+
+TOMBSTONE_STATUS = "[삭제]"
+# `[삭제]`는 삭제 경로가 DELETE 이력 스냅숏과 함께 남기는 tombstone이다. 등록·수정으로 직접
+# 넣으면 스냅숏이 없어 되살릴 수 없고 엑셀 행만 삭제 표시가 된다. (2026-10-21 감사)
+TOMBSTONE_STATUS_ERROR = (
+    "진행상태 '[삭제]'는 직접 입력할 수 없습니다. 삭제 기능을 사용하세요."
 )
 
 
@@ -110,6 +118,7 @@ class LedgerService:
         base_dir: Optional[Path] = None,
         read_only: bool = False,
         immutable: bool = False,
+        read_connection=None,
     ):
         # base_dir를 생략하면 DB가 있는 폴더를 쓴다. 예전에는 운영 폴더가 기본값이라,
         # DB만 임시 파일로 바꾼 테스트가 운영 마스터 엑셀·보류 큐에 썼다. (감사 R3-01)
@@ -130,8 +139,13 @@ class LedgerService:
         # (감사 ISSUE-002)
         self._read_only = bool(read_only)
         self._immutable = bool(immutable)
+        self._read_connection = read_connection
 
     def get_conn(self, readonly: bool = False) -> sqlite3.Connection:
+        if self._read_only and self._read_connection is not None:
+            from db.connections import BorrowedConnection
+
+            return cast(sqlite3.Connection, BorrowedConnection(self._read_connection))
         # 검색 경로는 읽기 전용으로 연다(제안서 D9). DB가 아직 없으면 mode=ro가 실패하므로
         # 그때는 평소대로 연다. 스키마 준비가 먼저 돌면서 파일을 만든다.
         # read_only 서비스에서는 쓰기 연결을 절대 열지 않는다. 호출자가 스키마를 먼저
@@ -181,6 +195,10 @@ class LedgerService:
         """
         if self._read_only:
             return
+        return self._prepare_schema()
+
+    @guarded_write("raise")
+    def _prepare_schema(self):
         from db.database_manager import DatabaseManager
 
         key = str(Path(self.db_path).resolve())
@@ -211,10 +229,12 @@ class LedgerService:
         100MB를 넘을 수 있어, 대장 수정마다 스레드를 새로 띄우면 같은 파일을 줄지어
         다시 쓰게 된다. (감사 R3-16)
         """
+        if self._read_only:
+            raise RuntimeError("읽기 전용 서비스에서는 출력 파일을 쓸 수 없습니다.")
         global LAST_SYNC_THREAD
 
         def _do_sync():
-            with JSON_LOCK:
+            with storage_activity(self.base_dir), JSON_LOCK:
                 if not self.db_path.exists():
                     return
                 ensure_writable(self.json_path, "JSON 캐시")
@@ -258,6 +278,12 @@ class LedgerService:
                 while True:
                     try:
                         _do_sync()
+                    except StorageBusyError:
+                        # A long workbook save/rebuild can outlast one lock
+                        # attempt. Keep the coalesced request until storage is
+                        # available; never clear RUNNING/DIRTY as if exported.
+                        time.sleep(0.1)
+                        continue
                     except Exception as e:
                         print(f"JSON 동기화 알림: {e}")
                     with _JSON_STATE_LOCK:
@@ -1022,6 +1048,7 @@ class LedgerService:
         except Exception:
             pass
 
+    @guarded_write()
     def insert_ledger_item(self, data):
         blocked = self._reject_if_pipeline_running()
         if blocked:
@@ -1063,6 +1090,12 @@ class LedgerService:
             return {
                 "success": False,
                 "error": f"관리번호는 REQ-연도-번호 형식이어야 합니다 (예: REQ-{year}-001): {requested_id}",
+            }
+        if _clean(data.get("status")) == TOMBSTONE_STATUS:
+            return {
+                "success": False,
+                "code": "invalid",
+                "error": TOMBSTONE_STATUS_ERROR,
             }
         request_key = _clean(data.get("idempotency_key"))
         if len(request_key) > 200:
@@ -1137,6 +1170,18 @@ class LedgerService:
                     "created_at": now_str,
                     "updated_at": now_str,
                 }
+                if item["linked_doc_id"]:
+                    # 수정 경로와 같은 규칙: 없는 문서로는 연결하지 않고, 문서 쪽 역참조도 쓴다.
+                    link_error = self._apply_doc_link(
+                        cur, ledger_id, "", item["linked_doc_id"]
+                    )
+                    if link_error:
+                        conn.rollback()
+                        return {
+                            "success": False,
+                            "code": "invalid",
+                            "error": link_error,
+                        }
                 auto_link_ledger_to_doc(conn, item)
                 cur.execute(
                     """
@@ -1326,6 +1371,8 @@ class LedgerService:
                 val = coerced
                 if val == current:
                     continue
+            if f == "status" and val == TOMBSTONE_STATUS:
+                return {}, TOMBSTONE_STATUS_ERROR
             if f == "status" and not val and current:
                 # 편집 폼 드롭다운에 없는 값(`완료`·`업무설명` 등)이 빈 값으로 넘어오던 경로.
                 # 빈 상태는 엑셀 '제출' 칸을 지우고 다음 동기화에서 `미제출`로 바뀐다.
@@ -1334,6 +1381,7 @@ class LedgerService:
             clean_data[f] = val
         return clean_data, None
 
+    @guarded_write()
     def update_ledger_item(self, ledger_id, data):
         blocked = self._reject_if_pipeline_running()
         if blocked:
@@ -1528,6 +1576,7 @@ class LedgerService:
             "excel_message": excel_res.get("message", ""),
         }
 
+    @guarded_write()
     def delete_ledger_item(self, ledger_id):
         blocked = self._reject_if_pipeline_running()
         if blocked:
@@ -1660,6 +1709,7 @@ class LedgerService:
         finally:
             conn.close()
 
+    @guarded_write()
     def restore_ledger_item(self, ledger_id):
         """웹에서 삭제한 항목을 되살린다(삭제 직후 '되돌리기').
 

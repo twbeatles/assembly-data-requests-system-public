@@ -37,8 +37,8 @@ class TestMultiDepartmentAndPackaging(unittest.TestCase):
 
         # Save new custom config
         custom = {
-            "department_name": "테스트운영팀",
-            "agency_name": "공공기관",
+            "department_name": "테스트심의팀",
+            "agency_name": "대외심의위원회",
             "system_title": "자료요구 통합 테스트 시스템",
         }
         ok = system_config.save_config(custom, self.temp_dir)
@@ -46,7 +46,7 @@ class TestMultiDepartmentAndPackaging(unittest.TestCase):
         self.assertTrue((self.temp_dir / "config.json").exists())
 
         loaded = system_config.get_config(self.temp_dir)
-        self.assertEqual(loaded["department_name"], "테스트운영팀")
+        self.assertEqual(loaded["department_name"], "테스트심의팀")
         self.assertEqual(loaded["system_title"], "자료요구 통합 테스트 시스템")
 
     def test_universal_package_structure(self):

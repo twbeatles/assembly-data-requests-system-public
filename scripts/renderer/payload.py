@@ -249,6 +249,16 @@ class PayloadMixin:
         """
         template_str = self.embed_data(template_str, b64_data, body_b64s)
         dept_name = html.escape(str(config.get("department_name", "국회·대외기관")))
+        if marked_js:
+            from renderer.assemble import AssembleMixin
+
+            # The bundled library may be CommonJS or UMD. Both populate the
+            # local exports object; expose only the parser's browser API.
+            marked_js = AssembleMixin.escape_inline_script(
+                "(function(){var module={exports:{}};var exports=module.exports;\n"
+                + marked_js
+                + "\nif(module.exports && module.exports.parse){window.marked=module.exports;}\n})();"
+            )
         agency_name = html.escape(str(config.get("agency_name", "공공기관")))
         sys_title = html.escape(
             str(

@@ -37,6 +37,22 @@ function prepareSearchQuery(query) {
   return { posGroups, neg, fields, active: !!(posGroups.length || neg.length || fields) };
 }
 
+// 전문 비교용 문자열: 화면에 보이는 글자만 남긴다. 변환 마크다운에는 `1\~3월`(KorDoc의 물결
+// 이스케이프, 문서 466건), `<td>` 같은 HTML 표 태그, `**` 굵게 표시가 섞여 있어 예전에는
+// "1~3월" 검색이 본문을 놓치고 "td" 검색이 표 있는 문서 전부에 걸렸다. 표시 문자열(전문)은
+// 그대로 두고 비교 사본에서만 뗀다.
+function searchableBodyNoSpace(text) {
+  return String(text || '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*\b[^>]*>/g, '')
+    .replace(/&nbsp;/gi, '')
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;/g, "'").replace(/&amp;/gi, '&')
+    .replace(/\\([\\`*_{}\[\]()#+\-.!~|<>])/g, '$1')
+    .replace(/\*\*/g, '')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
 // 항목 하나를 평가한다. 걸러지면 -1, 통과하면 점수(0 이상).
 // ignoreScreenFilters: 화면의 연도·기관·즐겨찾기 칩을 보지 않고 검색어만 본다(등록 폼의 유사 답변 추천용).
 function matchSearchItem(item, prepared, skipQuery, ignoreScreenFilters) {
@@ -90,7 +106,7 @@ function matchSearchItem(item, prepared, skipQuery, ignoreScreenFilters) {
   const answer = answerBody ? `${answerSummary} ${answerBody}` : answerSummary;
   // 전문은 커서 공백 제거·소문자 사본 하나만 캐시한다(사본 두 개는 수백 MB가 된다).
   // 공백을 뺀 비교가 공백 포함 비교를 포함하므로 결과는 같다.
-  const answerNoSpace = searchCache(item, 'answerNoSpace', answer, (x) => x.replace(/\s+/g, '').toLowerCase());
+  const answerNoSpace = searchCache(item, 'answerNoSpace', answer, searchableBodyNoSpace);
   const table = item.table_summary || '';
   const tableLower = table.toLowerCase();
   // 짧은 필드의 공백 제거·소문자 사본은 항목당 한 번만 계산해 캐시한다. 아래 토큰×변형

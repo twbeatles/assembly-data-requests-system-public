@@ -352,13 +352,16 @@ async function refreshTabCounts(currentFiltered, setTab) {
     const docs = reuse('docs') || await collectMatchesAsync(DOCUMENTS, prepared, isStale);
     if (docs === null || isStale()) return;
     setTab('tab-count-docs', docs.length);
-    setTab('tab-count-tables', docs.filter(d => d && d.has_tables === 'Y').length);
+    const tables = docs.filter(d => d && d.has_tables === 'Y').length;
+    setTab('tab-count-tables', tables);
     const ledger = reuse('ledger') || await collectMatchesAsync(REQUEST_LEDGER, prepared, isStale);
     if (ledger === null || isStale()) return;
     setTab('tab-count-ledger', ledger.length);
     const qas = reuse('qa') || await collectMatchesAsync(QA_ITEMS, prepared, isStale);
     if (qas === null || isStale()) return;
     setTab('tab-count-qa', qas.length);
+    SEARCH_TAB_COUNTS = { docs: docs.length, qa: qas.length, tables, ledger: ledger.length };
+    renderEmptyJumps();
   } catch (e) { /* 본문 로딩 중 실패하면 예전 값을 둔다 */ }
 }
 
@@ -370,15 +373,19 @@ function refreshSearchExtras(currentFiltered) {
     if (el) el.textContent = show ? ` · ${v}건` : '';
   };
   if (show) {
+    SEARCH_TAB_COUNTS = null;
     refreshTabCounts(currentFiltered, setTab);
   } else {
     SEARCH_EXTRAS_SEQ += 1;
     ['tab-count-docs', 'tab-count-qa', 'tab-count-tables', 'tab-count-ledger'].forEach(id => setTab(id, ''));
+    SEARCH_TAB_COUNTS = null;
   }
   try { renderActiveChips(); } catch (e) {}
   try { updateSortOptions(); } catch (e) {}
   const clearBtn = _UXD.getElementById('search-clear');
   if (clearBtn) clearBtn.hidden = !((typeof activeFilters !== 'undefined' && activeFilters && activeFilters.query));
+  try { renderEmptyJumps(); } catch (e) {}
+  try { refreshSearchAids(); } catch (e) {}
 }
 
 function renderActiveChips() {
@@ -996,6 +1003,215 @@ if (typeof _UXG.refreshServerExcelStatus === 'function') {
 }
 
 // ---------------------------------------------------------------------------
+// 검색 쉽게 쓰기: 0건일 때 다른 탭 바로 가기, 검색 링크, 결과 키보드 이동, 문서 창 안 검색어 이동.
+// 검색 판정은 그대로 filterItems 계열이다(불변조건 18·51). 여기서는 화면 이동만 돕는다.
+// ---------------------------------------------------------------------------
+let SEARCH_TAB_COUNTS = null;
+const SEARCH_MODE_LABELS = { docs: '답변서', qa: '질문·답변', tables: '표 있는 답변서', ledger: '요구자료 관리대장' };
+
+// 결과가 0건일 때 누를 수 있는 바로 가기. 예전에는 "위쪽 탭의 건수를 보라"는 글만 있었다.
+function emptyJumpTargets(counts, mode, synonymsOn, query) {
+  const out = [];
+  if (counts) {
+    Object.keys(SEARCH_MODE_LABELS).forEach(m => {
+      if (m !== mode && Number(counts[m]) > 0) {
+        out.push({ action: 'mode', mode: m, label: `${SEARCH_MODE_LABELS[m]}에서 ${counts[m]}건 보기` });
+      }
+    });
+  }
+  if (String(query || '').trim() && !synonymsOn) {
+    out.push({ action: 'synonyms', label: '비슷한 말도 함께 찾기 켜기' });
+  }
+  return out;
+}
+
+function renderEmptyJumps() {
+  const box = _UXD && _UXD.getElementById('empty-state-jumps');
+  if (!box) return;
+  box.innerHTML = '';
+  const syn = _UXD.getElementById('chk-synonyms');
+  const targets = emptyJumpTargets(SEARCH_TAB_COUNTS, currentMode, !syn || syn.checked, activeFilters.query);
+  targets.forEach(t => {
+    const b = _UXD.createElement('button');
+    b.type = 'button';
+    b.className = 'empty-jump';
+    b.textContent = t.label;
+    b.addEventListener('click', () => {
+      if (t.action === 'mode') {
+        switchMode(t.mode);
+      } else if (syn) {
+        syn.checked = true;
+        render();
+      }
+    });
+    box.appendChild(b);
+  });
+}
+
+// 검색어에 따라 바뀌는 부속: 최근 검색어 칩(검색어 없을 때만), 검색 링크 버튼, 주소창의 검색 링크.
+function refreshSearchAids() {
+  const hasQuery = !!(activeFilters && activeFilters.query);
+  const recent = _UXD.getElementById('recent-chips');
+  if (recent) recent.hidden = hasQuery || !recent.children.length;
+  const linkBtn = _UXD.getElementById('btn-copy-search-link');
+  if (linkBtn) linkBtn.hidden = !hasQuery;
+  syncSearchHash();
+}
+
+function syncSearchHash() {
+  if (!_UXG.history || !_UXG.history.replaceState || !_UXG.location) return;
+  // 상세 창이 열려 있으면 그 창의 주소(#doc=…, #ledger=…)를 건드리지 않는다.
+  if (isModalOpen('modal-backdrop') || isModalOpen('ledger-modal-backdrop')) return;
+  const cur = _UXG.location.hash || '';
+  // 처음 연 주소가 문서 바로가기(#doc=…)면 그 창이 열릴 때까지 그대로 둔다.
+  if (cur && !/^#q=/.test(cur)) return;
+  const next = searchHashFor(activeFilters.query, currentMode);
+  if (next === cur) return;
+  try {
+    _UXG.history.replaceState(null, '', next || (_UXG.location.pathname + _UXG.location.search));
+  } catch (e) { /* 주소를 못 바꿔도 검색은 된다 */ }
+}
+
+function copySearchLink() {
+  const hash = searchHashFor(activeFilters.query, currentMode);
+  if (!hash) {
+    notify('검색어를 먼저 입력하세요.', 'info');
+    return;
+  }
+  const base = String(_UXG.location.href).split('#')[0];
+  copyText(base + hash, '검색 링크를 복사했습니다. 같은 화면 파일이나 서버 주소를 여는 동료는 같은 검색 결과를 봅니다.');
+}
+
+// 결과 목록 키보드 이동: 검색창에서 ↓로 들어와 ↑↓(←→)로 고르고 Enter로 연다. 맨 위에서 ↑는 검색창으로.
+function resultElements() {
+  const isTable = (typeof currentView !== 'undefined' && currentView === 'table');
+  const root = _UXD.getElementById(isTable ? 'table-body' : 'card-container');
+  return root ? Array.from(root.children) : [];
+}
+
+function focusResultAt(i) {
+  const el = resultElements()[i];
+  if (!el || !el.focus) return false;
+  el.focus();
+  if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+  return true;
+}
+
+function initResultKeyboard() {
+  if (!_UXD || !_UXD.addEventListener) return;
+  _UXD.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (!t || !t.matches || !t.matches('#card-container > .card, #table-body > tr')) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      t.click();
+      return;
+    }
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const list = resultElements();
+    const idx = list.indexOf(t) + step;
+    if (idx < 0) {
+      const si = _UXD.getElementById('search-input');
+      if (si) si.focus();
+      return;
+    }
+    focusResultAt(Math.min(idx, list.length - 1));
+  });
+}
+
+// 문서 창 안 검색어 위치 이동. 긴 답변서에서 노란 표시를 눈으로 하나씩 찾아 내려가야 했다.
+let MODAL_HITS = [];
+let MODAL_HIT_INDEX = -1;
+
+function nextHitIndex(cur, delta, n) {
+  if (!n) return -1;
+  if (cur < 0) return delta > 0 ? 0 : n - 1;
+  return ((cur + delta) % n + n) % n;
+}
+
+function modalActiveView() {
+  for (const id of ['modal-view-formatted', 'modal-view-qa']) {
+    const el = _UXD.getElementById(id);
+    if (el && el.style.display !== 'none') return el;
+  }
+  return null; // '글자만 보기'에는 표시가 없다.
+}
+
+function updateHitLabel() {
+  const label = _UXD.getElementById('hit-nav-label');
+  if (!label) return;
+  const n = MODAL_HITS.length;
+  label.textContent = MODAL_HIT_INDEX >= 0 ? `검색어 ${MODAL_HIT_INDEX + 1} / ${n}곳` : `검색어 ${n}곳`;
+}
+
+function refreshModalHits(jumpToFirst) {
+  if (!_UXD) return;
+  const view = modalActiveView();
+  MODAL_HITS = view ? Array.from(view.querySelectorAll('mark.highlight')) : [];
+  MODAL_HIT_INDEX = -1;
+  const nav = _UXD.getElementById('hit-nav');
+  if (nav) nav.hidden = !MODAL_HITS.length;
+  updateHitLabel();
+  if (jumpToFirst && MODAL_HITS.length) gotoModalHit(1);
+}
+
+function gotoModalHit(delta) {
+  if (!MODAL_HITS.length) return;
+  const prev = MODAL_HITS[MODAL_HIT_INDEX];
+  if (prev) prev.classList.remove('current');
+  MODAL_HIT_INDEX = nextHitIndex(MODAL_HIT_INDEX, delta, MODAL_HITS.length);
+  const el = MODAL_HITS[MODAL_HIT_INDEX];
+  el.classList.add('current');
+  try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { el.scrollIntoView(); }
+  updateHitLabel();
+}
+
+if (typeof _UXG.openDocModal === 'function') {
+  const _openDocModalForHits = _UXG.openDocModal;
+  _UXG.openDocModal = function (...args) {
+    const r = _openDocModalForHits.apply(this, args);
+    // 질문 칩으로 연 경우는 그 질문 위치로 이미 내려가므로 첫 검색어로 끌고 가지 않는다.
+    const after = () => setTimeout(() => refreshModalHits(!args[1]), 60);
+    if (r && typeof r.then === 'function') r.then(after, () => {});
+    else after();
+    return r;
+  };
+}
+
+if (typeof _UXG.switchModalTab === 'function') {
+  const _switchModalTabForHits = _UXG.switchModalTab;
+  _UXG.switchModalTab = function (...args) {
+    const r = _switchModalTabForHits.apply(this, args);
+    try { refreshModalHits(false); } catch (e) {}
+    return r;
+  };
+}
+
+['closeModal', 'closeLedgerModal'].forEach(name => {
+  const orig = _UXG[name];
+  if (typeof orig !== 'function') return;
+  _UXG[name] = function (...args) {
+    const r = orig.apply(this, args);
+    if (name === 'closeModal') MODAL_HITS = [];
+    // 상세 창을 닫으면 주소가 비워진다. 지금 검색 링크로 되돌린다.
+    try { syncSearchHash(); } catch (e) {}
+    return r;
+  };
+});
+
+if (_UXD && _UXD.addEventListener) {
+  _UXD.addEventListener('keydown', (e) => {
+    if (e.key !== 'F3' || !isModalOpen('modal-backdrop')) return;
+    const top = MODAL_STACK[MODAL_STACK.length - 1];
+    if (top && top.id !== 'modal-backdrop' && isModalOpen(top.id)) return;
+    e.preventDefault();
+    gotoModalHit(e.shiftKey ? -1 : 1);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 부팅 시 한 번.
 // ---------------------------------------------------------------------------
 function initUxEnhancements() {
@@ -1004,6 +1220,7 @@ function initUxEnhancements() {
   initDatePreviews();
   initRequesterAutocomplete();
   initSimilarPanel();
+  initResultKeyboard();
   refreshConnStatus();
   refreshDueSummary();
 }

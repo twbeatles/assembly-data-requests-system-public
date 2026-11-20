@@ -3,6 +3,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="img-src 'self' data:; object-src 'none'; base-uri 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>__PAGE_TITLE__</title>
 <style>
@@ -214,6 +215,17 @@
   }
   .option-check input { width: 15px; height: 15px; cursor: pointer; }
   .grammar-chips .option-check { margin-left: auto; font-size: 12.5px; }
+  .recent-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .recent-chips[hidden] { display: none; }
+  .recent-label { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-right: 2px; }
+  .recent-chip {
+    border: 1px solid var(--border); background: #fff; border-radius: 999px;
+    padding: 3px 11px; font-size: 12px; cursor: pointer; color: #334155; max-width: 220px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .recent-chip:hover { background: var(--tag-bg); border-color: #93c5fd; color: var(--tag-text); }
+  .recent-clear { border: 0; background: none; font-size: 12px; color: var(--text-muted); cursor: pointer; text-decoration: underline; }
+  .recent-chip:focus-visible, .recent-clear:focus-visible, .hit-nav-btn:focus-visible, .empty-jump:focus-visible { outline: none; box-shadow: var(--focus-ring); }
   .search-help { font-size: 12.5px; color: #475569; margin-top: 8px; }
   .search-help summary { cursor: pointer; font-weight: 600; color: var(--accent); width: fit-content; }
   .search-help table { border-collapse: collapse; margin-top: 6px; }
@@ -367,6 +379,13 @@
   .empty-state h3 { margin: 0 0 8px; color: #334155; font-size: 17px; }
   .empty-state ul { display: inline-block; text-align: left; margin: 8px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.8; }
   .empty-actions { margin-top: 14px; }
+  .empty-jumps { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 14px; }
+  .empty-jumps:empty { display: none; }
+  .empty-jump {
+    border: 1px solid #93c5fd; background: var(--tag-bg); color: var(--tag-text); border-radius: var(--radius-sm);
+    padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .empty-jump:hover { background: #dbeafe; }
 
   /* ---------------- 표 보기 ---------------- */
   .table-container {
@@ -459,16 +478,17 @@
   .modal-tab-btn:hover { color: var(--text); }
   .modal-tab-btn.active { color: var(--primary); border-bottom-color: var(--accent); background: #fff; }
   .modal-tabs-spacer { flex: 1; }
+  .hit-nav { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; font-size: 12.5px; }
+  .hit-nav[hidden] { display: none; }
+  .hit-nav-label { color: var(--highlight-text); background: var(--highlight-bg); border-radius: 999px; padding: 2px 9px; font-weight: 700; }
+  .hit-nav-btn {
+    border: 1px solid var(--border-strong); background: #fff; border-radius: var(--radius-sm);
+    width: 28px; height: 26px; cursor: pointer; font-size: 11px; color: #334155;
+  }
+  .hit-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  mark.highlight.current { background: #fb923c; color: #fff; box-shadow: 0 0 0 2px #fb923c; }
   .modal-tab-action { background: none; border: 0; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 8px 4px; }
   .modal-tab-action:hover { text-decoration: underline; }
-  .hit-nav { display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: 12px; color: var(--text-muted); }
-  .hit-nav[hidden] { display: none; }
-  .hit-nav-label { font-weight: 600; }
-  .hit-nav-btn { border: 1px solid var(--border-strong); background: var(--card-bg); color: var(--text); border-radius: var(--radius-sm); width: 26px; height: 24px; cursor: pointer; font-size: 11px; line-height: 1; }
-  .hit-nav-btn:hover { background: var(--tag-bg); border-color: var(--accent); }
-  .hit-nav-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-  .hit-pos { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
-  mark.highlight.hit-current { background: #fb923c; color: #fff; box-shadow: 0 0 0 2px #fb923c; }
   .modal-body { padding: 20px 22px; overflow-y: auto; font-size: 14px; flex: 1; line-height: 1.6; background: #fff; min-height: 0; }
   #modal-text-content { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; line-height: 1.7; }
   .modal-footer {
@@ -578,6 +598,8 @@
   .modal-rendered-view ul, .modal-rendered-view ol { margin-left: 20px; margin-bottom: 14px; }
   .modal-rendered-view li { margin-bottom: 5px; }
   .modal-rendered-view img { max-width: 100%; height: auto; }
+  .modal-rendered-view sup { font-size: 0.75em; vertical-align: super; line-height: 0; }
+  .modal-rendered-view sub { font-size: 0.75em; vertical-align: sub; line-height: 0; }
   .table-wrapper { margin: 16px 0; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; background: #fff; }
   .table-wrapper-header {
     display: flex; justify-content: space-between; align-items: center; background: #f1f5f9;
@@ -591,6 +613,10 @@
     text-align: center !important; vertical-align: middle !important; white-space: nowrap;
   }
   .modal-rendered-view td { color: #334155; vertical-align: middle; text-align: center; }
+  .modal-rendered-view td[colspan] { text-align: left; }
+  .modal-rendered-view td[align="left"] { text-align: left !important; }
+  .modal-rendered-view td[align="right"] { text-align: right !important; }
+  .modal-rendered-view td[align="center"] { text-align: center !important; }
   .modal-rendered-view tr:nth-child(even) td { background: var(--surface-2); }
   .modal-rendered-view tr:hover td { background: #eff6ff; }
   .btn-copy-table {
@@ -704,6 +730,19 @@
     .quarantine-row { flex-direction: column; }
     .card-grid { grid-template-columns: 1fr; }
   }
+
+  .snippet-loading {
+    color: var(--text-muted, #888);
+    font-style: italic;
+    font-size: 0.9em;
+    display: inline-block;
+    opacity: 0.8;
+    animation: pulse-loading 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes pulse-loading {
+    from { opacity: 0.4; }
+    to { opacity: 0.9; }
+  }
 </style>
 <script>
 /* __MARKED_JS__ */
@@ -792,9 +831,8 @@
     <div class="search-row">
       <div class="search-input-wrapper">
         <span class="search-icon" id="search-icon" aria-hidden="true">🔍</span>
-        <input type="text" id="search-input" list="recent-searches" autocomplete="off" aria-label="통합 검색어" placeholder="제목·본문·의원명으로 검색 (Ctrl+K)">
+        <input type="text" id="search-input" autocomplete="off" aria-label="통합 검색어" placeholder="제목·본문·의원명으로 검색 (Ctrl+K)" enterkeyhint="search">
         <button type="button" class="search-clear" id="search-clear" onclick="clearOneFilter('query')" aria-label="검색어 지우기" title="검색어 지우기" hidden>&times;</button>
-        <datalist id="recent-searches"></datalist>
       </div>
       <button class="btn btn-secondary" id="btn-export" title="지금 목록에 보이는 결과를 엑셀에서 열 수 있는 CSV 파일로 저장합니다">목록 내려받기 (CSV)</button>
       <a href="국회_대외기관_자료요구_통합DB.xlsx" id="link-excel-db" class="btn btn-secondary" download title="전체 자료가 정리된 엑셀 파일을 엽니다">엑셀 파일 열기</a>
@@ -803,6 +841,8 @@
       <span id="search-spinner" class="search-spinner" style="display:none;" role="status">검색 중…</span>
       <span id="search-scope-hint" class="search-scope-hint" style="display:none;"></span>
     </div>
+    <!-- 최근 검색어: 검색창이 비어 있을 때 한 번 눌러 다시 찾는다(이 브라우저에만 저장). -->
+    <div class="recent-chips" id="recent-chips" role="group" aria-label="최근 검색어" hidden></div>
     <div class="grammar-chips" id="grammar-chips" aria-label="검색 방법 바로 넣기">
       <span class="grammar-label">검색 팁</span>
       <button type="button" class="g-chip" data-insert=" OR " title="둘 중 하나라도 들어간 자료">A 또는 B</button>
@@ -811,7 +851,7 @@
       <button type="button" class="g-chip" data-insert="요구자:" title="이 사람이 요구한 자료만 (예: 요구자:홍길동)">요구자로</button>
       <button type="button" class="g-chip" data-insert="기간:" title="요구일 기간으로 거르기 (예: 기간:2025-01..2025-06)">기간으로</button>
       <button type="button" class="g-chip" data-jump="search-help" title="검색 방법 전체 보기">검색 방법 더 보기</button>
-      <label class="option-check" title="‘과기부’로 찾으면 ‘과학기술정보통신부’도, ‘트위터’로 찾으면 ‘엑스’도 함께 찾습니다">
+      <label class="option-check" title="‘트위터’로 찾으면 ‘엑스’도, ‘심의위’로 찾으면 ‘대외심의위원회’도 함께 찾습니다">
         <input type="checkbox" id="chk-synonyms" checked> 비슷한 말도 함께 찾기
       </label>
     </div>
@@ -844,7 +884,7 @@
         <div class="filter-chips" id="inst-chips">
           <span class="chip active" data-filter="inst" data-val="ALL">전체</span>
           <span class="chip" data-filter="inst" data-val="국회">국회</span>
-          <span class="chip" data-filter="inst" data-val="상급감독기관">상급감독기관/대외기관</span>
+          <span class="chip" data-filter="inst" data-val="대외기관">대외기관</span>
           <span class="chip" data-filter="inst" data-val="국회입법조사처">입법조사처</span>
         </div>
       </div>
@@ -918,6 +958,7 @@
       <div class="active-chips" id="active-filter-chips" aria-live="polite"></div>
     </div>
     <div class="results-tools">
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-search-link" onclick="copySearchLink()" title="지금 검색어·탭을 그대로 다시 여는 주소를 복사합니다 (같은 화면 파일을 쓰는 동료와 공유)" hidden>검색 링크 복사</button>
       <label class="option-check" id="select-all-wrap">
         <input type="checkbox" id="chk-select-all" onchange="toggleSelectAll(this.checked)"> 전체 선택
       </label>
@@ -944,6 +985,7 @@
     <h3>조건에 맞는 자료가 없습니다</h3>
     <div id="empty-state-reason"></div>
     <ul id="empty-state-hints"></ul>
+    <div class="empty-jumps" id="empty-state-jumps"></div>
     <div class="empty-actions">
       <button type="button" class="btn btn-secondary" id="empty-clear-filters" onclick="clearAllFilters()">검색어·필터 모두 지우기</button>
     </div>
@@ -1369,12 +1411,11 @@
       <button class="modal-tab-btn" data-tab="qa" onclick="switchModalTab('qa')">질문별로 보기</button>
       <button class="modal-tab-btn" data-tab="text" onclick="switchModalTab('text')">글자만 보기</button>
       <span class="modal-tabs-spacer"></span>
-      <span class="hit-nav" id="hit-nav" role="group" aria-label="검색어 위치 이동" hidden>
-        <span class="hit-nav-label">검색어</span>
-        <button type="button" class="hit-nav-btn" id="hit-prev" onclick="gotoSearchHit(-1)" title="앞 검색어로 (Shift+F3)" aria-label="앞 검색어로">▲</button>
-        <span class="hit-pos" id="hit-pos" aria-live="polite">0/0</span>
-        <button type="button" class="hit-nav-btn" id="hit-next" onclick="gotoSearchHit(1)" title="다음 검색어로 (F3)" aria-label="다음 검색어로">▼</button>
-      </span>
+      <div class="hit-nav" id="hit-nav" role="group" aria-label="본문에서 검색어 위치 이동" hidden>
+        <span class="hit-nav-label" id="hit-nav-label" aria-live="polite"></span>
+        <button type="button" class="hit-nav-btn" id="hit-nav-prev" onclick="gotoModalHit(-1)" title="이전 검색어 위치 (Shift+F3)" aria-label="이전 검색어 위치">▲</button>
+        <button type="button" class="hit-nav-btn" id="hit-nav-next" onclick="gotoModalHit(1)" title="다음 검색어 위치 (F3)" aria-label="다음 검색어 위치">▼</button>
+      </div>
       <button class="modal-tab-action" onclick="openComparePicker()" title="다른 답변서와 나란히 놓고 비교합니다">다른 답변서와 비교</button>
     </div>
 
@@ -1568,6 +1609,12 @@ async function loadDeferredBodies() {
     }
     BODY_CHUNKS_LOADED += 1;
     updateBodyLoadStatus();
+    // 첫 청크가 도착했을 때 현재 질문-답변 모드이고 검색어가 없으면 즉시 1차 렌더링
+    const isQaMode = typeof currentMode !== 'undefined' && currentMode === 'qa';
+    const hasQuery = typeof activeFilters !== 'undefined' && !!activeFilters.query;
+    if (BODY_CHUNKS_LOADED === 1 && isQaMode && !hasQuery && typeof render === 'function') {
+      render();
+    }
     await new Promise(r => setTimeout(r, 0));
   }
   BODY_CHUNKS_LOADED = BODY_CHUNKS_TOTAL;
@@ -1580,8 +1627,8 @@ async function loadDeferredBodies() {
   if (resolveBodiesReady) resolveBodiesReady();
   updateBodyLoadStatus();
   warmSearchCache();
-  // 본문이 오기 전에 한 검색은 제목·요약만 봤다. 전문으로 다시 평가한다.
-  if (activeFilters.query) render();
+  // 본문 청크 로딩 완료 후 반드시 렌더링을 갱신한다 (질문-답변 스니펫 등 본문 반영).
+  if (typeof render === 'function') render();
 }
 
 async function loadAndDecompressDatabase() {
@@ -2110,12 +2157,40 @@ function applyDeepLink() {
       const found = DOCS_MAP[qa.doc_id || qa.parent_id];
       if (found) setTimeout(() => openDocModal(found, qa.q_num), 200);
     }
+  } else if (targetId.startsWith('q=')) {
+    // 검색 링크(#q=검색어&mode=탭): 직접 친 것과 같은 경로로 검색한다.
+    const s = parseSearchHash(raw);
+    if (s) {
+      if (s.mode !== currentMode) switchMode(s.mode);
+      setSearchQuery(s.q);
+    }
   } else if (targetId.startsWith('ledger=') || targetId.startsWith('req=')) {
     const id = targetId.replace(/^ledger=/, '').replace(/^req=/, '');
     switchMode('ledger');
     const found = LEDGER_MAP[id];
     if (found) setTimeout(() => openLedgerModal(found), 200);
   }
+}
+
+// 검색 링크 주소. 같은 화면 파일(01)이나 서버 주소(02)를 여는 동료가 같은 검색 결과를 보게 한다.
+// 주소는 history.replaceState로만 바꾼다(location.hash 대입 금지 — 불변조건 53).
+function searchHashFor(query, mode) {
+  const q = String(query || '').trim();
+  if (!q) return '';
+  const params = new URLSearchParams();
+  params.set('q', q);
+  if (mode && mode !== 'docs') params.set('mode', mode);
+  return '#' + params.toString();
+}
+
+function parseSearchHash(hash) {
+  const raw = String(hash || '').replace(/^#/, '');
+  if (!/^q=/.test(raw)) return null;
+  const params = new URLSearchParams(raw);
+  const q = String(params.get('q') || '').trim();
+  if (!q) return null;
+  const mode = params.get('mode');
+  return { q, mode: VIEW_MODES.includes(mode) ? mode : 'docs' };
 }
 
 function updateFavCount() {
@@ -2329,7 +2404,8 @@ function getDocOrigUrl(relPath) {
   if (window.location.protocol.startsWith('http')) {
     return '/api/download?path=' + encodeURIComponent(relPath);
   }
-  return relPath;
+  const clean = String(relPath).replace(/\\/g, '/').replace(/^\/+/, '');
+  return clean.startsWith('../') ? clean : ('../' + clean);
 }
 
 async function openFileLocation(relPath) {
@@ -2342,7 +2418,11 @@ async function openFileLocation(relPath) {
     return;
   }
   try {
-    const res = await fetch('/api/open?path=' + encodeURIComponent(relPath) + '&mode=explorer');
+    const res = await fetch('/api/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: relPath, mode: 'explorer' })
+    });
     const data = await res.json();
     if (res.ok && data.success) {
       notify('원본 파일이 있는 폴더를 열었습니다.', 'success');
@@ -2583,11 +2663,16 @@ function decodeHtmlEntities(text) {
 function isSafeUrl(value, attrName) {
   const compact = decodeHtmlEntities(value).replace(/[\u0000-\u0020\u007f-\u009f]+/g, '').toLowerCase();
   const scheme = /^([a-z][a-z0-9+.-]*):/.exec(compact);
+  if (attrName === 'src') {
+    // Browser URL parsing treats //host and backslash variants as an external
+    // authority. These are not local relative paths, even without a scheme.
+    if (/\\/.test(compact) || compact.startsWith('//')) return false;
+    if (!scheme) return true;
+    return /^data:image\/(png|jpe?g|gif|webp|bmp);/.test(compact);
+  }
   if (!scheme) return true; // 상대 경로·#앵커
   if (attrName === 'href') return ['http', 'https', 'mailto'].includes(scheme[1]);
-  // img src의 원격 http(s)는 렌더링 시점에 외부 요청을 내므로 허용하지 않는다.
-  // 오프라인 단일 HTML이라는 제품 보장을 지키기 위한 차단이다. (감사 Documentation Mismatch)
-  return /^data:image\/(png|jpe?g|gif|webp|bmp);/.test(compact);
+  return false;
 }
 
 function rebuildTag(tag) {
@@ -2615,14 +2700,27 @@ function sanitizeHtml(html) {
   if (!html) return '';
   return String(html)
     .replace(SANITIZE_DROP_WITH_CONTENT, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\x3c!--[\s\S]*?-->/g, '')
     .replace(/<\/?[a-zA-Z][^>]*>?|<[!?][^>]*>?/g, rebuildTag);
+}
+
+// KorDoc이 한글 개요 수준을 그대로 `#`로 옮겨, 본문 항목(`## - 일반인 신고…`, `## ○ …`)과
+// 긴 문장이 큰 제목으로 보이는 문서가 있다(운영 48건·358줄, 80자 넘는 제목 17건). 화면 표시에서만
+// 제목 표시를 떼어 본문으로 보여 준다. 글자는 그대로이고 저장된 전문·복사본은 바뀌지 않는다.
+function demoteBodyHeadings(md) {
+  return String(md || '')
+    .replace(/^#{1,6}[ \t]+(?=[-–○ㅇ※·▶•][ \t])/gm, '')
+    .replace(/^#{1,6}[ \t]+(?=\S[^\r\n]{79,}\r?$)/gm, '');
 }
 
 function safeMarkedParse(md) {
   try {
     if (typeof marked !== 'undefined' && marked.parse) {
-      return sanitizeHtml(marked.parse(md || ''));
+      const clean = String(md || '')
+        .replace(/\u25cc/g, '○')
+        .replace(/^\[포맷:\s*[A-Z0-9]+\s*\|\s*페이지:\s*\d+\]\s*\n?/i, '')
+        .replace(/^\x3c!--\s*source:.*?-->\s*\n?/i, '');
+      return sanitizeHtml(marked.parse(demoteBodyHeadings(clean)));
     }
     return escapeHtml(md || '');
   } catch (e) {
@@ -2658,13 +2756,15 @@ function applyDomHighlight(element, tokens) {
   let node;
   while (node = walker.nextNode()) {
     if (node.nodeValue && matchRegex.test(node.nodeValue)) {
+      const p = node.parentNode;
+      if (p && p.closest && p.closest('.table-wrapper-header')) continue;
       textNodes.push(node);
     }
   }
 
   textNodes.forEach(textNode => {
     const parent = textNode.parentNode;
-    if (parent && parent.nodeName !== 'MARK' && parent.nodeName !== 'SCRIPT' && parent.nodeName !== 'STYLE') {
+    if (parent && parent.nodeName !== 'MARK' && parent.nodeName !== 'SCRIPT' && parent.nodeName !== 'STYLE' && !(parent.closest && parent.closest('.table-wrapper-header'))) {
       const frag = document.createDocumentFragment();
       const parts = textNode.nodeValue.split(splitRegex);
       parts.forEach(part => {
@@ -2776,7 +2876,7 @@ function copyTableHtml(btn) {
   const tbl = wrapper.querySelector('table');
   if (!tbl) return;
 
-  const htmlData = tbl.outerHTML;
+  const htmlData = tbl.outerHTML.replace(/<mark class="highlight">([\s\S]*?)<\/mark>/gi, '$1');
   const textData = tbl.innerText;
 
   if (navigator.clipboard && window.ClipboardItem) {
@@ -2788,9 +2888,9 @@ function copyTableHtml(btn) {
         btn.innerText = '✅ 표 복사 완료!';
         setTimeout(() => btn.innerText = orig, 2000);
       })
-      .catch(() => copyText(textData, '표 텍스트가 클립보드에 복사되었습니다.'));
+      .catch(() => copyText(textData, '표의 텍스트를 복사했습니다. 이 환경에서는 표 서식 복사가 지원되지 않습니다.'));
   } else {
-    copyText(textData, '표가 복사되었습니다.');
+    copyText(textData, '표의 텍스트를 복사했습니다. 이 환경에서는 표 서식 복사가 지원되지 않습니다.');
   }
 }
 
@@ -2987,7 +3087,7 @@ function emptyStateHints(filteredCount, totalCount) {
       hints.push('여러 단어는 모두 들어간 자료만 찾습니다. 하나만 있어도 되면 "OR"로 이어 주세요.');
     }
     if (q && positive.length === 0 && /(^|\s)-\S/.test(q)) hints.push('제외어(-)만으로는 검색되지 않습니다. 찾을 단어를 함께 입력하세요.');
-    if (q) hints.push('위쪽 다른 탭에 같은 검색어로 찾은 건수가 표시됩니다. 그 탭을 눌러 보세요.');
+    // 다른 탭에 결과가 있으면 아래 바로 가기 버튼(renderEmptyJumps)이 건수와 함께 뜬다.
   }
   return { active, hints };
 }
@@ -3345,11 +3445,41 @@ function nextRecentSearches(items, query) {
   return [q].concat(list.filter(x => x !== q)).slice(0, 8);
 }
 
+// 최근 검색어는 검색창 아래 칩으로 보여 준다. 예전 datalist는 입력창을 눌러야만 보여 거의 쓰이지 않았다.
+// 검색어가 있을 때는 숨긴다(refreshSearchAids). 이 브라우저에만 저장되며 [지우기]로 비울 수 있다.
 function loadRecentSearches() {
-  const list = document.getElementById('recent-searches');
-  if (!list) return;
-  const items = nextRecentSearches(safeStorageGet(RECENT_SEARCH_KEY, []), '');
-  list.innerHTML = items.map(q => `<option value="${escapeHtml(q)}"></option>`).join('');
+  const box = document.getElementById('recent-chips');
+  if (!box) return;
+  const items = nextRecentSearches(safeStorageGet(RECENT_SEARCH_KEY, []), '').slice(0, 6);
+  box.innerHTML = '';
+  if (!items.length) {
+    box.hidden = true;
+    return;
+  }
+  const label = document.createElement('span');
+  label.className = 'recent-label';
+  label.textContent = '최근 검색';
+  box.appendChild(label);
+  items.forEach(q => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'recent-chip';
+    b.textContent = q;
+    b.title = `“${q}” 다시 찾기`;
+    b.addEventListener('click', () => setSearchQuery(q));
+    box.appendChild(b);
+  });
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'recent-clear';
+  clear.textContent = '지우기';
+  clear.title = '이 브라우저에 남은 최근 검색어를 지웁니다';
+  clear.addEventListener('click', () => {
+    safeStorageSet(RECENT_SEARCH_KEY, []);
+    loadRecentSearches();
+  });
+  box.appendChild(clear);
+  box.hidden = !!(activeFilters && activeFilters.query);
 }
 
 function rememberSearch(query) {
@@ -3425,6 +3555,22 @@ function prepareSearchQuery(query) {
   return { posGroups, neg, fields, active: !!(posGroups.length || neg.length || fields) };
 }
 
+// 전문 비교용 문자열: 화면에 보이는 글자만 남긴다. 변환 마크다운에는 `1\~3월`(KorDoc의 물결
+// 이스케이프, 문서 466건), `<td>` 같은 HTML 표 태그, `**` 굵게 표시가 섞여 있어 예전에는
+// "1~3월" 검색이 본문을 놓치고 "td" 검색이 표 있는 문서 전부에 걸렸다. 표시 문자열(전문)은
+// 그대로 두고 비교 사본에서만 뗀다.
+function searchableBodyNoSpace(text) {
+  return String(text || '')
+    .replace(/\x3c!--[\s\S]*?-->/g, '')
+    .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*\b[^>]*>/g, '')
+    .replace(/&nbsp;/gi, '')
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;/g, "'").replace(/&amp;/gi, '&')
+    .replace(/\\([\\`*_{}\[\]()#+\-.!~|<>])/g, '$1')
+    .replace(/\*\*/g, '')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
 // 항목 하나를 평가한다. 걸러지면 -1, 통과하면 점수(0 이상).
 // ignoreScreenFilters: 화면의 연도·기관·즐겨찾기 칩을 보지 않고 검색어만 본다(등록 폼의 유사 답변 추천용).
 function matchSearchItem(item, prepared, skipQuery, ignoreScreenFilters) {
@@ -3478,7 +3624,7 @@ function matchSearchItem(item, prepared, skipQuery, ignoreScreenFilters) {
   const answer = answerBody ? `${answerSummary} ${answerBody}` : answerSummary;
   // 전문은 커서 공백 제거·소문자 사본 하나만 캐시한다(사본 두 개는 수백 MB가 된다).
   // 공백을 뺀 비교가 공백 포함 비교를 포함하므로 결과는 같다.
-  const answerNoSpace = searchCache(item, 'answerNoSpace', answer, (x) => x.replace(/\s+/g, '').toLowerCase());
+  const answerNoSpace = searchCache(item, 'answerNoSpace', answer, searchableBodyNoSpace);
   const table = item.table_summary || '';
   const tableLower = table.toLowerCase();
   // 짧은 필드의 공백 제거·소문자 사본은 항목당 한 번만 계산해 캐시한다. 아래 토큰×변형
@@ -4718,6 +4864,7 @@ async function render() {
 
         const bodyText = doc.full_markdown || doc.answer_full_text || doc.question_list;
         let snippet = highlightTokens.length ? getSnippet(bodyText, highlightTokens, 160, cardPreviewText) : getSnippet(cardPreviewText(bodyText), highlightTokens);
+        if (!snippet && bodiesLoading()) snippet = '<span class="snippet-loading muted">답변 내용 불러오는 중...</span>';
         if (currentMode === 'tables' && doc.table_summary) {
           snippet = `<div class="table-summary-note"><strong>들어 있는 표:</strong> ${highlightTextString(doc.table_summary, highlightTokens)}</div>` + snippet;
         }
@@ -4880,7 +5027,9 @@ async function render() {
         card.className = 'card';
         card.onclick = openParent;
 
-        const snippet = highlightTokens.length ? getSnippet(qa.answer_full, highlightTokens, 160, cardPreviewText) : getSnippet(cardPreviewText(qa.answer_full), highlightTokens);
+        const rawText = qa.answer_full || qa.answer_markdown || '';
+        const rawSnippet = getSnippet(highlightTokens.length ? cleanSnippetText(rawText) : cardPreviewText(rawText), highlightTokens);
+        const snippet = rawSnippet || (bodiesLoading() ? '<span class="snippet-loading muted">답변 내용 불러오는 중...</span>' : '');
 
         card.innerHTML = `
           <div class="card-header-actions">
@@ -4905,6 +5054,8 @@ async function render() {
       }
 
       if (!wantCards) {
+        const rawClip = cardPreviewText(qa.answer_full || qa.answer_markdown).slice(0, 200);
+        const clipHtml = rawClip ? escapeHtml(rawClip) : (bodiesLoading() ? '<span class="snippet-loading muted">답변 내용 불러오는 중...</span>' : '-');
         const tr = document.createElement('tr');
         tr.onclick = openParent;
         tr.innerHTML = `
@@ -4913,7 +5064,7 @@ async function render() {
           <td class="cell-nowrap">${dateText}</td>
           <td class="cell-nowrap"><strong>${reqHighlighted}</strong></td>
           <td class="cell-title">${qTitleHighlighted}</td>
-          <td class="cell-clip">${escapeHtml(cardPreviewText(qa.answer_full).slice(0, 200))}</td>
+          <td class="cell-clip">${clipHtml}</td>
           <td class="cell-center">${qa.has_tables === 'Y' ? '있음' : '-'}</td>
           <td class="cell-nowrap" onclick="event.stopPropagation();">
             <a href="${escapeHtml(getDocMdUrl(qa.parsed_md_path))}" target="_blank" title="변환된 전문을 새 탭에서 엽니다">전문</a>
@@ -4925,20 +5076,28 @@ async function render() {
   }
   cardContainer.replaceChildren(cardSink);
   tableBody.replaceChildren(rowSink);
+  Array.from(cardContainer.children).forEach(card => { card.tabIndex = 0; });
+  Array.from(tableBody.children).forEach(row => { row.tabIndex = 0; });
 }
 
 // 카드 미리보기용: 마크다운 기호(#, |, ---, ** 등)와 HTML 태그를 걷어 낸 앞부분 글.
 // 미리보기에만 쓴다. 문서를 열면 full_markdown 전문을 그대로 보여 준다(전문 보존 정책 5).
-function cardPreviewText(text) {
-  return String(text || '').slice(0, 1500)
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<[^>]{0,200}>/g, ' ')
+function cleanSnippetText(text, maxLen = 0) {
+  let s = String(text || '');
+  if (maxLen > 0) s = s.slice(0, maxLen);
+  return s
+    .replace(/\x3c!--[\s\S]*?-->/g, ' ')
+    .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*\b[^>]*>/g, ' ')
     .replace(/^\s{0,3}#{1,6}\s*/gm, '')
     .replace(/^\s*\|?[\s:|-]*-{3,}[\s:|-]*\|?\s*$/gm, ' ')
     .replace(/\|/g, ' ')
     .replace(/(\*\*|__|`)/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function cardPreviewText(text) {
+  return cleanSnippetText(text, 1500);
 }
 
 // Favorite Toggle
@@ -5094,6 +5253,28 @@ function exportSelectedCsv() {
     `국회_대외기관_선택문서_${new Date().toISOString().slice(0,10)}.csv`);
 }
 
+function fixDocMediaPaths(md, doc) {
+  if (!md || !doc || !doc.parsed_md_path) return md || '';
+  const rel = String(doc.parsed_md_path).replace(/\\/g, '/').replace(/^\/+/, '');
+  const lastSlash = rel.lastIndexOf('/');
+  const baseDir = lastSlash !== -1 ? rel.slice(0, lastSlash) : '';
+  if (!baseDir) return md;
+
+  return String(md)
+    .replace(/!\[([^\]]*)\]\((?!https?:\/\/|data:|\/)([^)]+)\)/g, (match, alt, rawSrc) => {
+      const src = String(rawSrc || '').trim().replace(/\\/g, '/');
+      if (src.startsWith('_parsed_markdown/') || src.startsWith(baseDir + '/')) return match;
+      const cleanSrc = src.replace(/^\.\//, '');
+      return `![${alt}](${baseDir}/${cleanSrc})`;
+    })
+    .replace(/<img\b([^>]*?)\bsrc=["'](?!https?:\/\/|data:|\/)([^"']+)["']([^>]*?)>/gi, (match, p1, rawSrc, p2) => {
+      const src = String(rawSrc || '').trim().replace(/\\/g, '/');
+      if (src.startsWith('_parsed_markdown/') || src.startsWith(baseDir + '/')) return match;
+      const cleanSrc = src.replace(/^\.\//, '');
+      return `<img${p1}src="${baseDir}/${cleanSrc}"${p2}>`;
+    });
+}
+
 function docDisplayBody(doc) {
   // 전문 보존: 모달·인쇄·비교는 full_markdown 전체를 쓴다. 요약/엑셀 잘림본으로 대체하지 않는다.
   return (doc && (doc.full_markdown || doc.answer_full_text)) || '';
@@ -5207,7 +5388,7 @@ async function openDocModal(doc, targetQNum = null) {
   // 1. Markdown & Tables Rendering with marked.js
   const formattedContainer = document.getElementById('modal-view-formatted');
   try {
-    let parsedHtml = safeMarkedParse(displayBody);
+    let parsedHtml = safeMarkedParse(fixDocMediaPaths(displayBody, doc));
     formattedContainer.innerHTML = incompleteBanner + parsedHtml;
 
     enhanceTablesInElement(formattedContainer);
@@ -5235,12 +5416,12 @@ async function openDocModal(doc, targetQNum = null) {
       const rawContent = q.answer_markdown || q.answer_full || '';
       let qHtml = '';
       try {
-        qHtml = safeMarkedParse(rawContent);
+        qHtml = safeMarkedParse(fixDocMediaPaths(rawContent, doc));
       } catch (e) {
         qHtml = '<pre>' + escapeHtml(rawContent) + '</pre>';
       }
 
-      const hasTbl = q.has_tables === 'Y' || rawContent.includes('<table') || rawContent.includes('| --- |');
+      const hasTbl = q.has_tables === 'Y' || rawContent.includes('<table') || /\|[\s:\-]+\|[\s:\-]+\|/.test(rawContent);
 
       qBox.innerHTML = `
         <div class="qa-head">
@@ -5281,8 +5462,6 @@ async function openDocModal(doc, targetQNum = null) {
     }, 150);
   } else {
     switchModalTab('formatted');
-    // 검색해서 연 답변서면 첫 검색어 자리를 바로 보여 준다.
-    if (highlightTokens.length) refreshSearchHits(true);
   }
 
   const isWebMode = window.location.protocol.startsWith('http');
@@ -5332,7 +5511,8 @@ function setupModalCopyButtons(doc) {
 
   // 2. Official Korean Doc Format (□ ○ -)
   document.getElementById('btn-copy-gov').onclick = () => {
-    const govText = `□ [${doc.requester}] ${doc.title}\n  ○ 질의내용:\n${(doc.question_list || '').split('\n').map(l => '    - ' + l).join('\n')}\n\n  ○ 답변내용:\n${(doc.answer_summary || doc.full_markdown || doc.answer_full_text || '').slice(0, 800)}\n\n  * 담당: ${doc.contact_person || doc.department || appConfig.department_name || '__DEFAULT_DEPT__'}`;
+    const ansText = doc.answer_summary || cleanSnippetText(doc.full_markdown || doc.answer_full_text || '', 800);
+    const govText = `□ [${doc.requester}] ${doc.title}\n  ○ 질의내용:\n${(doc.question_list || '').split('\n').map(l => '    - ' + l).join('\n')}\n\n  ○ 답변내용:\n${ansText.slice(0, 800)}\n\n  * 담당: ${doc.contact_person || doc.department || appConfig.department_name || '__DEFAULT_DEPT__'}`;
     copyText(govText, '보고용 개조식(□ ○ -)으로 복사했습니다.');
   };
 
@@ -5344,7 +5524,7 @@ function setupModalCopyButtons(doc) {
       notify('이 답변서에는 표가 없습니다.');
       return;
     }
-    const htmlToCopy = Array.from(tables).map(t => t.outerHTML).join('<br><br>');
+    const htmlToCopy = Array.from(tables).map(t => t.outerHTML.replace(/<mark class="highlight">([\s\S]*?)<\/mark>/gi, '$1')).join('<br><br>');
     const plainToCopy = Array.from(tables).map(t => t.innerText).join('\n\n');
 
     if (navigator.clipboard && window.ClipboardItem) {
@@ -5390,7 +5570,7 @@ function copyQaTable(qIdx) {
     notify('이 질문에는 복사할 표가 없습니다.');
     return;
   }
-  const htmlToCopy = Array.from(tables).map(t => t.outerHTML).join('<br><br>');
+  const htmlToCopy = Array.from(tables).map(t => t.outerHTML.replace(/<mark class="highlight">([\s\S]*?)<\/mark>/gi, '$1')).join('<br><br>');
   const plainToCopy = Array.from(tables).map(t => t.innerText).join('\n\n');
 
   if (navigator.clipboard && window.ClipboardItem) {
@@ -5422,50 +5602,6 @@ function switchModalTab(tab) {
   document.getElementById('modal-view-formatted').style.display = tab === 'formatted' ? 'block' : 'none';
   document.getElementById('modal-view-text').style.display = tab === 'text' ? 'block' : 'none';
   document.getElementById('modal-view-qa').style.display = tab === 'qa' ? 'block' : 'none';
-  refreshSearchHits(false);
-}
-
-// ---------------------------------------------------------------------------
-// 열린 답변서 안에서 검색어 위치로 옮겨 다닌다(▲/▼, F3/Shift+F3). 수십 쪽짜리 답변서에서
-// 검색어가 어디 있는지 스크롤로 찾지 않아도 된다. 강조(mark.highlight)가 있는 보기에서만 뜬다.
-// ---------------------------------------------------------------------------
-let SEARCH_HITS = [];
-let SEARCH_HIT_IDX = -1;
-
-function visibleModalView() {
-  for (const id of ['modal-view-formatted', 'modal-view-qa']) {
-    const el = document.getElementById(id);
-    if (el && el.style.display !== 'none') return el;
-  }
-  return null;
-}
-
-function updateSearchHitPos() {
-  const pos = document.getElementById('hit-pos');
-  if (pos) pos.textContent = SEARCH_HITS.length ? `${Math.max(SEARCH_HIT_IDX + 1, 0)}/${SEARCH_HITS.length}` : '0/0';
-}
-
-function refreshSearchHits(autoJump) {
-  SEARCH_HITS.forEach(m => m.classList.remove('hit-current'));
-  const view = visibleModalView();
-  SEARCH_HITS = view ? Array.from(view.querySelectorAll('mark.highlight')) : [];
-  SEARCH_HIT_IDX = -1;
-  const nav = document.getElementById('hit-nav');
-  if (nav) nav.hidden = !SEARCH_HITS.length;
-  updateSearchHitPos();
-  if (autoJump && SEARCH_HITS.length) gotoSearchHit(1, true);
-}
-
-function gotoSearchHit(delta, gentle) {
-  if (!SEARCH_HITS.length) return;
-  const n = SEARCH_HITS.length;
-  if (SEARCH_HITS[SEARCH_HIT_IDX]) SEARCH_HITS[SEARCH_HIT_IDX].classList.remove('hit-current');
-  SEARCH_HIT_IDX = SEARCH_HIT_IDX < 0 ? (delta > 0 ? 0 : n - 1) : (SEARCH_HIT_IDX + delta + n) % n;
-  const el = SEARCH_HITS[SEARCH_HIT_IDX];
-  el.classList.add('hit-current');
-  // 처음 열 때는 이미 보이는 자리면 화면을 움직이지 않는다. 직접 누르면 가운데로 가져온다.
-  try { el.scrollIntoView({ block: gentle ? 'nearest' : 'center' }); } catch (e) { el.scrollIntoView(); }
-  updateSearchHitPos();
 }
 
 function closeModal() {
@@ -5500,9 +5636,13 @@ function openComparePicker() {
       <h3>${escapeHtml(currentSelectedDoc.title)}</h3>
       <div class="sub">${escapeHtml(currentSelectedDoc.requester)} · ${escapeHtml(currentSelectedDoc.request_date || currentSelectedDoc.year)}</div>
     </div>
-    <div class="modal-rendered-view">${safeMarkedParse(docDisplayBody(currentSelectedDoc))}</div>
+    <div class="modal-rendered-view">${safeMarkedParse(fixDocMediaPaths(docDisplayBody(currentSelectedDoc), currentSelectedDoc))}</div>
   `;
 
+  enhanceTablesInElement(leftPane);
+  if (typeof highlightTokens !== 'undefined' && highlightTokens.length) {
+    applyDomHighlight(leftPane, highlightTokens);
+  }
   updateCompareRightPane();
   document.getElementById('compare-backdrop').classList.add('open');
 }
@@ -5523,8 +5663,12 @@ async function updateCompareRightPane() {
       <h3>${escapeHtml(docB.title)}</h3>
       <div class="sub">${escapeHtml(docB.requester)} · ${escapeHtml(docB.request_date || docB.year)}</div>
     </div>
-    <div class="modal-rendered-view">${safeMarkedParse(docDisplayBody(docB))}</div>
+    <div class="modal-rendered-view">${safeMarkedParse(fixDocMediaPaths(docDisplayBody(docB), docB))}</div>
   `;
+  enhanceTablesInElement(rightPane);
+  if (typeof highlightTokens !== 'undefined' && highlightTokens.length) {
+    applyDomHighlight(rightPane, highlightTokens);
+  }
 }
 
 function gotoLinkedLedgerFromDoc() {
@@ -5572,12 +5716,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
-      // 새 검색어면 결과 앞쪽부터 보여 준다(앞 검색에서 [더 보기]로 늘린 한도를 이어 쓰지 않는다).
-      currentRenderLimit = 40;
       render();
     }, 200);
     clearTimeout(recentSearchTimer);
     recentSearchTimer = setTimeout(() => rememberSearch(activeFilters.query), 1500);
+  });
+
+  // Enter는 기다리지 않고 바로 찾고 최근 검색어에 남긴다. Esc는 검색어를 지운다. ↓는 첫 결과로 간다.
+  document.getElementById('search-input').addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) return; // 한글 조합 중 Enter는 글자 확정용이다.
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(searchDebounceTimer);
+      clearTimeout(recentSearchTimer);
+      activeFilters.query = e.target.value.trim();
+      render();
+      rememberSearch(activeFilters.query);
+    } else if (e.key === 'Escape' && e.target.value) {
+      e.preventDefault();
+      e.stopPropagation();
+      clearOneFilter('query');
+    } else if (e.key === 'ArrowDown') {
+      if (typeof focusResultAt === 'function' && focusResultAt(0)) e.preventDefault();
+    }
   });
 
   // 연도·진행상태 칩은 데이터로 다시 만들어지므로 개별 등록 대신 이벤트 위임을 쓴다.
@@ -5611,19 +5772,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     render();
   });
 
-  // 지금 보기 방식만 그리므로(11_render.js) 바꾸면 다시 그린다.
   document.getElementById('btn-view-card').addEventListener('click', () => {
-    if (currentView === 'card') return;
     setView('card');
     saveViewPrefs();
-    render();
   });
 
   document.getElementById('btn-view-table').addEventListener('click', () => {
-    if (currentView === 'table') return;
     setView('table');
     saveViewPrefs();
-    render();
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -5647,12 +5803,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.addEventListener('keydown', (e) => {
-    // 답변서 창이 열려 있으면 F3 / Shift+F3으로 검색어 위치를 옮긴다(브라우저 찾기 대신).
-    if (e.key === 'F3' && isModalOpen('modal-backdrop') && SEARCH_HITS.length) {
-      e.preventDefault();
-      gotoSearchHit(e.shiftKey ? -1 : 1);
-      return;
-    }
     if (e.key === 'Escape') {
       if (typeof closeTopModal === 'function' && closeTopModal()) return;
       closeModal();
@@ -6226,13 +6376,16 @@ async function refreshTabCounts(currentFiltered, setTab) {
     const docs = reuse('docs') || await collectMatchesAsync(DOCUMENTS, prepared, isStale);
     if (docs === null || isStale()) return;
     setTab('tab-count-docs', docs.length);
-    setTab('tab-count-tables', docs.filter(d => d && d.has_tables === 'Y').length);
+    const tables = docs.filter(d => d && d.has_tables === 'Y').length;
+    setTab('tab-count-tables', tables);
     const ledger = reuse('ledger') || await collectMatchesAsync(REQUEST_LEDGER, prepared, isStale);
     if (ledger === null || isStale()) return;
     setTab('tab-count-ledger', ledger.length);
     const qas = reuse('qa') || await collectMatchesAsync(QA_ITEMS, prepared, isStale);
     if (qas === null || isStale()) return;
     setTab('tab-count-qa', qas.length);
+    SEARCH_TAB_COUNTS = { docs: docs.length, qa: qas.length, tables, ledger: ledger.length };
+    renderEmptyJumps();
   } catch (e) { /* 본문 로딩 중 실패하면 예전 값을 둔다 */ }
 }
 
@@ -6244,15 +6397,19 @@ function refreshSearchExtras(currentFiltered) {
     if (el) el.textContent = show ? ` · ${v}건` : '';
   };
   if (show) {
+    SEARCH_TAB_COUNTS = null;
     refreshTabCounts(currentFiltered, setTab);
   } else {
     SEARCH_EXTRAS_SEQ += 1;
     ['tab-count-docs', 'tab-count-qa', 'tab-count-tables', 'tab-count-ledger'].forEach(id => setTab(id, ''));
+    SEARCH_TAB_COUNTS = null;
   }
   try { renderActiveChips(); } catch (e) {}
   try { updateSortOptions(); } catch (e) {}
   const clearBtn = _UXD.getElementById('search-clear');
   if (clearBtn) clearBtn.hidden = !((typeof activeFilters !== 'undefined' && activeFilters && activeFilters.query));
+  try { renderEmptyJumps(); } catch (e) {}
+  try { refreshSearchAids(); } catch (e) {}
 }
 
 function renderActiveChips() {
@@ -6870,6 +7027,215 @@ if (typeof _UXG.refreshServerExcelStatus === 'function') {
 }
 
 // ---------------------------------------------------------------------------
+// 검색 쉽게 쓰기: 0건일 때 다른 탭 바로 가기, 검색 링크, 결과 키보드 이동, 문서 창 안 검색어 이동.
+// 검색 판정은 그대로 filterItems 계열이다(불변조건 18·51). 여기서는 화면 이동만 돕는다.
+// ---------------------------------------------------------------------------
+let SEARCH_TAB_COUNTS = null;
+const SEARCH_MODE_LABELS = { docs: '답변서', qa: '질문·답변', tables: '표 있는 답변서', ledger: '요구자료 관리대장' };
+
+// 결과가 0건일 때 누를 수 있는 바로 가기. 예전에는 "위쪽 탭의 건수를 보라"는 글만 있었다.
+function emptyJumpTargets(counts, mode, synonymsOn, query) {
+  const out = [];
+  if (counts) {
+    Object.keys(SEARCH_MODE_LABELS).forEach(m => {
+      if (m !== mode && Number(counts[m]) > 0) {
+        out.push({ action: 'mode', mode: m, label: `${SEARCH_MODE_LABELS[m]}에서 ${counts[m]}건 보기` });
+      }
+    });
+  }
+  if (String(query || '').trim() && !synonymsOn) {
+    out.push({ action: 'synonyms', label: '비슷한 말도 함께 찾기 켜기' });
+  }
+  return out;
+}
+
+function renderEmptyJumps() {
+  const box = _UXD && _UXD.getElementById('empty-state-jumps');
+  if (!box) return;
+  box.innerHTML = '';
+  const syn = _UXD.getElementById('chk-synonyms');
+  const targets = emptyJumpTargets(SEARCH_TAB_COUNTS, currentMode, !syn || syn.checked, activeFilters.query);
+  targets.forEach(t => {
+    const b = _UXD.createElement('button');
+    b.type = 'button';
+    b.className = 'empty-jump';
+    b.textContent = t.label;
+    b.addEventListener('click', () => {
+      if (t.action === 'mode') {
+        switchMode(t.mode);
+      } else if (syn) {
+        syn.checked = true;
+        render();
+      }
+    });
+    box.appendChild(b);
+  });
+}
+
+// 검색어에 따라 바뀌는 부속: 최근 검색어 칩(검색어 없을 때만), 검색 링크 버튼, 주소창의 검색 링크.
+function refreshSearchAids() {
+  const hasQuery = !!(activeFilters && activeFilters.query);
+  const recent = _UXD.getElementById('recent-chips');
+  if (recent) recent.hidden = hasQuery || !recent.children.length;
+  const linkBtn = _UXD.getElementById('btn-copy-search-link');
+  if (linkBtn) linkBtn.hidden = !hasQuery;
+  syncSearchHash();
+}
+
+function syncSearchHash() {
+  if (!_UXG.history || !_UXG.history.replaceState || !_UXG.location) return;
+  // 상세 창이 열려 있으면 그 창의 주소(#doc=…, #ledger=…)를 건드리지 않는다.
+  if (isModalOpen('modal-backdrop') || isModalOpen('ledger-modal-backdrop')) return;
+  const cur = _UXG.location.hash || '';
+  // 처음 연 주소가 문서 바로가기(#doc=…)면 그 창이 열릴 때까지 그대로 둔다.
+  if (cur && !/^#q=/.test(cur)) return;
+  const next = searchHashFor(activeFilters.query, currentMode);
+  if (next === cur) return;
+  try {
+    _UXG.history.replaceState(null, '', next || (_UXG.location.pathname + _UXG.location.search));
+  } catch (e) { /* 주소를 못 바꿔도 검색은 된다 */ }
+}
+
+function copySearchLink() {
+  const hash = searchHashFor(activeFilters.query, currentMode);
+  if (!hash) {
+    notify('검색어를 먼저 입력하세요.', 'info');
+    return;
+  }
+  const base = String(_UXG.location.href).split('#')[0];
+  copyText(base + hash, '검색 링크를 복사했습니다. 같은 화면 파일이나 서버 주소를 여는 동료는 같은 검색 결과를 봅니다.');
+}
+
+// 결과 목록 키보드 이동: 검색창에서 ↓로 들어와 ↑↓(←→)로 고르고 Enter로 연다. 맨 위에서 ↑는 검색창으로.
+function resultElements() {
+  const isTable = (typeof currentView !== 'undefined' && currentView === 'table');
+  const root = _UXD.getElementById(isTable ? 'table-body' : 'card-container');
+  return root ? Array.from(root.children) : [];
+}
+
+function focusResultAt(i) {
+  const el = resultElements()[i];
+  if (!el || !el.focus) return false;
+  el.focus();
+  if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+  return true;
+}
+
+function initResultKeyboard() {
+  if (!_UXD || !_UXD.addEventListener) return;
+  _UXD.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (!t || !t.matches || !t.matches('#card-container > .card, #table-body > tr')) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      t.click();
+      return;
+    }
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const list = resultElements();
+    const idx = list.indexOf(t) + step;
+    if (idx < 0) {
+      const si = _UXD.getElementById('search-input');
+      if (si) si.focus();
+      return;
+    }
+    focusResultAt(Math.min(idx, list.length - 1));
+  });
+}
+
+// 문서 창 안 검색어 위치 이동. 긴 답변서에서 노란 표시를 눈으로 하나씩 찾아 내려가야 했다.
+let MODAL_HITS = [];
+let MODAL_HIT_INDEX = -1;
+
+function nextHitIndex(cur, delta, n) {
+  if (!n) return -1;
+  if (cur < 0) return delta > 0 ? 0 : n - 1;
+  return ((cur + delta) % n + n) % n;
+}
+
+function modalActiveView() {
+  for (const id of ['modal-view-formatted', 'modal-view-qa']) {
+    const el = _UXD.getElementById(id);
+    if (el && el.style.display !== 'none') return el;
+  }
+  return null; // '글자만 보기'에는 표시가 없다.
+}
+
+function updateHitLabel() {
+  const label = _UXD.getElementById('hit-nav-label');
+  if (!label) return;
+  const n = MODAL_HITS.length;
+  label.textContent = MODAL_HIT_INDEX >= 0 ? `검색어 ${MODAL_HIT_INDEX + 1} / ${n}곳` : `검색어 ${n}곳`;
+}
+
+function refreshModalHits(jumpToFirst) {
+  if (!_UXD) return;
+  const view = modalActiveView();
+  MODAL_HITS = view ? Array.from(view.querySelectorAll('mark.highlight')) : [];
+  MODAL_HIT_INDEX = -1;
+  const nav = _UXD.getElementById('hit-nav');
+  if (nav) nav.hidden = !MODAL_HITS.length;
+  updateHitLabel();
+  if (jumpToFirst && MODAL_HITS.length) gotoModalHit(1);
+}
+
+function gotoModalHit(delta) {
+  if (!MODAL_HITS.length) return;
+  const prev = MODAL_HITS[MODAL_HIT_INDEX];
+  if (prev) prev.classList.remove('current');
+  MODAL_HIT_INDEX = nextHitIndex(MODAL_HIT_INDEX, delta, MODAL_HITS.length);
+  const el = MODAL_HITS[MODAL_HIT_INDEX];
+  el.classList.add('current');
+  try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { el.scrollIntoView(); }
+  updateHitLabel();
+}
+
+if (typeof _UXG.openDocModal === 'function') {
+  const _openDocModalForHits = _UXG.openDocModal;
+  _UXG.openDocModal = function (...args) {
+    const r = _openDocModalForHits.apply(this, args);
+    // 질문 칩으로 연 경우는 그 질문 위치로 이미 내려가므로 첫 검색어로 끌고 가지 않는다.
+    const after = () => setTimeout(() => refreshModalHits(!args[1]), 60);
+    if (r && typeof r.then === 'function') r.then(after, () => {});
+    else after();
+    return r;
+  };
+}
+
+if (typeof _UXG.switchModalTab === 'function') {
+  const _switchModalTabForHits = _UXG.switchModalTab;
+  _UXG.switchModalTab = function (...args) {
+    const r = _switchModalTabForHits.apply(this, args);
+    try { refreshModalHits(false); } catch (e) {}
+    return r;
+  };
+}
+
+['closeModal', 'closeLedgerModal'].forEach(name => {
+  const orig = _UXG[name];
+  if (typeof orig !== 'function') return;
+  _UXG[name] = function (...args) {
+    const r = orig.apply(this, args);
+    if (name === 'closeModal') MODAL_HITS = [];
+    // 상세 창을 닫으면 주소가 비워진다. 지금 검색 링크로 되돌린다.
+    try { syncSearchHash(); } catch (e) {}
+    return r;
+  };
+});
+
+if (_UXD && _UXD.addEventListener) {
+  _UXD.addEventListener('keydown', (e) => {
+    if (e.key !== 'F3' || !isModalOpen('modal-backdrop')) return;
+    const top = MODAL_STACK[MODAL_STACK.length - 1];
+    if (top && top.id !== 'modal-backdrop' && isModalOpen(top.id)) return;
+    e.preventDefault();
+    gotoModalHit(e.shiftKey ? -1 : 1);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 부팅 시 한 번.
 // ---------------------------------------------------------------------------
 function initUxEnhancements() {
@@ -6878,6 +7244,7 @@ function initUxEnhancements() {
   initDatePreviews();
   initRequesterAutocomplete();
   initSimilarPanel();
+  initResultKeyboard();
   refreshConnStatus();
   refreshDueSummary();
 }

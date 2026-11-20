@@ -105,6 +105,7 @@ SEARCH_FUNCS = [
     "parseSearchTokens",
     "escapeRegExpLiteral",
     "prepareSearchQuery",
+    "searchableBodyNoSpace",
     "matchSearchItem",
     "sortSearchResults",
     "filterItemsFromList",
@@ -416,7 +417,7 @@ console.log(JSON.stringify(out));
             '<table><tr><td colspan="2" rowspan="3">A</td></tr></table>',
             "<JB> 보도 내용",
             '<img src="image_001.png" alt="image">',
-            '<a href="https://www.example.go.kr/">링크</a>',
+            '<a href="https://example.org/">링크</a>',
         ]
         out = self.sanitize(samples)
         self.assertEqual(
@@ -429,7 +430,7 @@ console.log(JSON.stringify(out));
             "원문 꺾쇠 표기가 태그로 해석돼 사라지면 안 된다",
         )
         self.assertEqual(out[samples[2]], '<img src="image_001.png" alt="image">')
-        self.assertIn('href="https://www.example.go.kr/"', out[samples[3]])
+        self.assertIn('href="https://example.org/"', out[samples[3]])
 
 
 class TestServerSearchGrammar(unittest.TestCase):

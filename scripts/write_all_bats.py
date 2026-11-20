@@ -11,7 +11,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 import system_config
 
 WORKSPACE_ROOT = system_config.find_workspace_root(SYSTEM_DIR)
-from bats.content import (  # noqa: F401 # re-export (build_universal_package + tests import via shim)
+from bats.content import (  # noqa: F401 # shim re-export (build_universal_package.py, test_audit_phase12_batch.py)
     DEPS_CHECK,
     DISTRIBUTED_BATS,
     MIN_PYTHON,

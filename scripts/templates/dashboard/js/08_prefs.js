@@ -113,11 +113,41 @@ function nextRecentSearches(items, query) {
   return [q].concat(list.filter(x => x !== q)).slice(0, 8);
 }
 
+// 최근 검색어는 검색창 아래 칩으로 보여 준다. 예전 datalist는 입력창을 눌러야만 보여 거의 쓰이지 않았다.
+// 검색어가 있을 때는 숨긴다(refreshSearchAids). 이 브라우저에만 저장되며 [지우기]로 비울 수 있다.
 function loadRecentSearches() {
-  const list = document.getElementById('recent-searches');
-  if (!list) return;
-  const items = nextRecentSearches(safeStorageGet(RECENT_SEARCH_KEY, []), '');
-  list.innerHTML = items.map(q => `<option value="${escapeHtml(q)}"></option>`).join('');
+  const box = document.getElementById('recent-chips');
+  if (!box) return;
+  const items = nextRecentSearches(safeStorageGet(RECENT_SEARCH_KEY, []), '').slice(0, 6);
+  box.innerHTML = '';
+  if (!items.length) {
+    box.hidden = true;
+    return;
+  }
+  const label = document.createElement('span');
+  label.className = 'recent-label';
+  label.textContent = '최근 검색';
+  box.appendChild(label);
+  items.forEach(q => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'recent-chip';
+    b.textContent = q;
+    b.title = `“${q}” 다시 찾기`;
+    b.addEventListener('click', () => setSearchQuery(q));
+    box.appendChild(b);
+  });
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'recent-clear';
+  clear.textContent = '지우기';
+  clear.title = '이 브라우저에 남은 최근 검색어를 지웁니다';
+  clear.addEventListener('click', () => {
+    safeStorageSet(RECENT_SEARCH_KEY, []);
+    loadRecentSearches();
+  });
+  box.appendChild(clear);
+  box.hidden = !!(activeFilters && activeFilters.query);
 }
 
 function rememberSearch(query) {

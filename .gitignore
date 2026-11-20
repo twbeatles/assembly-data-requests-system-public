@@ -12,8 +12,10 @@
 *.temp
 .pipeline.lock
 .pipeline.lock.guard
+.storage_activity.guard
 *.zip
 .web_server.lock
+.web_server.lock.guard
 
 
 .excel_pending_queue.json
@@ -24,6 +26,7 @@
 .maintenance_backup/
 data_requests.json
 parsing_report.json
+artifacts/
 .file_hash_cache.json
 .file_hash_cache.json.tmp
 
@@ -37,7 +40,7 @@ parsing_report.json
 *.xlsm
 *.xls
 _parsed_markdown/
-자료요구_통합검색_대시보드.html
+*자료요구_통합검색_대시보드*.html
 배포용_자료요구_통합검색시스템/
 ../국회자료요구_스마트시스템_범용배포용/*.db
 ../국회자료요구_스마트시스템_범용배포용/*.json
@@ -72,3 +75,6 @@ Thumbs.db
 새자료_투입폴더/**
 !새자료_투입폴더/
 !새자료_투입폴더/README_여기에_파일을_넣으세요.txt
+
+# Added by environment hygiene
+.pytest_cache/

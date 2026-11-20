@@ -33,14 +33,19 @@ fixable = []
 "scripts/services/excel_sync/service.py" = ["E402"]
 "scripts/services/excel_sync/watcher.py" = ["E402"]
 "scripts/services/ledger/service.py" = ["E402"]
+# E402 for services/ledger_service.py: pre-existing layout (re-export
+# `import json` precedes the module docstring, so the shim imports sit
+# below a string statement). Proven at HEAD (S1 commit) via isolated
+# check; S1 bulk did not introduce it. Behavior-preserving: no moves.
+"scripts/services/ledger_service.py" = ["E402"]
 "scripts/set_department.py" = ["E402"]
 "scripts/sync_distributions.py" = ["E402"]
 "scripts/template_renderer.py" = ["E402"]
 # I001 deferred for scripts/web_server.py: its import reorder changes
 # pyright inference in dependent scripts/web/security.py (2 errors in
-# an untouched file; mechanism unisolated, reproduced by file swap).
-# Reverted to S1-verified order. Owner action: isolate the inference
-# coupling, then adopt I001 here.
+# an untouched file; same coupling as the -public sibling, mechanism
+# unisolated). Reverted to S1-verified order. Owner action: isolate
+# the inference coupling, then adopt I001 here.
 "scripts/web_server.py" = ["E402", "I001"]
 "scripts/write_all_bats.py" = ["E402"]
 "tests/__init__.py" = ["E402"]

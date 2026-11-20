@@ -2,17 +2,22 @@
 """CLI ↔ 기존 서비스 parity + 조회 무변경 + 비정상 입력 안정성.
 
 - 동일 합성 DB에서 `LedgerService.search_all`과 CLI 검색의 ID 집합이 같다.
-- 조회 전후 파일 지문이 변하지 않는다 (웜업 1회 후 정상 상태 기준).
+- 첫 조회부터 모든 파일의 지문이 변하지 않는다.
 - 손상 DB·빈 DB·특수문자 경로에서 stdout JSON 외 출력·트레이스백이 없다.
 """
 
 import hashlib
 import io
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 from contextlib import redirect_stdout
+from pathlib import Path
 
 import agent_fixtures
+import pytest
 from agent_bridge.facade import AgentFacade
 
 
@@ -59,37 +64,33 @@ def test_search_parity_with_ledger_service(tmp_path):
 
 def _fingerprints(base_dir):
     marks = {}
-    for name in (
-        "data_requests.db",
-        "data_requests.db-wal",
-        "data_requests.db-shm",
-        "data_requests.json",
-    ):
-        path = base_dir / name
-        if path.exists():
+    for path in base_dir.rglob("*"):
+        if path.is_file():
             digest = hashlib.sha256()
             with open(str(path), "rb") as handle:
                 for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                     digest.update(chunk)
-            marks[name] = digest.hexdigest()
+            marks[path.relative_to(base_dir).as_posix()] = digest.hexdigest()
     return marks
 
 
 def test_readonly_calls_leave_files_untouched(tmp_path):
     agent_fixtures.build_synthetic_db(tmp_path)
-    # 첫 호출로 파일 상태를 안정화한 뒤 비교한다 (정상 상태의 읽기는 무변경).
-    _run_cli(["search", "딥페이크"], tmp_path)
     before = _fingerprints(tmp_path)
-    _run_cli(["search", "딥페이크", "--category", "qa"], tmp_path)
-    _run_cli(["document", "get", "DOC-2026-001"], tmp_path)
-    _run_cli(["qa", "get", "QA-2026-001"], tmp_path)
-    _run_cli(["ledger", "list"], tmp_path)
-    _run_cli(["ledger", "show", "REQ-2026-001"], tmp_path)
-    _run_cli(["ledger", "summary"], tmp_path)
-    _run_cli(["ledger", "history", "REQ-2026-001"], tmp_path)
-    _run_cli(["reconcile"], tmp_path)
-    _run_cli(["doctor"], tmp_path)
-    assert _fingerprints(tmp_path) == before
+    for args in (
+        ["search", "딥페이크", "--category", "qa"],
+        ["document", "get", "DOC-2026-001"],
+        ["qa", "get", "QA-2026-001"],
+        ["ledger", "list"],
+        ["ledger", "show", "REQ-2026-001"],
+        ["ledger", "summary"],
+        ["ledger", "history", "REQ-2026-001"],
+        ["reconcile"],
+        ["doctor"],
+    ):
+        envelope, code, _ = _run_cli(args, tmp_path)
+        assert code == 0 and envelope["ok"] is True, (args, envelope)
+        assert _fingerprints(tmp_path) == before, args
 
 
 def test_search_log_not_written(tmp_path):
@@ -125,3 +126,51 @@ def test_special_char_path_works(tmp_path):
     agent_fixtures.build_synthetic_db(target)
     envelope, code, _ = _run_cli(["search", "딥페이크"], target)
     assert code == 0 and envelope["ok"] is True
+
+
+@pytest.mark.parametrize(
+    "state,arguments,exit_code,error",
+    [
+        ("valid", ["search", "토착왜가리"], 0, None),
+        ("missing", ["search", "토착왜가리"], 3, "dataset_unavailable"),
+        ("future", ["search", "토착왜가리"], 3, "dataset_unavailable"),
+        ("valid", ["document", "get", "DOC-MISSING"], 2, "invalid_input"),
+    ],
+)
+def test_cli_process_json_exit_code_and_readonly_contract(
+    tmp_path, state, arguments, exit_code, error
+):
+    """Run the shipped entry point outside the repo cwd and Python import state."""
+    base = tmp_path / "자료 요청 (2026) [최종]"
+    base.mkdir()
+    if state != "missing":
+        agent_fixtures.build_synthetic_db(base)
+    if state == "future":
+        from contextlib import closing
+
+        from db.migrations import SCHEMA_VERSION
+
+        with closing(sqlite3.connect(base / "data_requests.db")) as conn:
+            conn.execute(f"PRAGMA user_version={SCHEMA_VERSION + 1}")
+            conn.commit()
+    before = _fingerprints(base)
+    entry = Path(__file__).resolve().parents[1] / "scripts" / "datareq_cli.py"
+    result = subprocess.run(
+        [sys.executable, str(entry), "--data-root", str(base), "--json", *arguments],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        cwd=tmp_path,
+        env={**os.environ, "DATAREQ_PROFILE": "reader", "PYTHONIOENCODING": "utf-8"},
+    )
+    assert result.returncode == exit_code, (result.stdout, result.stderr)
+    payload = json.loads(result.stdout)  # Extra diagnostic text on stdout fails.
+    assert payload["ok"] is (error is None)
+    if error:
+        assert payload["error"]["code"] == error
+    else:
+        assert _stable_ids(payload["data"]["items"]) == {"DOC-2024-001"}
+    assert "Traceback" not in result.stderr
+    assert _fingerprints(base) == before

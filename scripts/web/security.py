@@ -48,6 +48,27 @@ class SecurityMixin(_HostBase_SecurityMixin):  # pyright: ignore[reportGeneralTy
         # 같은 PC의 다른 로컬 웹앱이 대장을 변경하지 못하게 포트까지 확인한다.
         return self._is_local_server_origin(origin)
 
+    def is_cross_site_request(self) -> bool:
+        """다른 사이트·다른 로컬 출처가 보낸 요청인가.
+
+        `<img src>`처럼 Origin 없이 오는 GET도 브라우저는 `Sec-Fetch-Site`를 붙인다.
+        헤더가 둘 다 없으면 브라우저가 아닌 로컬 도구로 보고 허용한다.
+        """
+        headers = getattr(self, "headers", {}) or {}
+        site = str(headers.get("Sec-Fetch-Site", "") or "").strip().lower()
+        if site in ("cross-site", "same-site"):
+            return True
+        return not self.has_trusted_write_origin()
+
+    def reject_cross_site_request(self) -> bool:
+        if not self.is_cross_site_request():
+            return False
+        self.send_error_response(
+            403,
+            "허용되지 않은 요청 출처입니다. 웹 관리 서버에서 연 대시보드를 사용하세요.",
+        )
+        return True
+
     def reject_untrusted_write_origin(self) -> bool:
         if self.has_trusted_write_origin():
             return False

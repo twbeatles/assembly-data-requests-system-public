@@ -34,6 +34,36 @@ class ServerInstanceLock:
         self.guard_path = Path(str(self.path) + GUARD_SUFFIX)
         self._owned = False
 
+    def _read_settled(self) -> Optional[dict]:
+        """락 파일을 읽는다. 막 만드는 중이면 잠깐 기다렸다가 다시 읽는다.
+
+        새로 만든 파일은 생성(O_EXCL)과 내용 기록 사이에 빈틈이 있어,
+        그 사이 읽으면 빈 문자열·깨진 JSON으로 None이 나온다. 외부 스캔이
+        잠깐 잠그는 경우도 있다. 수백 ms 안에 해소되므로 기다렸다가 본다.
+        """
+        info = self.read()
+        if info is not None:
+            return info
+        for _ in range(50):
+            time.sleep(0.01)
+            try:
+                if not self.path.exists():
+                    return None
+            except OSError:
+                return None
+            info = self.read()
+            if info is not None:
+                return info
+        return None
+
+    def _unreadable_is_fresh(self) -> bool:
+        """읽히지 않는 파일이 막 만든 것인지 본다. 쓰던 중일 수 있으면 True."""
+        try:
+            age = time.time() - self.path.stat().st_mtime
+        except OSError:
+            return False
+        return age < 60
+
     def read(self) -> Optional[dict]:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
@@ -82,8 +112,12 @@ class ServerInstanceLock:
             finally:
                 stream.seek(0)
                 if os.name == "nt":
+                    import msvcrt
+
                     msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
                 else:
+                    import fcntl
+
                     fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
     def _write(self, info: dict, exclusive: bool):
@@ -112,12 +146,17 @@ class ServerInstanceLock:
                     try:
                         self._write({"pid": os.getpid(), "port": None}, exclusive=True)
                     except FileExistsError:
-                        info = self.read()
+                        info = self._read_settled()
                         if self._holder_alive(info):
                             return False, info
                         if self._is_mine(info):
                             self._owned = True
                             return True, None
+                        if info is None and self._unreadable_is_fresh():
+                            # 읽히지 않는 새 파일은 쓰는 중일 수 있다. 살아 있는
+                            # 소유자의 락일 수 있으니 지우지 않고 물러난다.
+                            # (빈 폴더 동시 진입 경합에서 확인된 경로)
+                            return False, None
                         # 비정상 종료로 남은 락. 같은 잠금 안에서 지우고 곧바로 다시 만든다.
                         # 바깥에서 먼저 읽은 stale 정보로는 절대 unlink하지 않는다.
                         try:

@@ -27,7 +27,8 @@ def clean_for_excel(text: str, max_chars: int = 30000) -> str:
     if not text:
         return ""
     # Remove HTML tags but keep text inside
-    t = re.sub(r"<[^>]+>", " ", text)
+    t = re.sub(r"<!--[\s\S]*?-->", "", text)
+    t = re.sub(r"</?[a-zA-Z][^>]*>", " ", t)
     # Normalize multiple blank lines to double newline
     t = re.sub(r"\n{3,}", "\n\n", t)
     t = t.strip()
@@ -212,12 +213,15 @@ def extract_metadata(
     if m_rep:
         institution = "국회"
         requester = f"{m_rep.group(1)} 의원"
+    elif "대외기관" in filename or "대외위원회" in filename:
+        institution = "대외기관"
+        requester = "대외기관"
     elif "대외기관" in filename:
         institution = "상급감독기관"
         requester = "상급감독기관"
-    elif "심의위" in filename or "대외위원회" in filename:
-        institution = "대외위원회"
-        requester = "대외위원회"
+    elif "심의위" in filename:
+        institution = "대외심의위원회"
+        requester = "대외심의위원회"
     elif "입법조사처" in filename or "입법조사관" in filename:
         institution = "국회입법조사처"
         requester = "국회입법조사처"
@@ -227,7 +231,7 @@ def extract_metadata(
     elif "전문위원" in filename:
         institution = "국회"
         requester = "국회 전문위원"
-    elif "기자" in filename or "언론" in filename:
+    elif "기자" in filename or "JTBC" in filename:
         m_press = re.search(r"([A-Za-z가-힣]+)\s*([가-힣]{2,4})\s*기자", filename)
         if m_press:
             institution = "언론/기자"
@@ -253,6 +257,9 @@ def extract_metadata(
         if m_rep_f:
             institution = "국회"
             requester = f"{m_rep_f.group(1)} 의원"
+        elif "대외기관" in rel_path or "대외위원회" in rel_path:
+            institution = "대외기관"
+            requester = "대외기관"
         elif "입법조사처" in rel_path or "입법조사관" in rel_path:
             institution = "국회입법조사처"
             requester = "국회입법조사처"
@@ -277,9 +284,9 @@ def extract_metadata(
         elif "대외기관" in rel_path:
             institution = "상급감독기관"
             requester = "상급감독기관"
-        elif "심의위" in rel_path or "대외위원회" in rel_path:
-            institution = "대외위원회"
-            requester = "대외위원회"
+        elif "심의위" in rel_path or "5기 위원회" in rel_path:
+            institution = "대외심의위원회"
+            requester = "대외심의위원회"
 
     # 본문 내부 추가 탐색 (여전히 미분류인 경우)
     if requester == "미분류" and md_text:
@@ -296,9 +303,9 @@ def extract_metadata(
         elif "대외기관" in head_text:
             institution = "상급감독기관"
             requester = "상급감독기관"
-        elif "심의위" in head_text or "대외위원회" in head_text:
-            institution = "대외위원회"
-            requester = "대외위원회"
+        elif "심의위" in head_text or "대외심의위원회" in head_text:
+            institution = "대외심의위원회"
+            requester = "대외심의위원회"
 
     version = "최종/일반"
     if "초안" in filename or "초안" in rel_path:
@@ -355,12 +362,14 @@ def extract_content_details(md_text: str):
     questions = []
     lines = md_text.split("\n")
     Q_PATTERN = re.compile(
-        r"^(?:\*{1,2}|#{1,4}\s*)?(?:질의|질문|문)?\s*([0-9]{1,2}[\.\)]|\([0-9]{1,2}\)|[①-⑩]|[가-하]\.|\<[0-9]{1,2}\>|\[질의\s*[0-9]{1,2}\]|【질의\s*[0-9]{1,2}】)\s*(.+?)(?:\*{1,2})?$"
+        r"^(?:\*{1,2}|#{1,4}\s*)?(?:질의|질문|문)?\s*([0-9]{1,2}[\.\)]|\([0-9]{1,2}\)|\<[0-9]{1,2}\>|\[질의\s*[0-9]{1,2}\]|【질의\s*[0-9]{1,2}】|\[질문\s*[0-9]{1,2}\]|【질문\s*[0-9]{1,2}】)\s*(.+?)(?:\*{1,2})?$"
     )
     Q_BOX_PATTERN = re.compile(
-        r"^(?:\*{1,2}|#{1,4}\s*)?□\s*(?:질의|질문|문)\s*([0-9]{1,2}[\.\)]|\([0-9]{1,2}\)|[①-⑩]|[가-하]\.|\<[0-9]{1,2}\>|\[[0-9]{1,2}\]|【[0-9]{1,2}】)?\s*(.+?)(?:\*{1,2})?$"
+        r"^(?:\*{1,2}|#{1,4}\s*)?[□■◆●▲]\s*(?:질의|질문|문)\s*([0-9]{1,2}[\.\)]|\([0-9]{1,2}\)|\<[0-9]{1,2}\>|\[[0-9]{1,2}\]|【[0-9]{1,2}】)?\s*(.+?)(?:\*{1,2})?$"
     )
-    Q_QUESTION_PATTERN = re.compile(r"^(?:\*{1,2}|#{1,4}\s*)?□\s*(.+?\?)(?:\*{1,2})?$")
+    Q_QUESTION_PATTERN = re.compile(
+        r"^(?:\*{1,2}|#{1,4}\s*)?[□■◆●▲]\s*(.+?\?)(?:\*{1,2})?$"
+    )
     EXCLUDE_PREFIXES = (
         "단위",
         "참고",
@@ -382,10 +391,62 @@ def extract_content_details(md_text: str):
         "추진배경",
         "주요내용",
         "보고순서",
+        "제1항",
+        "제2항",
+        "제3항",
+        "제4항",
+        "제5항",
+        "반포",
+        "영리",
+        "상습",
+        "벌금",
+        "징역",
+        "누구든지",
+        "과태료",
+        "생략",
     )
+    LAW_SECTION_RE = re.compile(
+        r"^(?:<|\*|<|#|【|\[)?\s*(?:참고\s*자료\s*[:：]?\s*)?(?:관련\s*법령|관계\s*법령|근거\s*법령|관련\s*법률|관련\s*조문|성폭력.*특례법|정보통신망.*법|청소년.*보호법|형법|행정절차법)"
+    )
+    LAW_ARTICLE_RE = re.compile(r"^제\s*\d+\s*조(?:\s*의\s*\d+)?(?:\s*\([^\)]+\))?")
+    TOC_LINE_RE = re.compile(r"[\t\s]+\d{1,4}\s*$")
 
+    # 서면답변서(`<홍길동 위원>` + `1-2.` 질의)는 Q&A 분할과 같은 규칙으로 질의 목록을 만든다.
+    # 두 규칙이 갈라지면 질문 목록에는 4건, 질문·답변 탭에는 11건처럼 서로 다르게 보인다.
+    try:
+        from .qa_splitter import (
+            _written_answer_sections,
+            law_section_ends,
+            unescape_markdown_text,
+        )
+    except ImportError:
+        from extractors.qa_splitter import (
+            _written_answer_sections,
+            law_section_ends,
+            unescape_markdown_text,
+        )
+    written = _written_answer_sections(md_text.splitlines())
+    if written:
+        questions = [s["title"] for s in written][:40]
+        lines = []
+
+    in_law = False
+    last_num = 0
     for line in lines:
         line_s = line.strip()
+        line_clean = line_s.replace("*", "").strip()
+
+        if LAW_SECTION_RE.search(line_clean) or LAW_ARTICLE_RE.search(line_clean):
+            in_law = True
+            continue
+        if in_law:
+            # Q&A 분할과 같은 규칙으로 법령 인용 구간을 끝낸다(예전에는 문서 끝까지 이어졌다).
+            if not law_section_ends(line_clean, last_num):
+                continue
+            in_law = False
+        if TOC_LINE_RE.search(line_s) and len(line_s) < 80:
+            continue
+
         m_q = Q_PATTERN.match(line_s) or Q_BOX_PATTERN.match(line_s)
         if not m_q and line_s.endswith("?"):
             m_q = Q_QUESTION_PATTERN.match(line_s)
@@ -404,11 +465,18 @@ def extract_content_details(md_text: str):
             )
             if len(q_text) >= min_len and not q_text.startswith(EXCLUDE_PREFIXES):
                 if not line_s.startswith(("|", "<td", "<th", "<tr", "<table")):
-                    if q_text not in questions:
-                        questions.append(q_text)
+                    if not LAW_ARTICLE_RE.search(q_text) and not re.match(
+                        r"^\d{1,2}\s*\.\s*\d", q_text
+                    ):
+                        m_num = re.match(r"\(?(\d{1,2})", m_q.group(1) or "")
+                        if m_num:
+                            last_num = int(m_num.group(1))
+                        if q_text not in questions:
+                            questions.append(q_text)
         if len(questions) >= 12:
             break
 
+    questions = [unescape_markdown_text(q) for q in questions]
     questions_str = (
         "\n".join([f"{i + 1}. {q}" for i, q in enumerate(questions)])
         if questions
@@ -416,7 +484,7 @@ def extract_content_details(md_text: str):
     )
 
     table_count = len(re.findall(r"<table", md_text, re.IGNORECASE)) + len(
-        re.findall(r"\|[ -]+\|[ -]+\|", md_text)
+        re.findall(r"\|[\s:\-]+\|[\s:\-]+\|", md_text)
     )
     has_tables = "Y" if table_count > 0 else "N"
 
@@ -459,7 +527,11 @@ def extract_content_details(md_text: str):
     answers = []
     for line in lines:
         line_s = line.strip()
-        if line_s.startswith("○") or line_s.startswith("-") or line_s.startswith("□"):
+        if (
+            line_s.startswith(("○", "-", "□", "■", "◆", "●", "▶"))
+            or line_s.startswith("1.")
+            or line_s.startswith("2.")
+        ):
             cleaned_ans = re.sub(r"<[^>]+>", "", line_s).strip()
             cleaned_ans = re.sub(r"^[\s○\-□*]+", "", cleaned_ans)
             if len(cleaned_ans) > 15 and not cleaned_ans.startswith("【"):

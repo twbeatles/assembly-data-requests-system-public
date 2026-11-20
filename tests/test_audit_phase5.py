@@ -156,8 +156,15 @@ class TestAuditPhase5(unittest.TestCase):
         handler.send_json_response = mock_send_json
 
         # Test GET /api/sync
-        handler.path = "/api/sync"
-        handler.do_GET()
+        import web_server
+
+        orig_base = web_server.BASE_DIR
+        try:
+            web_server.BASE_DIR = self.temp_path
+            handler.path = "/api/sync"
+            handler.do_GET()
+        finally:
+            web_server.BASE_DIR = orig_base
         self.assertEqual(len(sent_responses), 1)
         self.assertEqual(sent_responses[0][0], 200)
         self.assertTrue(sent_responses[0][1]["success"])

@@ -38,13 +38,13 @@ DIST_MANIFEST = SYSTEM_DIR / ".distribution_manifest.json"
 # Import and re-export all functions for 100% backwards compatibility
 from build_db.merge import merge_concurrent_ledger_updates
 from db.database_manager import DatabaseManager
-from extractors.ledger_parser import (  # noqa: F401 # snapshot public surface
+from extractors.ledger_parser import (  # noqa: F401 # shim re-export (test_ledger_and_server.py)
     LedgerParser,
     load_request_ledger,
     normalize_ledger_date,
 )
 from extractors.qa_splitter import QASplitter, split_into_qa_items  # noqa: F401 # snapshot public surface
-from extractors.text_extractor import (  # noqa: F401 # snapshot public surface
+from extractors.text_extractor import (  # noqa: F401 # shim re-export (test_audit_fixes.py)
     TextExtractor,
     clean_for_excel,
     extract_content_details,
@@ -52,7 +52,11 @@ from extractors.text_extractor import (  # noqa: F401 # snapshot public surface
     mask_pii,
     parse_date,
 )
-from pipeline.parse.layout import SOURCE_HEADER_RE, strip_source_header
+from pipeline.parse.layout import (
+    SOURCE_HEADER_RE,
+    strip_source_header,
+    unsplit_bold_words,
+)
 
 
 def _mtime(path) -> float:
@@ -62,7 +66,8 @@ def _mtime(path) -> float:
         return 0.0
 
 
-from build_db.docids import (  # noqa: F401 # re-export (tests import via shim)
+from build_db.docids import (  # noqa: F401 # shim re-export (test_audit_phase12_performance.py, test_audit_scope4.py)
+    _remember_doc_keys,
     assign_doc_id,
     file_sha256,
     load_existing_id_map,
@@ -306,7 +311,8 @@ def _main_locked():
 
         # 역추적 주석은 파이프라인 메타데이터라 문서 전문에 넣지 않는다. 넣으면 카드 미리보기에
         # `<!-- source: … -->`가 글자 그대로 보이고 폴더명이 본문 검색에 걸린다. (감사 7회차 ISSUE-005)
-        md_clean_body = strip_source_header(md_content)
+        # 낱말을 가르는 굵게 표시(`**2**018`)는 검색을 깨므로 표시만 뗀다(글자는 그대로).
+        md_clean_body = unsplit_bold_words(strip_source_header(md_content))
         meta = extract_metadata(
             rel_str, filename, md_clean_body, orig_candidate or full_path
         )

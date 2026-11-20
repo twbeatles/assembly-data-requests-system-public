@@ -1,4 +1,24 @@
 {
   "typeCheckingMode": "standard",
-  "extraPaths": ["scripts", "tests"]
+  "extraPaths": ["scripts", "tests", "."],
+  "exclude": [
+    "**/__pycache__",
+    ".pytest_cache",
+    "build",
+    "dist"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "extraPaths": ["scripts", "..", "."],
+      "reportMissingImports": "none",
+      "reportOptionalMemberAccess": "none",
+      "reportOptionalSubscript": "none",
+      "reportCallIssue": "none",
+      "reportArgumentType": "none",
+      "reportOperatorIssue": "none",
+      "reportIncompatibleMethodOverride": "none",
+      "reportAttributeAccessIssue": "none"
+    }
+  ]
 }

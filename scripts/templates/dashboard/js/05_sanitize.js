@@ -32,11 +32,16 @@ function decodeHtmlEntities(text) {
 function isSafeUrl(value, attrName) {
   const compact = decodeHtmlEntities(value).replace(/[\u0000-\u0020\u007f-\u009f]+/g, '').toLowerCase();
   const scheme = /^([a-z][a-z0-9+.-]*):/.exec(compact);
+  if (attrName === 'src') {
+    // Browser URL parsing treats //host and backslash variants as an external
+    // authority. These are not local relative paths, even without a scheme.
+    if (/\\/.test(compact) || compact.startsWith('//')) return false;
+    if (!scheme) return true;
+    return /^data:image\/(png|jpe?g|gif|webp|bmp);/.test(compact);
+  }
   if (!scheme) return true; // 상대 경로·#앵커
   if (attrName === 'href') return ['http', 'https', 'mailto'].includes(scheme[1]);
-  // img src의 원격 http(s)는 렌더링 시점에 외부 요청을 내므로 허용하지 않는다.
-  // 오프라인 단일 HTML이라는 제품 보장을 지키기 위한 차단이다. (감사 Documentation Mismatch)
-  return /^data:image\/(png|jpe?g|gif|webp|bmp);/.test(compact);
+  return false;
 }
 
 function rebuildTag(tag) {
@@ -68,10 +73,23 @@ function sanitizeHtml(html) {
     .replace(/<\/?[a-zA-Z][^>]*>?|<[!?][^>]*>?/g, rebuildTag);
 }
 
+// KorDoc이 한글 개요 수준을 그대로 `#`로 옮겨, 본문 항목(`## - 일반인 신고…`, `## ○ …`)과
+// 긴 문장이 큰 제목으로 보이는 문서가 있다(운영 48건·358줄, 80자 넘는 제목 17건). 화면 표시에서만
+// 제목 표시를 떼어 본문으로 보여 준다. 글자는 그대로이고 저장된 전문·복사본은 바뀌지 않는다.
+function demoteBodyHeadings(md) {
+  return String(md || '')
+    .replace(/^#{1,6}[ \t]+(?=[-–○ㅇ※·▶•][ \t])/gm, '')
+    .replace(/^#{1,6}[ \t]+(?=\S[^\r\n]{79,}\r?$)/gm, '');
+}
+
 function safeMarkedParse(md) {
   try {
     if (typeof marked !== 'undefined' && marked.parse) {
-      return sanitizeHtml(marked.parse(md || ''));
+      const clean = String(md || '')
+        .replace(/\u25cc/g, '○')
+        .replace(/^\[포맷:\s*[A-Z0-9]+\s*\|\s*페이지:\s*\d+\]\s*\n?/i, '')
+        .replace(/^<!--\s*source:.*?-->\s*\n?/i, '');
+      return sanitizeHtml(marked.parse(demoteBodyHeadings(clean)));
     }
     return escapeHtml(md || '');
   } catch (e) {
@@ -107,13 +125,15 @@ function applyDomHighlight(element, tokens) {
   let node;
   while (node = walker.nextNode()) {
     if (node.nodeValue && matchRegex.test(node.nodeValue)) {
+      const p = node.parentNode;
+      if (p && p.closest && p.closest('.table-wrapper-header')) continue;
       textNodes.push(node);
     }
   }
 
   textNodes.forEach(textNode => {
     const parent = textNode.parentNode;
-    if (parent && parent.nodeName !== 'MARK' && parent.nodeName !== 'SCRIPT' && parent.nodeName !== 'STYLE') {
+    if (parent && parent.nodeName !== 'MARK' && parent.nodeName !== 'SCRIPT' && parent.nodeName !== 'STYLE' && !(parent.closest && parent.closest('.table-wrapper-header'))) {
       const frag = document.createDocumentFragment();
       const parts = textNode.nodeValue.split(splitRegex);
       parts.forEach(part => {
@@ -225,7 +245,7 @@ function copyTableHtml(btn) {
   const tbl = wrapper.querySelector('table');
   if (!tbl) return;
 
-  const htmlData = tbl.outerHTML;
+  const htmlData = tbl.outerHTML.replace(/<mark class="highlight">([\s\S]*?)<\/mark>/gi, '$1');
   const textData = tbl.innerText;
 
   if (navigator.clipboard && window.ClipboardItem) {
@@ -237,9 +257,9 @@ function copyTableHtml(btn) {
         btn.innerText = '✅ 표 복사 완료!';
         setTimeout(() => btn.innerText = orig, 2000);
       })
-      .catch(() => copyText(textData, '표 텍스트가 클립보드에 복사되었습니다.'));
+      .catch(() => copyText(textData, '표의 텍스트를 복사했습니다. 이 환경에서는 표 서식 복사가 지원되지 않습니다.'));
   } else {
-    copyText(textData, '표가 복사되었습니다.');
+    copyText(textData, '표의 텍스트를 복사했습니다. 이 환경에서는 표 서식 복사가 지원되지 않습니다.');
   }
 }
 

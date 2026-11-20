@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from storage_activity import guarded_write
+
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
@@ -27,6 +29,7 @@ else:
 
 
 class ExcelToDbMixin(_HostBase_ExcelToDbMixin):  # pyright: ignore[reportGeneralTypeIssues]  # static-only cycle; runtime base is object
+    @guarded_write("sync")
     def sync_excel_to_db(self, write_json: bool = True) -> Dict[str, Any]:
         """
         Scans the master Excel file and synchronizes any manual additions or updates into the SQLite DB.

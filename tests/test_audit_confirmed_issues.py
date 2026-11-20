@@ -2,6 +2,8 @@
 """PROJECT_AUDIT 확정 이슈(ISSUE-001~004)·Gap 회귀 테스트. 합성 픽스처만 쓴다.
 
 - ISSUE-001: 죽은 락을 둔 동시 회수는 정확히 한 프로세스만 성공한다.
+- LOCK-02/03/04: 살아 있는 소유자가 있으면 두 번째 취득이 실패하고, 강제 종료된
+  소유자의 락은 회수되며, 소유하지 않은 프로세스의 release는 새 락을 지우지 않는다.
 - ISSUE-002: 빈·구·미래 DB에서 모든 agent 조회는 파일을 만들지 않고
   `dataset_unavailable`로 실패한다(ID 없음과 구분된다).
 - ISSUE-003: WAL에 커밋된 건수 유지 UPDATE는 지문을 바꾸고, rollback·checkpoint는
@@ -19,6 +21,7 @@ import sqlite3
 import subprocess
 import sys
 import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -120,8 +123,7 @@ class TestIssue001ConcurrentReclaim(unittest.TestCase):
             self.assertTrue(pid_is_alive(winners[0][1]))
             info = ServerInstanceLock(tmp_path).read()
             self.assertIsNotNone(info)
-            assert info is not None
-            self.assertEqual(str(info.get("pid")), str(winners[0][1]))
+            self.assertEqual(str((info or {}).get("pid")), str(winners[0][1]))
             for _, _, holder in losers:
                 self.assertEqual(
                     holder, winners[0][1], "패자는 살아 있는 새 소유자를 돌려줘야 한다"
@@ -137,6 +139,351 @@ class TestIssue001ConcurrentReclaim(unittest.TestCase):
         for _ in range(3):
             with _race_tmp() as tmp_path:
                 self._one_round(Path(tmp_path))
+
+
+def _holder_worker(base_dir, gate, hold, out):
+    """살아 있는 소유자 프로세스. 취득 후 hold까지 살아 있어 회수 대상이 아니다."""
+    from web.instance_lock import ServerInstanceLock
+
+    gate.wait(timeout=30)
+    lock = ServerInstanceLock(base_dir)
+    try:
+        ok, info = lock.acquire()
+    except Exception as exc:  # noqa: BLE001 - 워커 실패는 큐로 보고
+        out.put(("error", os.getpid(), repr(exc)))
+        return
+    out.put(("ok" if ok else "refused", os.getpid(), info))
+    if ok:
+        hold.wait(timeout=120)
+        try:
+            lock.release()
+        except Exception:  # noqa: BLE001, S110 - 정리 실패는 join이 검증
+            pass
+
+
+def _non_owner_release_worker(base_dir, out):
+    """락을 쥔 적 없는 프로세스의 release. 락 파일을 지우면 안 된다."""
+    from web.instance_lock import ServerInstanceLock
+
+    try:
+        ServerInstanceLock(base_dir).release()
+        out.put("released-noop")
+    except Exception as exc:  # noqa: BLE001 - 워커 실패는 큐로 보고
+        out.put("error:" + repr(exc))
+
+
+def _start_holder(base_dir):
+    gate = multiprocessing.Event()
+    hold = multiprocessing.Event()
+    out = multiprocessing.Queue()
+    proc = multiprocessing.Process(
+        target=_holder_worker, args=(str(base_dir), gate, hold, out)
+    )
+    proc.start()
+    gate.set()
+    return proc, hold, out
+
+
+def _short_lived_holder(base_dir, gate, out):
+    """acquire 뒤 sleep 5초 후 os._exit(0)으로 스스로 끝난다.
+
+    강제 종료 재현에 terminate()를 쓰지 않는다. Event.wait() 안에 있는 프로세스를
+    밖에서 죽이면 그 Event의 내부 잠금이 고아가 되어 부모의 set()이 멈춘다.
+    time.sleep 중에는 공유 잠금을 쥐지 않으므로 _exit가 안전하다.
+    """
+    from web.instance_lock import ServerInstanceLock
+
+    gate.wait(timeout=30)
+    lock = ServerInstanceLock(base_dir)
+    try:
+        ok, _ = lock.acquire()
+    except Exception as exc:  # noqa: BLE001 - 워커 실패는 큐로 보고
+        out.put(("error", repr(exc)))
+        return
+    if not ok:
+        out.put(("refused", None))
+        return
+    out.put(("ok", os.getpid()))
+    time.sleep(5)
+    os._exit(0)
+
+
+def _join_clean(testcase, proc, hold, what):
+    hold.set()
+    proc.join(timeout=30)
+    if proc.is_alive():
+        proc.terminate()
+        proc.join(timeout=30)
+    testcase.assertFalse(proc.is_alive())
+    testcase.assertEqual(proc.exitcode, 0)
+
+
+class TestLockLiveOwnerContention(unittest.TestCase):
+    """LOCK-02: 살아 있는 소유자가 있으면 두 번째 취득은 실패한다."""
+
+    def test_second_acquire_while_owner_alive_fails(self):
+        from pipeline_guard import pid_is_alive
+        from web.instance_lock import LOCK_NAME, ServerInstanceLock
+
+        with _race_tmp() as tmp_path:
+            base = Path(tmp_path)
+            proc, hold, out = _start_holder(base)
+            try:
+                kind, holder_pid, _ = out.get(timeout=60)
+                self.assertEqual(kind, "ok")
+                self.assertTrue(pid_is_alive(holder_pid))
+                ok, info = ServerInstanceLock(base).acquire()
+                self.assertFalse(ok)
+                self.assertIsNotNone(info)
+                self.assertEqual(str((info or {}).get("pid")), str(holder_pid))
+                ServerInstanceLock(base).release()
+                kept = ServerInstanceLock(base).read()
+                self.assertIsNotNone(kept)
+                self.assertEqual(str((kept or {}).get("pid")), str(holder_pid))
+                self.assertTrue((base / LOCK_NAME).exists())
+            finally:
+                _join_clean(self, proc, hold, "owner")
+            ok, _ = ServerInstanceLock(base).acquire()
+            self.assertTrue(ok)
+            ServerInstanceLock(base).release()
+
+    def test_non_owner_process_release_keeps_lock(self):
+        from web.instance_lock import ServerInstanceLock
+
+        with _race_tmp() as tmp_path:
+            base = Path(tmp_path)
+            proc, hold, out = _start_holder(base)
+            try:
+                kind, holder_pid, _ = out.get(timeout=60)
+                self.assertEqual(kind, "ok")
+                stranger_out = multiprocessing.Queue()
+                stranger = multiprocessing.Process(
+                    target=_non_owner_release_worker, args=(str(base), stranger_out)
+                )
+                stranger.start()
+                stranger.join(timeout=30)
+                self.assertFalse(stranger.is_alive())
+                self.assertEqual(stranger_out.get(timeout=30), "released-noop")
+                kept = ServerInstanceLock(base).read()
+                self.assertIsNotNone(kept)
+                self.assertEqual(str((kept or {}).get("pid")), str(holder_pid))
+            finally:
+                _join_clean(self, proc, hold, "owner")
+
+
+def _port_holder(base_dir, gate, out):
+    """set_port 뒤 스스로 끝나는 소유자. spawn pickling을 위해 최상위 함수다.
+
+    ready Event 대기는 쓰지 않는다. 대기 중인 프로세스를 밖에서 죽이면
+    그 Event가 고아가 된다(_short_lived_holder 참조).
+    """
+    from web.instance_lock import ServerInstanceLock as Lock
+
+    gate.wait(timeout=30)
+    lock = Lock(base_dir)
+    try:
+        ok, _ = lock.acquire()
+    except Exception as exc:  # noqa: BLE001 - 워커 실패는 큐로 보고
+        out.put(("error", repr(exc)))
+        return
+    if not ok:
+        out.put(("refused", None))
+        return
+    lock.set_port(18081)
+    out.put(("ok", os.getpid()))
+    time.sleep(5)
+    os._exit(0)
+
+
+class TestLockReclaimAfterKill(unittest.TestCase):
+    """LOCK-03: 강제 종료된 소유자의 락은 회수된다."""
+
+    def test_reclaim_after_kill_with_live_lock_file(self):
+        from pipeline_guard import pid_is_alive
+        from web.instance_lock import ServerInstanceLock
+
+        with _race_tmp() as tmp_path:
+            base = Path(tmp_path)
+            gate = multiprocessing.Event()
+            out = multiprocessing.Queue()
+            proc = multiprocessing.Process(
+                target=_short_lived_holder, args=(str(base), gate, out)
+            )
+            proc.start()
+            try:
+                gate.set()
+                kind, holder_pid = out.get(timeout=60)
+                self.assertEqual(kind, "ok")
+                proc.join(timeout=30)
+                self.assertFalse(proc.is_alive(), "홀더는 5초 뒤 스스로 끝나야 한다")
+                self.assertFalse(pid_is_alive(holder_pid))
+                ok, _ = ServerInstanceLock(base).acquire()
+                self.assertTrue(ok, "dead owner lock must be reclaimed")
+                mine = ServerInstanceLock(base).read()
+                self.assertEqual(str((mine or {}).get("pid")), str(os.getpid()))
+            finally:
+                if proc.is_alive():
+                    proc.terminate()
+                    proc.join(timeout=30)
+            ServerInstanceLock(base).release()
+
+    def test_reclaim_after_set_port_and_kill(self):
+        """포트를 기록한 소유자가 죽으면 포트 포함 락도 회수된다."""
+        from pipeline_guard import pid_is_alive
+        from web.instance_lock import ServerInstanceLock
+
+        with _race_tmp() as tmp_path:
+            base = Path(tmp_path)
+            gate = multiprocessing.Event()
+            out = multiprocessing.Queue()
+            proc = multiprocessing.Process(
+                target=_port_holder, args=(str(base), gate, out)
+            )
+            proc.start()
+            try:
+                gate.set()
+                kind, holder_pid = out.get(timeout=60)
+                self.assertEqual(kind, "ok")
+                recorded = ServerInstanceLock(base).read()
+                self.assertEqual((recorded or {}).get("port"), 18081)
+                proc.join(timeout=30)
+                self.assertFalse(proc.is_alive(), "홀더는 5초 뒤 스스로 끝나야 한다")
+                self.assertFalse(pid_is_alive(holder_pid))
+                ok, _ = ServerInstanceLock(base).acquire()
+                self.assertTrue(ok, "포트를 기록하고 죽은 소유자의 락도 회수돼야 한다")
+                self.assertEqual(
+                    str((ServerInstanceLock(base).read() or {}).get("pid")),
+                    str(os.getpid()),
+                )
+            finally:
+                if proc.is_alive():
+                    proc.terminate()
+                    proc.join(timeout=30)
+            ServerInstanceLock(base).release()
+
+
+class TestLockEmptyDirRaceRepeated(unittest.TestCase):
+    """LOCK-04: 빈 폴더 동시 진입도 정확히 하나만 소유한다. 10회 반복 측정."""
+
+    def test_empty_dir_race_single_winner_ten_rounds(self):
+        import queue
+
+        from pipeline_guard import pid_is_alive
+        from web.instance_lock import ServerInstanceLock
+
+        wins = failures = timeouts = 0
+        for round_no in range(10):
+            with _race_tmp() as tmp_path:
+                base = Path(tmp_path)
+                gate = multiprocessing.Event()
+                hold = multiprocessing.Event()
+                out = multiprocessing.Queue()
+                procs = [
+                    multiprocessing.Process(
+                        target=_race_worker, args=(str(base), gate, hold, out, i)
+                    )
+                    for i in range(5)
+                ]
+                for proc in procs:
+                    proc.start()
+                try:
+                    gate.set()
+                    results = []
+                    for _ in procs:
+                        try:
+                            results.append(out.get(timeout=30))
+                        except queue.Empty:
+                            timeouts += 1
+                            if not all(p.is_alive() for p in procs):
+                                break
+                    winners = [r for r in results if r[0]]
+                    losers = [r for r in results if not r[0]]
+                    if len(winners) == 1:
+                        wins += 1
+                    else:
+                        failures += 1
+                    self.assertEqual(len(winners), 1, f"round {round_no}: {results!r}")
+                    self.assertTrue(pid_is_alive(winners[0][1]))
+                    info = ServerInstanceLock(base).read()
+                    self.assertEqual(str((info or {}).get("pid")), str(winners[0][1]))
+                    for _, _, holder in losers:
+                        self.assertEqual(holder, winners[0][1])
+                finally:
+                    # 패자는 put 뒤 바로 끝나므로 all()은 항상 거짓이 된다.
+                    # set()을 조건에 걸면 승자가 깨어나지 못해 매 라운드 30초씩 탄다.
+                    # 대기 중 자식을 밖에서 죽이는 일은 없으므로(terminate는
+                    # join 실패 최후 수단) 무조건 깨운다. 기존 _one_round과 같은 방식.
+                    hold.set()
+                    for proc in procs:
+                        proc.join(timeout=30)
+                        if proc.is_alive():
+                            proc.terminate()
+                            proc.join(timeout=30)
+                    lingering = [p for p in procs if p.is_alive()]
+                    self.assertEqual(lingering, [], f"round {round_no}")
+        self.assertEqual((wins, failures, timeouts), (10, 0, 0))
+
+
+class TestLockUnreadableBackoff(unittest.TestCase):
+    """읽히지 않는 락은 살았을 수 있으니 지우지 않고 물러난다."""
+
+    def test_fresh_unreadable_lock_is_not_deleted(self):
+        import json
+        from unittest import mock
+
+        from web.instance_lock import LOCK_NAME, ServerInstanceLock
+
+        with _race_tmp() as tmp_path:
+            base = Path(tmp_path)
+            (base / LOCK_NAME).write_text(
+                json.dumps({"pid": os.getpid() + 100000}), encoding="utf-8"
+            )
+            before = (base / LOCK_NAME).read_bytes()
+            with mock.patch.object(ServerInstanceLock, "read", return_value=None):
+                ok, info = ServerInstanceLock(base).acquire()
+            self.assertFalse(ok)
+            self.assertIsNone(info)
+            self.assertEqual(
+                (base / LOCK_NAME).read_bytes(),
+                before,
+                "읽히지 않는 새 락을 지우면 살아 있는 소유자가 날아간다",
+            )
+
+    def test_old_unreadable_lock_is_reclaimed(self):
+        import json
+        import os
+        import time
+        from unittest import mock
+
+        from web.instance_lock import LOCK_NAME, ServerInstanceLock
+
+        with _race_tmp() as tmp_path:
+            base = Path(tmp_path)
+            (base / LOCK_NAME).write_text(json.dumps({"pid": 1}), encoding="utf-8")
+            old = time.time() - 3600
+            os.utime(str(base / LOCK_NAME), (old, old))
+            with mock.patch.object(ServerInstanceLock, "read", return_value=None):
+                ok, _ = ServerInstanceLock(base).acquire()
+            self.assertTrue(ok, "오래된 읽불가 락은 회수돼야 한다(복구 경로 유지)")
+            self.assertEqual(
+                (ServerInstanceLock(base).read() or {}).get("pid"), os.getpid()
+            )
+            ServerInstanceLock(base).release()
+
+    def test_read_settled_reads_plain_file(self):
+        from web.instance_lock import ServerInstanceLock
+
+        with _race_tmp() as tmp_path:
+            base = Path(tmp_path)
+            lock = ServerInstanceLock(base)
+            ok, _ = lock.acquire()
+            self.assertTrue(ok)
+            lock.release()
+            settling = ServerInstanceLock(base)
+            ok2, _ = settling.acquire()
+            self.assertTrue(ok2)
+            self.assertIsNotNone(settling._read_settled())
+            settling.release()
 
 
 class _race_tmp:
@@ -237,7 +584,9 @@ class TestIssue002ReadonlyContract(unittest.TestCase):
     def test_stale_and_future_schema_fail_without_modification(self):
         import tempfile
 
-        for target_version, hint in ((1, "오래"), (4, "최신")):
+        from db.migrations import SCHEMA_VERSION
+
+        for target_version, hint in ((1, "오래"), (SCHEMA_VERSION + 1, "최신")):
             with tempfile.TemporaryDirectory(prefix="issue002_ver_") as tmp:
                 base = Path(tmp)
                 agent_fixtures.build_synthetic_db(base)
@@ -373,12 +722,25 @@ class TestIssue004FailureContract(unittest.TestCase):
         extract_and_build_db.DB_PATH = Path(tmp_path) / "data_requests.db"
         self.addCleanup(setattr, add_documents_smart, "SYSTEM_DIR", self._old_system)
         self.addCleanup(setattr, extract_and_build_db, "DB_PATH", self._old_db)
+        # A preflight regression must fail inside the fixture, never fall through
+        # to the real parser's root paths.
+        from unittest.mock import patch
+
+        body_guard = patch.object(
+            add_documents_smart,
+            "_run_smart_add_body",
+            side_effect=AssertionError("future DB reached pipeline body"),
+        )
+        body_guard.start()
+        self.addCleanup(body_guard.stop)
 
     def _future_db(self, tmp_path):
         db_path = Path(tmp_path) / "data_requests.db"
         conn = sqlite3.connect(str(db_path))
         try:
-            conn.execute("PRAGMA user_version = 4")
+            from db.migrations import SCHEMA_VERSION
+
+            conn.execute("PRAGMA user_version = %d" % (SCHEMA_VERSION + 1))
             conn.commit()
         finally:
             conn.close()
@@ -537,7 +899,7 @@ class TestRemoteImageBlocked(unittest.TestCase):
                 '<img src="http://evil.example/x.png">',
                 '<img src="image_001.png" alt="image">',
                 '<img src="data:image/png;base64,iVBORw0KGgo=" alt="inline">',
-                '<a href="https://www.example.go.kr/">링크</a>',
+                '<a href="https://example.org/">링크</a>',
             ]
         )
         self.assertNotIn(
@@ -561,6 +923,6 @@ class TestRemoteImageBlocked(unittest.TestCase):
             out['<img src="data:image/png;base64,iVBORw0KGgo=" alt="inline">'],
         )
         self.assertIn(
-            'href="https://www.example.go.kr/"',
-            out['<a href="https://www.example.go.kr/">링크</a>'],
+            'href="https://example.org/"',
+            out['<a href="https://example.org/">링크</a>'],
         )

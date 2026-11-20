@@ -537,6 +537,10 @@ class LauncherApp(ViewsMixin, ActionsMixin):  # pyright: ignore[reportGeneralTyp
                     )
 
                 if err_msg:
+                    if isinstance(result_data, dict) and result_data.get(
+                        "artifacts_may_be_partial"
+                    ):
+                        err_msg += "\nDB는 갱신됐지만 일부 출력 파일은 이전 상태일 수 있습니다. 00번을 다시 실행해 출력 파일을 다시 만드세요."
                     guide_msg = (
                         f"DB 갱신 중 오류가 발생했습니다:\n\n{err_msg}\n\n"
                         "※ 신규 한글(HWP/HWPX) 문서 자동 변환 및 동기화는\n"

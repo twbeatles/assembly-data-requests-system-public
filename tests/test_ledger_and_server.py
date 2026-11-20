@@ -41,6 +41,17 @@ class TestLedgerAndServer(unittest.TestCase):
                 "2026-01-01",
             ),
         )
+        conn.execute(
+            "INSERT INTO documents(doc_id, year, title, full_markdown) VALUES (?,?,?,?)",
+            ("DOC-TEST", "2026", "딥페이크 문서", "원문 자료"),
+        )
+        conn.execute(
+            "INSERT INTO qa_items(qa_id, doc_id, year, question_title, answer_markdown) VALUES (?,?,?,?,?)",
+            ("QA-TEST", "DOC-TEST", "2026", "딥페이크 질문", "법 및 통신 관련 답변"),
+        )
+        conn.execute(
+            "UPDATE request_ledger SET linked_doc_id='DOC-TEST' WHERE ledger_id='REQ-2026-001'"
+        )
         conn.commit()
         conn.close()
 
@@ -98,7 +109,7 @@ class TestLedgerAndServer(unittest.TestCase):
         linked_count = cur.execute(
             "SELECT COUNT(*) FROM request_ledger WHERE linked_doc_id != ''"
         ).fetchone()[0]
-        self.assertGreaterEqual(linked_count, 0)
+        self.assertEqual(linked_count, 1)
 
         conn.close()
 
@@ -198,15 +209,14 @@ class TestLedgerAndServer(unittest.TestCase):
             web_server.RequestLedgerHandler
         )
 
-        # Test 1 or 2 character keywords that trigger fallback LIKE search
-        # Previously failed with 'no such column: q.question_title' when using older init_db schema
-        try:
-            results_1char = handler.query_qa_items(kw="법")
-            self.assertIsInstance(results_1char, list)
-            results_2char = handler.query_qa_items(kw="통신")
-            self.assertIsInstance(results_2char, list)
-        except Exception as e:
-            self.fail(f"Short keyword fallback search raised an unexpected error: {e}")
+        # Both terms occur only in the canonical answer body; empty results fail.
+        for keyword in ("법", "통신"):
+            with self.subTest(keyword=keyword):
+                self.assertEqual(
+                    [r["qa_id"] for r in handler.query_qa_items(kw=keyword)],
+                    ["QA-TEST"],
+                )
+        self.assertEqual(handler.query_qa_items(kw="없는낱말"), [])
 
     def test_search_category_and_type_compatibility(self):
         """Test search_all supporting various category / type filters."""
@@ -215,9 +225,20 @@ class TestLedgerAndServer(unittest.TestCase):
         )
 
         for stype in ["all", "docs", "qa", "ledger"]:
-            res = handler.search_all(kw="자료", search_type=stype)
+            res = handler.search_all(kw="딥페이크", search_type=stype)
             self.assertTrue(res.get("success"))
             self.assertIn("counts", res)
+            expected = {
+                "documents": ("doc_id", "DOC-TEST", "docs"),
+                "qa_items": ("qa_id", "QA-TEST", "qa"),
+                "ledger": ("ledger_id", "REQ-2026-001", "ledger"),
+            }
+            for key, (id_field, expected_id, category) in expected.items():
+                self.assertEqual(
+                    [r[id_field] for r in res[key]],
+                    [expected_id] if stype in ("all", category) else [],
+                    (stype, key),
+                )
             if stype == "docs":
                 self.assertEqual(len(res["qa_items"]), 0)
                 self.assertEqual(len(res["ledger"]), 0)

@@ -11,6 +11,7 @@
 """
 
 import contextlib
+import copy
 import datetime
 import hashlib
 import sqlite3
@@ -37,6 +38,8 @@ class AgentFacade:
             raise DataReqError("invalid_input", "알 수 없는 권한 프로파일입니다.")
         self.profile = profile
         self.immutable = bool(immutable)
+        self._snapshot_connection = None
+        self._snapshot_file_identity = None
         self.allowed_roots = (
             [Path(p) for p in allowed_roots]
             if allowed_roots
@@ -59,6 +62,7 @@ class AgentFacade:
             base_dir=self.base_dir,
             read_only=True,
             immutable=self.immutable,
+            read_connection=self._snapshot_connection,
         )
 
     def _db_path(self):
@@ -134,6 +138,10 @@ class AgentFacade:
             service._maybe_prune_search_log = original_prune
 
     def _readonly_conn(self):
+        if self._snapshot_connection is not None:
+            from db.connections import BorrowedConnection
+
+            return BorrowedConnection(self._snapshot_connection)
         from extractors.ledger.workbook import connect_readonly
 
         db_path = self._require_db()
@@ -141,87 +149,94 @@ class AgentFacade:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def dataset_version(self):
-        """DB 지문. 없으면 'unavailable'.
+    @contextlib.contextmanager
+    def read_snapshot(self):
+        """Sources, search and fingerprint use one read-only SQLite snapshot."""
+        if self._snapshot_connection is not None:
+            yield self
+            return
+        from storage_activity import storage_activity
 
-        건수·파일 크기·초 단위 mtime만 보던 예전 지문은 WAL에 커밋된 같은 행 수정을
-        구분하지 못했다. 새 지문은 읽기 전용 연결(mode=ro, WAL 내용 포함)로 읽은
-        내용 집계(이력 ID·갱신 시각·행 해시)와 파일 식별자를 함께 해시한다.
-        지문을 얻기 위해 checkpoint 같은 쓰기는 하지 않는다. (감사 ISSUE-003)
+        # Lock an existing managed gate without creating any file. This also
+        # stabilizes immutable reads when the database currently has no WAL.
+        with storage_activity(self.base_dir, create=False):
+            conn = self._readonly_conn()
+            try:
+                conn.execute("BEGIN")
+                conn.execute("SELECT COUNT(*) FROM sqlite_master").fetchone()
+                snapshot = copy.copy(self)
+                snapshot._snapshot_connection = conn
+                stat = self._db_path().stat()
+                snapshot._snapshot_file_identity = (stat.st_ino, stat.st_dev)
+                yield snapshot
+            finally:
+                conn.rollback()
+                conn.close()
+
+    def dataset_version(self):
+        """Transactional content revision, independent of WAL/checkpoint/inode.
+
+        Every fresh shadow DB has a new build_id. Content triggers advance the
+        revision in the same commit as the mutation. Online backup copies both.
+        Version reads never migrate or checkpoint the dataset.
         """
-        db_path = self._db_path()
-        if not db_path.exists():
+        if not self._db_path().exists():
             return "unavailable"
         try:
             conn = self._readonly_conn()
             try:
-                cur = conn.cursor()
-                version = cur.execute("PRAGMA user_version").fetchone()[0]
-                docs = cur.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
-                qa = cur.execute("SELECT COUNT(*) FROM qa_items").fetchone()[0]
-                ledger = cur.execute(
-                    "SELECT COUNT(*) FROM request_ledger "
-                    "WHERE COALESCE(status, '') != '[삭제]'"
+                if not conn.in_transaction:
+                    conn.execute("BEGIN")
+                version = conn.execute("PRAGMA user_version").fetchone()[0]
+                docs = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+                qa = conn.execute("SELECT COUNT(*) FROM qa_items").fetchone()[0]
+                ledger = conn.execute(
+                    "SELECT COUNT(*) FROM request_ledger WHERE COALESCE(status, '') != '[삭제]'"
                 ).fetchone()[0]
-                tombstones = cur.execute(
+                tombstones = conn.execute(
                     "SELECT COUNT(*) FROM request_ledger WHERE status = '[삭제]'"
                 ).fetchone()[0]
-                docs_seq = cur.execute("SELECT MAX(rowid) FROM documents").fetchone()[0]
-                qa_seq = cur.execute("SELECT MAX(rowid) FROM qa_items").fetchone()[0]
-                ledger_seq = cur.execute(
-                    "SELECT MAX(rowid) FROM request_ledger"
-                ).fetchone()[0]
-                ledger_updated = cur.execute(
-                    "SELECT MAX(updated_at) FROM request_ledger"
-                ).fetchone()[0]
-                try:
-                    hist_seq = cur.execute(
-                        "SELECT MAX(history_id) FROM ledger_history"
-                    ).fetchone()[0]
-                except Exception:
-                    hist_seq = None
-                ledger_hash = self._ledger_content_hash(cur)
-            finally:
-                conn.close()
-            # 파일 식별자는 inode·장치만 쓴다. 크기·mtime은 checkpoint만으로 바뀌어
-            # 내용 불변에도 지문이 흔들리고, 재빌드(os.replace)는 inode가 바뀌어 구분된다.
-            stat = db_path.stat()
-            canonical = "|".join(
-                str(part)
-                for part in (
+                identity = conn.execute(
+                    "SELECT build_id, revision FROM dataset_revision WHERE singleton=1"
+                ).fetchone()
+                if identity is None:
+                    return "unavailable"
+                file_identity = self._snapshot_file_identity
+                if file_identity is None:
+                    stat = self._db_path().stat()
+                    file_identity = (stat.st_ino, stat.st_dev)
+                canonical = "|".join(
+                    str(value)
+                    for value in (
+                        version,
+                        docs,
+                        qa,
+                        ledger,
+                        tombstones,
+                        *identity,
+                        *file_identity,
+                    )
+                )
+                digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
+                return "v%s-docs%s-qa%s-ledger%s-tomb%s-rev%s" % (
                     version,
                     docs,
                     qa,
                     ledger,
                     tombstones,
-                    docs_seq,
-                    qa_seq,
-                    ledger_seq,
-                    ledger_updated,
-                    hist_seq,
-                    ledger_hash,
-                    stat.st_ino,
-                    stat.st_dev,
+                    digest,
                 )
-            )
-            digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
-            return "v%s-docs%s-qa%s-ledger%s-tomb%s-rev%s" % (
-                version,
-                docs,
-                qa,
-                ledger,
-                tombstones,
-                digest,
-            )
-        except Exception:
+            finally:
+                conn.close()
+        except (sqlite3.Error, OSError):
             return "unavailable"
 
     @staticmethod
     def _ledger_content_hash(cur):
         """대장 전 행의 내용 해시. 건수를 바꾸지 않는 UPDATE도 구분한다.
 
-        대장 표는 수백~수천 행 규모라 전 행 해시가 부담되지 않는다. 문서/Q&A 전문은
-        크기가 커서 건수·rowid·파일 식별자로만 식별한다 (재빌드 시 바뀐다).
+        호환용 내용 해시. 데이터셋 버전은 모든 정본 변경을 추적하는 DB 내부
+        build_id·revision을 사용하며, 파일 교체 방식에 의존하지 않는다.
         """
         digest = hashlib.sha256()
         for row in cur.execute("SELECT * FROM request_ledger ORDER BY ledger_id"):
@@ -388,6 +403,7 @@ class AgentFacade:
             conn.close()
 
     def get_document(self, doc_id, max_chars=None, offset=None):
+        self._require_schema()
         max_chars = policy.clamp_chars(
             max_chars, policy.MAX_EXCERPT_CHARS, policy.MAX_EXCERPT_CHARS
         )
@@ -419,6 +435,7 @@ class AgentFacade:
         }
 
     def get_qa(self, qa_id, max_chars=None, offset=None):
+        self._require_schema()
         max_chars = policy.clamp_chars(
             max_chars, policy.MAX_EXCERPT_CHARS, policy.MAX_EXCERPT_CHARS
         )

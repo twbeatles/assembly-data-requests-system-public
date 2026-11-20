@@ -123,8 +123,15 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
     )
     print("✓ 원클릭 바로가기 배치파일 7종 작성 완료")
 
-    exe_src = SYSTEM_DIR / "dist" / "자료요구_통합검색.exe"
-    if exe_src.exists():
+    exe_src = None
+    for cand in [
+        SYSTEM_DIR / "자료요구_통합검색.exe",
+        SYSTEM_DIR / "dist" / "자료요구_통합검색.exe",
+    ]:
+        if cand.exists():
+            exe_src = cand
+            break
+    if exe_src and exe_src.exists():
         shutil.copy2(exe_src, target_dir / "자료요구_통합검색.exe")
         print("✓ 독립 실행 파일(자료요구_통합검색.exe) 복사 완료")
 

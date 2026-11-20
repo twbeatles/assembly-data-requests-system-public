@@ -4,13 +4,14 @@
 
 본 가이드는 **① 동봉된 설치파일을 통한 문서 파싱**, **② KorDoc MCP(Model Context Protocol) 연동 파싱**, **③ 스마트시스템 DB 자동 적재 워크플로우**를 상세히 안내합니다.
 
+- **공식 저장소**: [https://github.com/chrisryugj/kordoc](https://github.com/chrisryugj/kordoc)
+- **공식 다운로드 (Releases)**: [https://github.com/chrisryugj/kordoc/releases](https://github.com/chrisryugj/kordoc/releases)
+
 ---
 
 ## 1. 동봉된 KorDoc AI 설치 파일 (`KorDoc.AI_1.5.1_x64_ko-KR.msi`)
 
 ### 1) 설치 파일 개요
-- **공식 저장소**: [https://github.com/chrisryugj/kordoc](https://github.com/chrisryugj/kordoc)
-- **공식 다운로드 (Releases)**: [https://github.com/chrisryugj/kordoc/releases](https://github.com/chrisryugj/kordoc/releases)
 - **파일명**: `KorDoc.AI_1.5.1_x64_ko-KR.msi` (약 15.3MB)
 - **버전**: KorDoc AI v1.5.1 (x64 Windows 한국어 공식 패키지)
 - **변환 지원 포맷**: `.hwp` (한글 3.0 / 5.0), `.hwpx`, `.pdf` (스캔본 한국어 OCR 내장), `.xlsx`, `.docx`, 이미지
@@ -117,6 +118,20 @@ AI 챗봇이나 에이전트에게 다음과 같이 요청하여 즉시 파싱�
 ```
 
 대시보드 HTML에는 파싱된 마크다운 **전문**이 들어갑니다. 용량을 이유로 본문을 빼지 않습니다. (원문 보존 정책)
+
+---
+
+## 3-1. 변환 엔진 버전 확인·갱신 (2026-11-12)
+
+00번 배치가 실제로 부르는 것은 `kordoc` 명령줄(npm 패키지)이며, 위 MSI(v1.5.1)와 버전이 다릅니다. 엔진은 자주 갱신됩니다(4.24.62~67이 2026-11-11~12 이틀 사이에 배포됨).
+
+- **현재 버전 확인:** 명령 프롬프트에서 `kordoc --version`. 00번 실행 로그에도 `kordoc 엔진 버전`이 찍힙니다.
+- **갱신:** `npm install -g kordoc@latest`
+- **기존 문서에는 자동 적용되지 않습니다.** 파싱 캐시는 원문 파일의 해시만 비교하므로, 원문이 같으면 엔진을 올려도 예전 변환 결과를 그대로 씁니다. 새 엔진으로 전체를 다시 변환하려면 `python scripts\parse_all.py --force`(OCR 문서가 많아 수 분~수십 분 걸립니다) 후 00번을 실행합니다.
+- **어느 엔진으로 변환됐는지:** `parsing_report.json`의 `kordoc_version`(전체)과 문서별 `kordoc_version`에 기록됩니다. 2026-11-12 이전에 변환된 문서는 기록이 없습니다.
+- **엔진을 올린 뒤 점검할 것:** 새 문서 몇 건의 `_parsed_markdown/*.md`에서 표·글자 모양(`**`)이 깨지지 않았는지, 대시보드 검색이 되는지 확인합니다. 글자 중간에 끼는 굵게 표시(`**2**018`)는 DB를 만들 때 자동으로 정리됩니다.
+- **지원하지 않는 형식:** 이 시스템은 HWP·HWPX·XLSX·PDF만 변환합니다. 투입 폴더의 txt·csv·zip·png 등은 건너뛰고 00번 로그에 건수만 알립니다. 요구 내용이 txt 메일이나 이미지로만 있는 경우 HWP/PDF로 저장해서 넣어야 검색됩니다.
+- **156MB 넘는 XLSX:** 새 엔진도 압축 해제 크기 한도(100MB)로 변환하지 못하며, 이 경우 상위 500행·30열 대체 추출이 쓰입니다.
 
 ---
 

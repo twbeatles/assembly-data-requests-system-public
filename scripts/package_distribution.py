@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 DIST_ROOT = ROOT_DIR / "배포용_자료요구_통합검색시스템"
 
 
-from distribution.copy import safe_copy_file
+from distribution.copy import mirror_markdown_tree, safe_copy_file
 
 
 def resolve_exe_src() -> Path:
@@ -510,9 +510,11 @@ def main():
     md_src_dir = ROOT_DIR / "_parsed_markdown"
     md_dst_dir = DIST_ROOT / "_parsed_markdown"
     if md_src_dir.exists():
-        shutil.copytree(md_src_dir, md_dst_dir, dirs_exist_ok=True)
+        removed = mirror_markdown_tree(md_src_dir, md_dst_dir)
         md_count = sum(1 for _ in md_dst_dir.rglob("*.md"))
-        print(f"마크다운 원문 폴더 동기화 완료: _parsed_markdown/ ({md_count}개 파일)")
+        print(
+            f"마크다운 원문 폴더 동기화 완료: _parsed_markdown/ ({md_count}개 파일, 원본에 없는 파일 {removed}건 정리)"
+        )
 
     # Source documents are intentionally not copied into the compact data package.
     # This manifest lets the incremental parser distinguish that case from a real

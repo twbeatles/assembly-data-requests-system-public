@@ -17,9 +17,7 @@
 있으면 FTS를 건너뛰고 곧바로 대체 경로로 보낸다(제안서 S2).
 """
 
-import re  # noqa: F401 # compat re-export shim
-
-from search.lang import (  # noqa: F401 # compat re-export shim
+from search.lang import (  # noqa: F401 # shim re-export (service.py)
     _CHOSEONG_MAX_LEN,
     _DATE_RANGE_RE,
     _FIELD_TOKEN_RE,
@@ -37,7 +35,7 @@ from search.lang import (  # noqa: F401 # compat re-export shim
     normalize_date,
     strip_particle,
 )
-from search.match import (  # noqa: F401 # compat re-export shim
+from search.match import (  # noqa: F401 # shim re-export (service.py, test_search_db_upgrade.py)
     _nospace_lower,
     _term_matches,
     fields_match,
@@ -45,4 +43,4 @@ from search.match import (  # noqa: F401 # compat re-export shim
     row_matches,
     score_row,
 )
-from search.parse import _expand_terms, _take_field, build_fts_match, parse_query  # noqa: F401 # compat re-export shim
+from search.parse import _expand_terms, _take_field, build_fts_match, parse_query  # noqa: F401 # shim re-export (service.py, test_audit_phase10_dashboard.py, test_search_db_upgrade.py)

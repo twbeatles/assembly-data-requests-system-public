@@ -191,7 +191,7 @@ function emptyStateHints(filteredCount, totalCount) {
       hints.push('여러 단어는 모두 들어간 자료만 찾습니다. 하나만 있어도 되면 "OR"로 이어 주세요.');
     }
     if (q && positive.length === 0 && /(^|\s)-\S/.test(q)) hints.push('제외어(-)만으로는 검색되지 않습니다. 찾을 단어를 함께 입력하세요.');
-    if (q) hints.push('위쪽 다른 탭에 같은 검색어로 찾은 건수가 표시됩니다. 그 탭을 눌러 보세요.');
+    // 다른 탭에 결과가 있으면 아래 바로 가기 버튼(renderEmptyJumps)이 건수와 함께 뜬다.
   }
   return { active, hints };
 }

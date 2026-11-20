@@ -156,13 +156,13 @@ class TestAuditScope4(unittest.TestCase):
         self.assertIn(".tmp.xlsx", src)
         self.assertIn("os.replace", src)
 
-    def test_requester_committee_substring_not_oversight(self):
+    def test_requester_committee_substring_not_kcsc(self):
         meta = extract_metadata(
             "붙임1_심의 관련 부서별 담당 정보.hwp",
             filename="붙임1_심의 관련 부서별 담당 정보.hwp",
             md_text="",
         )
-        self.assertNotEqual(meta["requester"], "대외위원회")
+        self.assertNotEqual(meta["requester"], "대외심의위원회")
 
     def test_requester_calculation_filename_not_internal_stats(self):
         meta = extract_metadata(

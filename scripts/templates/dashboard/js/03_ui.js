@@ -44,12 +44,40 @@ function applyDeepLink() {
       const found = DOCS_MAP[qa.doc_id || qa.parent_id];
       if (found) setTimeout(() => openDocModal(found, qa.q_num), 200);
     }
+  } else if (targetId.startsWith('q=')) {
+    // 검색 링크(#q=검색어&mode=탭): 직접 친 것과 같은 경로로 검색한다.
+    const s = parseSearchHash(raw);
+    if (s) {
+      if (s.mode !== currentMode) switchMode(s.mode);
+      setSearchQuery(s.q);
+    }
   } else if (targetId.startsWith('ledger=') || targetId.startsWith('req=')) {
     const id = targetId.replace(/^ledger=/, '').replace(/^req=/, '');
     switchMode('ledger');
     const found = LEDGER_MAP[id];
     if (found) setTimeout(() => openLedgerModal(found), 200);
   }
+}
+
+// 검색 링크 주소. 같은 화면 파일(01)이나 서버 주소(02)를 여는 동료가 같은 검색 결과를 보게 한다.
+// 주소는 history.replaceState로만 바꾼다(location.hash 대입 금지 — 불변조건 53).
+function searchHashFor(query, mode) {
+  const q = String(query || '').trim();
+  if (!q) return '';
+  const params = new URLSearchParams();
+  params.set('q', q);
+  if (mode && mode !== 'docs') params.set('mode', mode);
+  return '#' + params.toString();
+}
+
+function parseSearchHash(hash) {
+  const raw = String(hash || '').replace(/^#/, '');
+  if (!/^q=/.test(raw)) return null;
+  const params = new URLSearchParams(raw);
+  const q = String(params.get('q') || '').trim();
+  if (!q) return null;
+  const mode = params.get('mode');
+  return { q, mode: VIEW_MODES.includes(mode) ? mode : 'docs' };
 }
 
 function updateFavCount() {
@@ -263,7 +291,8 @@ function getDocOrigUrl(relPath) {
   if (window.location.protocol.startsWith('http')) {
     return '/api/download?path=' + encodeURIComponent(relPath);
   }
-  return relPath;
+  const clean = String(relPath).replace(/\\/g, '/').replace(/^\/+/, '');
+  return clean.startsWith('../') ? clean : ('../' + clean);
 }
 
 async function openFileLocation(relPath) {
@@ -276,7 +305,11 @@ async function openFileLocation(relPath) {
     return;
   }
   try {
-    const res = await fetch('/api/open?path=' + encodeURIComponent(relPath) + '&mode=explorer');
+    const res = await fetch('/api/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: relPath, mode: 'explorer' })
+    });
     const data = await res.json();
     if (res.ok && data.success) {
       notify('원본 파일이 있는 폴더를 열었습니다.', 'success');

@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
+from storage_activity import guarded_write
 from write_guard import ProductionWriteBlocked
 
 try:
@@ -94,6 +95,7 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
     # -------------------------------------------------------------------------
     # 3. Web -> Excel Write Operations
     # -------------------------------------------------------------------------
+    @guarded_write("sync")
     def sync_item_to_excel(
         self, item: Dict[str, Any], action: str = "insert"
     ) -> Dict[str, Any]:
@@ -281,6 +283,29 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             f"{located[0]} 시트 {located[1]}행({row.get('title') or row.get('requester') or '-'})이 "
             f"대장ID {item.get('ledger_id')}의 요구자료와 다릅니다"
         )
+
+    @staticmethod
+    def _copy_row_by_header(src_ws, src_row: int, dst_ws, dst_row: int) -> bool:
+        """원래 행의 값·서식을 같은 1행 헤더 이름의 열로 옮긴다. 하나라도 옮겼으면 True."""
+        from copy import copy as _copy
+
+        dst_cols = {}
+        for c in range(1, dst_ws.max_column + 1):
+            name = dst_ws.cell(1, c).value
+            if name is not None and str(name).strip():
+                dst_cols.setdefault(str(name).strip(), c)
+        copied = False
+        for c in range(1, src_ws.max_column + 1):
+            name = src_ws.cell(1, c).value
+            col = dst_cols.get(str(name).strip()) if name is not None else None
+            if not col:
+                continue
+            src_cell = src_ws.cell(src_row, c)
+            dst_cell = dst_ws.cell(dst_row, col, value=src_cell.value)
+            if src_cell.has_style:
+                dst_cell._style = _copy(src_cell._style)
+            copied = True
+        return copied
 
     def _create_year_sheet(self, wb, year_str: str, template_sheet_name: str):
         """새 연도 시트를 만들고 기준 시트의 헤더·열 너비를 복제한다."""
@@ -502,6 +527,12 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
                 ("note", c_note, item.get("note", ""), "left"),
                 ("request_type", c_type, item.get("request_type", "시스템"), "center"),
             ]
+            # 연도 이동은 원래 행을 그대로 옮긴 뒤 바뀐 칸만 고친다. 전체 스냅숏을 새로 쓰면
+            # 매핑되지 않은 사용자 열이 사라지고, 보류 재생 때 다른 칸의 엑셀 수기 수정을 옛 값으로
+            # 덮는다. (2026-10-21 감사)
+            moved = move_from is not None and self._copy_row_by_header(
+                wb[move_from[0]], move_from[1], ws, target_row
+            )
             # 기존 행을 고칠 때만 "바뀐 필드"로 좁힌다. 보류 큐 재생 때 오래된 전체
             # 스냅숏으로 사용자의 엑셀 수기 수정을 덮어쓰지 않기 위한 장치다.
             # 반대로 **새 행을 만들 때는 반드시 전체 필드를 기록한다.** 일부만 쓰면
@@ -510,7 +541,7 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             changed = item.get("_changed_fields")
             allowed = (
                 set(changed)
-                if (action == "update" and changed and not is_new_row)
+                if (action == "update" and changed and (not is_new_row or moved))
                 else None
             )
             for field, col, value, align in field_cols:

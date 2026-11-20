@@ -65,6 +65,32 @@ def strip_source_header(text: str) -> str:
     return re.sub(r"^﻿?<!--\s*source:.*?-->[ \t]*\r?\n?", "", text or "", count=1)
 
 
+_BOLD_RUN_RE = re.compile(r"(?<![*\\])\*\*(?=[^\s*])([^*\n]+?)(?<=[^\s*\\])\*\*(?!\*)")
+_WORD_CHAR_RE = re.compile(r"[0-9A-Za-z가-힣]")
+
+
+def unsplit_bold_words(text: str) -> str:
+    """낱말 중간에서 끊긴 굵게 표시(`**2**018`)의 `**`만 뗀다. 글자는 하나도 바꾸지 않는다.
+
+    KorDoc 4.24.x는 HWP 글자 모양을 `**`로 내보내는데, 한 낱말 안에서 글자 모양이 바뀌면
+    `**2**018`, `**○  ‘**딥페이크`처럼 표시가 낱말을 가른다. 그러면 "2018" 검색이
+    대시보드·FTS·GUI 모두에서 그 문서를 놓친다. 앞이나 뒤가 낱말 글자에 붙은 굵게 구간만
+    평문으로 되돌린다. 낱말 경계에 맞는 굵게(`**제14조의2(…)** ①`)는 그대로 둔다.
+    `<!-- source -->` 주석처럼 서식 표기라 전문 보존 정책의 예외가 아니다.
+    """
+    if not text or "**" not in text:
+        return text or ""
+
+    def _fix(m):
+        before = text[m.start() - 1] if m.start() > 0 else ""
+        after = text[m.end()] if m.end() < len(text) else ""
+        if _WORD_CHAR_RE.match(before) or _WORD_CHAR_RE.match(after):
+            return m.group(1)
+        return m.group(0)
+
+    return _BOLD_RUN_RE.sub(_fix, text)
+
+
 def write_text_atomic(path: Path, text: str):
     """같은 폴더의 임시 파일에 쓴 뒤 교체한다. 중간에 끊겨도 반쪽 마크다운이 남지 않는다."""
     path = Path(path)

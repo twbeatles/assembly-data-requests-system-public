@@ -14,7 +14,9 @@ import sys
 import tempfile
 import time
 import unittest
+from contextlib import closing
 from pathlib import Path
+from unittest import mock
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
@@ -28,6 +30,9 @@ from services.ledger_service import LedgerService
 
 class TestExcelBidirectionalSync(unittest.TestCase):
     def setUp(self):
+        instance_patch = mock.patch.object(ExcelSyncService, "_instance", None)
+        instance_patch.start()
+        self.addCleanup(instance_patch.stop)
         self.temp_dir = tempfile.mkdtemp(prefix="test_excel_sync_")
         self.base_dir = Path(self.temp_dir)
         self.db_path = self.base_dir / "data_requests.db"
@@ -123,6 +128,7 @@ class TestExcelBidirectionalSync(unittest.TestCase):
         self.sync_service.json_path = self.json_path
 
     def tearDown(self):
+        LedgerService.wait_last_sync(timeout=10)
         self.sync_service.stop_file_watcher()
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
@@ -269,8 +275,15 @@ class TestExcelBidirectionalSync(unittest.TestCase):
         self.assertEqual(row["status"], "보완요청")
 
     def test_07_file_lock_deferred_queue(self):
-        # Simulate an exclusive lock by keeping file open in write mode
-        with open(self.excel_path, "r+b"):
+        # Fail at the workbook save boundary on every OS. Merely opening a file
+        # does not lock it on POSIX. Parsing, outbox and queue persistence stay real.
+        self.sync_service.ensure_ledger_ids()
+        before = self.excel_path.read_bytes()
+        with mock.patch.object(
+            self.sync_service,
+            "_save_workbook",
+            side_effect=PermissionError("Excel busy"),
+        ) as save:
             # While file is locked, web inserts a new item
             new_item = {
                 "year": "2026",
@@ -284,30 +297,47 @@ class TestExcelBidirectionalSync(unittest.TestCase):
             self.assertTrue(res["success"])
             self.assertFalse(res.get("excel_synced"))
             self.assertTrue(res.get("excel_pending"))
+            self.assertTrue(save.called)
+            self.assertEqual(self.excel_path.read_bytes(), before)
 
             # Check item was queued
             with self.sync_service._pending_lock:
                 self.assertGreaterEqual(len(self.sync_service._pending_queue), 1)
 
-        # After locked_fp closes (Excel program closed), flush pending queue
+        # Recreate the service: an in-memory queue alone must not pass this test.
+        self.sync_service = ExcelSyncService(base_dir=self.base_dir)
+        self.assertEqual(self.sync_service.pending_count(), 1)
         flushed = self.sync_service.flush_pending_queue()
-        self.assertGreaterEqual(flushed, 1)
+        self.assertEqual(flushed, 1)
+        self.assertEqual(self.sync_service.pending_count(), 0)
+        self.assertEqual(self.sync_service.flush_pending_queue(), 0)
 
         # Verify row was written to Excel after unlock
         wb = openpyxl.load_workbook(str(self.excel_path), data_only=True)
         ws = wb["2026"]
         titles = [ws.cell(r, 5).value for r in range(2, ws.max_row + 1)]
         wb.close()
-        self.assertIn("잠금 중 등록된 자료", titles)
+        self.assertEqual(titles.count("잠금 중 등록된 자료"), 1)
 
     def test_08_startup_sync(self):
+        wb = openpyxl.load_workbook(self.excel_path)
+        wb["2026"].cell(2, 5, "서버 종료 중 엑셀에서 바꾼 제목")
+        wb["2026"].cell(2, 12, "수기 비고 보존")
+        wb.save(self.excel_path)
+        wb.close()
         # Advance Excel mtime into the future
         future_time = time.time() + 100
         os.utime(self.excel_path, (future_time, future_time))
 
         # Startup sync check
         self.sync_service.check_and_sync_startup()
-        self.assertGreaterEqual(self.sync_service.get_version(), 0)
+        with closing(sqlite3.connect(self.db_path)) as conn:
+            row = conn.execute(
+                "SELECT title, note FROM request_ledger WHERE ledger_id=?",
+                ("REQ-2026-001",),
+            ).fetchone()
+        self.assertEqual(row, ("서버 종료 중 엑셀에서 바꾼 제목", "수기 비고 보존"))
+        self.assertTrue(self.sync_service.last_excel_sync()["success"])
 
 
 if __name__ == "__main__":

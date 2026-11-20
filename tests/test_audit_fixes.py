@@ -183,13 +183,13 @@ class TestAuditFixes(unittest.TestCase):
 
     def test_pii_masking(self):
         """Test that mobile phone numbers and emails are masked while official numbers remain."""
-        text = "홍길동 기자(010-1234-5678)의 질의 및 메일 reporter@example.com, 대표전화 02-1234-5678 문의"
+        text = "홍길동 기자(010-0000-1234)의 질의 및 메일 reporter@example.org, 대표전화 02-0000-1234 문의"
         masked = extract_and_build_db.mask_pii(text)
-        self.assertNotIn("010-1234-5678", masked)
-        self.assertIn("010-****-5678", masked)
-        self.assertNotIn("reporter@example.com", masked)
-        self.assertIn("re***@example.com", masked)
-        self.assertIn("02-1234-5678", masked)  # Official telephone preserved
+        self.assertNotIn("010-0000-1234", masked)
+        self.assertIn("010-****-1234", masked)
+        self.assertNotIn("reporter@example.org", masked)
+        self.assertIn("re***@example.org", masked)
+        self.assertIn("02-0000-1234", masked)  # Official telephone preserved
 
     def test_sensitive_directory_exclusions(self):
         """Test that sensitive evidence and personnel directories are excluded."""
@@ -211,8 +211,6 @@ class TestAuditFixes(unittest.TestCase):
 
     def test_dashboard_compression_and_size(self):
         """Test that dashboard HTML is compressed under 2MB and decompresses cleanly."""
-        import base64
-        import gzip
         import re
 
         html_path = ROOT_DIR / "자료요구_통합검색_대시보드.html"
@@ -238,10 +236,9 @@ class TestAuditFixes(unittest.TestCase):
         self.assertIsNotNone(match, "COMPRESSED_DATA script tag must be found in HTML")
         assert match is not None
 
-        b64_data = match.group(1).strip()
-        compressed_bytes = base64.b64decode(b64_data)
-        decompressed_bytes = gzip.decompress(compressed_bytes)
-        db = json.loads(decompressed_bytes.decode("utf-8"))
+        from template_renderer import DashboardRenderer
+
+        db = DashboardRenderer.decode_dashboard_payload(html_text)
 
         self.assertIn("documents", db)
         self.assertIn("qa_items", db)
@@ -257,7 +254,7 @@ class TestAuditFixes(unittest.TestCase):
         # Ensure main JavaScript code is properly enclosed inside <script> tag
         self.assertRegex(
             html_text,
-            r"</script>\s*<script>\s*let DB\s*=",
+            r"<script>[\s\S]*?\blet DB\s*=",
             "Main JS code must be wrapped in <script> tag",
         )
 
