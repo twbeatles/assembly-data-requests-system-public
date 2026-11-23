@@ -52,6 +52,14 @@ class GetRoutesMixin(_HostBase_GetRoutesMixin):  # pyright: ignore[reportGeneral
 
         if path == "/api/sync":
             status = dict(ws._sync_service.get_status())
+            # 검색 관측 로그 유실 카운터. 본체 DB가 아닌 전용 파일이라
+            # 조회가 운영 DB에 쓰지 않는다. (PROJECT_AUDIT.md ISSUE-001)
+            try:
+                status["search_log_dropped"] = (
+                    ws.get_ledger_service().search_log_stats().get("dropped", 0)
+                )
+            except Exception:
+                status["search_log_dropped"] = 0
             try:
                 from services.excel_sync_service import ExcelSyncService
 

@@ -325,6 +325,9 @@ console.log(JSON.stringify([ledgerDirtyFields(before, after), ledgerDirtyFields(
                 "submitEditLedgerItemNow",
             ],
             """
+// 모달 열기·닫기는 <dialog> 도우미(07_excel_status.js)다. 이 하네스에는 DOM이 없어 비워 둔다.
+function showModalDialog() {}
+function hideModalDialog() {}
 const EDIT_LEDGER_FIELDS = [
   ['seq_no', 'edit-seq-no'], ['party', 'edit-party'], ['requester', 'edit-requester'],
   ['aide', 'edit-aide'], ['department', 'edit-dept'], ['title', 'edit-title'],

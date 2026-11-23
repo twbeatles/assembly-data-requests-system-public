@@ -150,11 +150,18 @@ class TestAuditScope4(unittest.TestCase):
         self.assertEqual(mapping.get("2022/a.hwp"), "DOC-2022-003")
         self.assertEqual(maxes.get("2022"), 3)
 
-    def test_generate_excel_db_uses_temp_replace(self):
+    def test_generate_excel_db_delegates_to_canonical_atomic_save(self):
+        # 통합 DB XLSX 저장의 tmp 저장·검증·교체 로직은 정본
+        # extractors/ledger/workbook.save_workbook_atomic 한 곳에만 있다.
+        # generate_excel_db 쪽은 잠금 대기 정책만 둔다. (PROJECT_AUDIT.md GAP-002)
         src = (SCRIPTS_DIR / "generate_excel_db.py").read_text(encoding="utf-8")
         self.assertIn("def save_workbook_atomic", src)
-        self.assertIn(".tmp.xlsx", src)
-        self.assertIn("os.replace", src)
+        self.assertIn("extractors.ledger.workbook", src)
+        canonical = (SCRIPTS_DIR / "extractors" / "ledger" / "workbook.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("def save_workbook_atomic", canonical)
+        self.assertIn("os.replace", canonical)
 
     def test_requester_committee_substring_not_kcsc(self):
         meta = extract_metadata(

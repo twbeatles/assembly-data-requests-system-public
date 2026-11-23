@@ -1,0 +1,125 @@
+openapi: 3.1.0
+info:
+  title: Collection Portal Partner API
+  version: 1.0.0
+servers:
+  - url: https://collection.example.org
+security:
+  - PartnerKey: []
+paths:
+  /integrations/v1/requests:
+    post:
+      operationId: intakeRequest
+      summary: Submit a request to the team configured for the calling integration
+      description: A repeat with the same external ID and same normalized content returns the current status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Intake'
+      responses:
+        '201':
+          $ref: '#/components/responses/Record'
+        '200':
+          $ref: '#/components/responses/Record'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '415':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Temporary storage contention or request saturation
+  /integrations/v1/requests/{external_id}:
+    parameters:
+      - name: external_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/ExternalId'
+    get:
+      operationId: getRequestStatus
+      summary: Get the status of a request submitted by the calling integration
+      responses:
+        '200':
+          $ref: '#/components/responses/Record'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Temporary storage contention or request saturation
+components:
+  securitySchemes:
+    PartnerKey:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque portal key
+  schemas:
+    ExternalId:
+      type: string
+      pattern: '^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$'
+    Intake:
+      type: object
+      additionalProperties: false
+      required: [external_id, title, requester, instructions, due]
+      properties:
+        external_id:
+          $ref: '#/components/schemas/ExternalId'
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        requester:
+          type: string
+          minLength: 1
+          maxLength: 120
+        instructions:
+          type: string
+          minLength: 1
+          maxLength: 30000
+        due:
+          type: string
+          format: date
+    Record:
+      type: object
+      required: [external_id, status, due]
+      properties:
+        external_id:
+          $ref: '#/components/schemas/ExternalId'
+        status:
+          type: string
+          enum: [received, collecting, finalized, sent]
+        due:
+          type: string
+          format: date
+  responses:
+    Record:
+      description: Request status
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Record'
+    Error:
+      description: Request rejected
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: string

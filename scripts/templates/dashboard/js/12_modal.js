@@ -151,7 +151,7 @@ async function openDocModal(doc, targetQNum = null) {
   // 3. QA Items View (Render full markdown tables)
   const docQas = DOC_QAS_MAP[doc.doc_id] || [];
   const qaContainer = document.getElementById('modal-view-qa');
-  qaContainer.innerHTML = '';
+  qaContainer.replaceChildren();
   if (docQas.length) {
     docQas.forEach((q, qIdx) => {
       const qBox = document.createElement('div');
@@ -239,7 +239,7 @@ async function openDocModal(doc, targetQNum = null) {
   setupModalCopyButtons(doc);
 
 
-  document.getElementById('modal-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('modal-backdrop'));
   // 다른 문서를 보다가 열어도 맨 위부터 보이게 한다(질문 위치로 가는 경우는 아래 scrollIntoView가 맡는다).
   if (!targetQNum) {
     const bodyEl = document.querySelector('#main-modal-dialog .modal-body');
@@ -350,7 +350,7 @@ function switchModalTab(tab) {
 }
 
 function closeModal() {
-  document.getElementById('modal-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('modal-backdrop'));
   // clear hash without jump
   history.replaceState(null, null, ' ');
 }
@@ -359,7 +359,7 @@ function closeModal() {
 function openComparePicker() {
   if (!currentSelectedDoc) return;
   const selectB = document.getElementById('compare-select-b');
-  selectB.innerHTML = '';
+  selectB.replaceChildren();
 
   // 같은 요구자의 답변서를 먼저, 그다음 최신순으로 보여 준다(비교는 대개 같은 의원의 지난 답변과 한다).
   const sameReq = (d) => (d.requester && d.requester === currentSelectedDoc.requester) ? 0 : 1;
@@ -389,7 +389,7 @@ function openComparePicker() {
     applyDomHighlight(leftPane, highlightTokens);
   }
   updateCompareRightPane();
-  document.getElementById('compare-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('compare-backdrop'));
 }
 
 async function updateCompareRightPane() {
@@ -429,6 +429,6 @@ function gotoLinkedLedgerFromDoc() {
 }
 
 function closeCompareModal() {
-  document.getElementById('compare-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('compare-backdrop'));
 }
 

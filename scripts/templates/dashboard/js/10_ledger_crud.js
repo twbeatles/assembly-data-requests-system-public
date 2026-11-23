@@ -53,12 +53,12 @@ function openConfigModal() {
   document.getElementById('cfg-title').value = (appConfig.system_title || '').replace(/^🛡️\s*/, '') || '';
   document.getElementById('cfg-subtitle').value = appConfig.system_subtitle || '';
   const bd = document.getElementById('config-modal-backdrop');
-  if (bd) { bd.style.display = 'flex'; bd.classList.add('open'); }
+  showModalDialog(bd);
 }
 
 function closeConfigModal() {
   const bd = document.getElementById('config-modal-backdrop');
-  if (bd) { bd.style.display = 'none'; bd.classList.remove('open'); }
+  hideModalDialog(bd);
 }
 
 function handleConfigSubmit(e) {
@@ -136,11 +136,11 @@ function openAddLedgerModal() {
   const todayStr = localDateString();
   const reqDateInput = document.getElementById('add-req-date');
   if (reqDateInput) reqDateInput.value = todayStr;
-  document.getElementById('add-ledger-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('add-ledger-backdrop'));
 }
 
 function closeAddLedgerModal() {
-  document.getElementById('add-ledger-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('add-ledger-backdrop'));
 }
 
 function submitNewLedgerItem() {
@@ -356,7 +356,7 @@ function openLedgerModal(item) {
     linkedBox.style.display = 'none';
   }
 
-  document.getElementById('ledger-modal-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('ledger-modal-backdrop'));
   if (item.ledger_id) {
     history.replaceState(null, null, `#ledger=${item.ledger_id}`);
   }
@@ -365,7 +365,7 @@ function openLedgerModal(item) {
 }
 
 function closeLedgerModal() {
-  document.getElementById('ledger-modal-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('ledger-modal-backdrop'));
   history.replaceState(null, null, ' ');
 }
 
@@ -547,6 +547,11 @@ async function importLocalLedgerFile(input) {
 const SYNC_BTN_LABEL = '새 문서 반영';
 const SYNC_BTN_BUSY_LABEL = '반영하는 중…';
 
+function setCancelSyncEnabled(on) {
+  const cancelBtn = document.getElementById('btn-cancel-sync');
+  if (cancelBtn) cancelBtn.disabled = !on;
+}
+
 async function triggerServerSync() {
   if (!window.location.protocol.startsWith('http')) {
     notify('서버 없이 연 화면(01번)에서는 쓸 수 없습니다.\n00_새자료_추가_및_DB동기화.bat을 직접 실행해 주세요.');
@@ -560,6 +565,7 @@ async function triggerServerSync() {
     syncBtn.disabled = true;
     syncBtn.innerText = SYNC_BTN_BUSY_LABEL;
   }
+  setCancelSyncEnabled(true);
   try {
     const res = await fetch('/api/sync', { method: 'POST' });
     const data = await res.json();
@@ -571,6 +577,7 @@ async function triggerServerSync() {
         syncBtn.disabled = false;
         syncBtn.innerText = SYNC_BTN_LABEL;
       }
+      setCancelSyncEnabled(false);
     }
   } catch (err) {
     notify(`❌ 서버에 연결하지 못했습니다: ${err.message}`);
@@ -578,7 +585,32 @@ async function triggerServerSync() {
       syncBtn.disabled = false;
       syncBtn.innerText = SYNC_BTN_LABEL;
     }
+    setCancelSyncEnabled(false);
   }
+}
+
+async function cancelServerSync() {
+  if (!window.location.protocol.startsWith('http')) {
+    notify('서버 없이 연 화면(01번)에서는 쓸 수 없습니다.');
+    return;
+  }
+  if (!confirm('진행 중인 새 문서 반영을 중단할까요?\n\n이미 반영된 문서는 유지되고, 나머지는 다음 반영 때 이어서 처리됩니다.')) {
+    return;
+  }
+  const cancelBtn = document.getElementById('btn-cancel-sync');
+  await runExclusive('cancel-sync', cancelBtn, async () => {
+    try {
+      const res = await fetch('/api/sync/cancel', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        notify('중단 요청을 전달했습니다. 잠시 후 상태를 확인하세요.');
+      } else {
+        notify(`❌ 반영 중단을 요청하지 못했습니다: ${data.error || data.message}`);
+      }
+    } catch (err) {
+      notify(`❌ 서버에 연결하지 못했습니다: ${err.message}`);
+    }
+  });
 }
 
 function pollSyncStatus() {
@@ -594,6 +626,7 @@ function pollSyncStatus() {
             syncBtn.disabled = false;
             syncBtn.innerText = SYNC_BTN_LABEL;
           }
+          setCancelSyncEnabled(false);
           if (status.last_success) {
             notify(`🎉 새 문서 반영이 끝났습니다 (${status.last_elapsed || 0}초 걸림). 새로고침하면 새 자료가 보입니다.`);
             const _stack = document.getElementById('toast-stack');
@@ -618,6 +651,7 @@ function pollSyncStatus() {
         syncBtn.disabled = false;
         syncBtn.innerText = SYNC_BTN_LABEL;
       }
+      setCancelSyncEnabled(false);
     }
   }, 2000);
 }
@@ -700,11 +734,11 @@ function openEditLedgerModal() {
   EDIT_LEDGER_SNAPSHOT = readEditLedgerForm();
   EDIT_LEDGER_VERSION = String(it.updated_at || "");
 
-  document.getElementById('edit-ledger-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('edit-ledger-backdrop'));
 }
 
 function closeEditLedgerModal() {
-  document.getElementById('edit-ledger-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('edit-ledger-backdrop'));
 }
 
 function submitEditLedgerItem() {

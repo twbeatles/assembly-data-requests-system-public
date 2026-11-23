@@ -80,7 +80,12 @@ class _ShellScan(HTMLParser):
         if a.get("id"):
             self.ids.add(a["id"])
         if a.get("id") in DIALOG_IDS:
-            self.dialog_roles[a["id"]] = (a.get("role"), a.get("aria-modal"))
+            self.dialog_roles[a["id"]] = (
+                tag,
+                a.get("role"),
+                a.get("aria-modal"),
+                a.get("aria-label") or a.get("aria-labelledby"),
+            )
         if tag == "button" and "btn-close" in (a.get("class") or ""):
             if not a.get("aria-label"):
                 self.close_missing_aria += 1
@@ -134,8 +139,11 @@ def test_status_options_unified():
 def test_dialog_a11y():
     scan = _scan_shell()
     for dlg in DIALOG_IDS:
-        role, modal = scan.dialog_roles.get(dlg, (None, None))
-        assert role == "dialog" and modal == "true", f"{dlg}에 role/aria-modal 없음"
+        tag, role, modal, name = scan.dialog_roles.get(dlg, (None, None, None, None))
+        # 네이티브 <dialog>+showModal()이 dialog 역할·모달 의미를 준다. role/aria-modal을 덧붙이지 않는다.
+        assert tag == "dialog", f"{dlg}가 <dialog> 요소가 아니다: <{tag}>"
+        assert role is None and modal is None, f"{dlg}에 중복 role/aria-modal이 있다"
+        assert name, f"{dlg}에 접근 가능한 이름(aria-label/labelledby)이 없다"
     assert scan.close_missing_aria == 0, "닫기 버튼에 aria-label 없음"
 
 

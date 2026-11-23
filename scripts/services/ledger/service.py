@@ -119,6 +119,7 @@ class LedgerService:
         read_only: bool = False,
         immutable: bool = False,
         read_connection=None,
+        log_db_path: Optional[Path] = None,
     ):
         # base_dir를 생략하면 DB가 있는 폴더를 쓴다. 예전에는 운영 폴더가 기본값이라,
         # DB만 임시 파일로 바꾼 테스트가 운영 마스터 엑셀·보류 큐에 썼다. (감사 R3-01)
@@ -140,6 +141,13 @@ class LedgerService:
         self._read_only = bool(read_only)
         self._immutable = bool(immutable)
         self._read_connection = read_connection
+        # 검색 관측 로그 전용 DB. 본체 DB와 파일을 분리해 조회 경로를 읽기
+        # 전용으로 유지한다. (PROJECT_AUDIT.md ISSUE-001)
+        from db.search_log import log_db_path_for
+
+        self.log_db_path = (
+            Path(log_db_path) if log_db_path else log_db_path_for(self.db_path)
+        )
 
     def get_conn(self, readonly: bool = False) -> sqlite3.Connection:
         if self._read_only and self._read_connection is not None:
@@ -241,6 +249,10 @@ class LedgerService:
                 # 행 단위 스트리밍으로 쓴다. 예전에는 세 테이블을 통째로 리스트로 읽고 indent=2로
                 # 다시 써서, DB가 커지면 대장 한 건 수정마다 전문 크기만큼 메모리를 썼다.
                 # 한 읽기 트랜잭션 안에서 읽어 세 테이블이 같은 시점을 본다.
+                # NOTE: 이 락을 JSON 전용 락으로 분리하지 않는다. CRUD·엑셀 왕복·큐 재생·
+                # JSON 출력은 `storage_activity` 아래에 두는 것이 불변조건이다(AGENTS.md 34).
+                # 대신 소요 시간을 기록해 대용량에서 CRUD 409 창을 관측한다. (GAP-003)
+                started = time.time()
                 conn = None
                 try:
                     from db.json_export import export_combined_json
@@ -248,7 +260,10 @@ class LedgerService:
                     conn = self.get_conn(readonly=True)
                     conn.execute("BEGIN")
                     export_combined_json(conn, self.json_path)
-                    print("✓ data_requests.json 동기화 완료")
+                    print(
+                        f"✓ data_requests.json 동기화 완료 "
+                        f"({time.time() - started:.1f}초)"
+                    )
                 except Exception as e:
                     if self.db_path.exists():
                         print(f"JSON 동기화 알림: {e}")
@@ -455,34 +470,36 @@ class LedgerService:
     def _log_search(self, kind, kw, count, elapsed_ms, used_fts):
         """검색 로그(제안서 S9). 0건으로 끝난 질의를 알아야 동의어 사전을 고칠 수 있다.
 
-        로그 실패는 검색 실패가 아니다. 어떤 예외도 삼킨다.
+        관측 로그는 본체 DB가 아닌 전용 파일에 둔다. 조회 경로가 운영 DB에
+        쓰지 않게 하기 위해서다. 로그 실패는 검색 실패가 아니다 — store가
+        실패를 세고 False만 돌려준다. (PROJECT_AUDIT.md ISSUE-001)
         read_only 서비스에서는 로그 쓰기 자체를 하지 않는다. (감사 ISSUE-002)
         """
         if self._read_only:
             return
         if not kw:
             return
-        try:
-            conn = self.get_conn()
-            try:
-                conn.execute(
-                    "INSERT INTO search_log (query, mode, result_count, elapsed_ms, used_fts, searched_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        str(kw)[:300],
-                        kind,
-                        int(count),
-                        int(elapsed_ms),
-                        1 if used_fts else 0,
-                        datetime.datetime.now().isoformat(timespec="seconds"),
-                    ),
-                )
-                conn.commit()
-            finally:
-                conn.close()
-        except Exception:
-            pass
+        from db import search_log as search_log_store
+
+        search_log_store.append(
+            self.log_db_path,
+            query=kw,
+            mode=kind,
+            result_count=count,
+            elapsed_ms=elapsed_ms,
+            used_fts=used_fts,
+            legacy_db_path=self.db_path,
+        )
         self._maybe_prune_search_log()
+
+    def search_log_stats(self) -> dict:
+        """관측 로그 저장소 상태. `/api/sync` 응답에 유실 카운터를 싣는다."""
+        from db import search_log as search_log_store
+
+        return {
+            "path": str(self.log_db_path),
+            "dropped": search_log_store.dropped_count(),
+        }
 
     def _maybe_prune_search_log(self):
         """검색 로그 rolling 정리. 프로세스·DB당 24시간에 한 번만 돈다. (감사 R6-04)
@@ -493,7 +510,7 @@ class LedgerService:
         if self._read_only:
             return
         try:
-            key = str(Path(self.db_path).resolve())
+            key = str(Path(self.log_db_path).resolve())
         except OSError:
             return
         now = time.time()
@@ -505,9 +522,12 @@ class LedgerService:
                 return
             _LAST_SEARCH_LOG_PRUNE[key] = now
         try:
+            from db import search_log as search_log_store
             from db.database_manager import DatabaseManager
 
-            conn = self.get_conn()
+            # 전용 로그 파일에서 정리한다. 본체 DB에는 손대지 않는다.
+            # (PROJECT_AUDIT.md ISSUE-001)
+            conn = search_log_store.connect(self.log_db_path)
             try:
                 deleted = DatabaseManager.prune_search_log(conn)
                 if deleted:
@@ -956,46 +976,14 @@ class LedgerService:
         return out[: int(limit)]
 
     def search_insights(self, limit=20, days=90):
-        """검색 로그 요약(제안서 S9). 0건으로 끝난 질의와 느린 질의를 보여준다."""
-        self._ensure_schema()
-        since = (
-            datetime.datetime.now() - datetime.timedelta(days=int(days))
-        ).isoformat(timespec="seconds")
-        conn = self.get_conn(readonly=True)
-        try:
-            cur = conn.cursor()
-            try:
-                zero = [
-                    dict(r)
-                    for r in cur.execute(
-                        "SELECT query, COUNT(*) AS hits, MAX(searched_at) AS last_at FROM search_log "
-                        "WHERE result_count = 0 AND searched_at >= ? "
-                        "GROUP BY query ORDER BY hits DESC, last_at DESC LIMIT ?",
-                        (since, int(limit)),
-                    )
-                ]
-                popular = [
-                    dict(r)
-                    for r in cur.execute(
-                        "SELECT query, COUNT(*) AS hits FROM search_log WHERE searched_at >= ? "
-                        "GROUP BY query ORDER BY hits DESC LIMIT ?",
-                        (since, int(limit)),
-                    )
-                ]
-                slow = [
-                    dict(r)
-                    for r in cur.execute(
-                        "SELECT query, MAX(elapsed_ms) AS worst_ms, AVG(elapsed_ms) AS avg_ms, "
-                        "SUM(used_fts) AS fts_hits, COUNT(*) AS hits FROM search_log "
-                        "WHERE searched_at >= ? GROUP BY query ORDER BY worst_ms DESC LIMIT ?",
-                        (since, int(limit)),
-                    )
-                ]
-            except sqlite3.Error:
-                return {"success": True, "zero_result": [], "popular": [], "slow": []}
-        finally:
-            conn.close()
-        return {"success": True, "zero_result": zero, "popular": popular, "slow": slow}
+        """검색 로그 요약(제안서 S9). 0건으로 끝난 질의와 느린 질의를 보여준다.
+
+        전용 로그 파일에서만 읽는다. 본체 DB 스키마 준비·조회 연결을 열지 않아
+        읽기 경로가 쓰기를 일으키지 않는다. (PROJECT_AUDIT.md ISSUE-001)
+        """
+        from db import search_log as search_log_store
+
+        return search_log_store.read_insights(self.log_db_path, limit=limit, days=days)
 
     def get_ledger_item(self, ledger_id):
         self._ensure_schema()

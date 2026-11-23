@@ -86,11 +86,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-view-card').addEventListener('click', () => {
     setView('card');
     saveViewPrefs();
+    render();
   });
 
   document.getElementById('btn-view-table').addEventListener('click', () => {
     setView('table');
     saveViewPrefs();
+    render();
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -114,12 +116,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (typeof closeTopModal === 'function' && closeTopModal()) return;
-      closeModal();
-      closeCompareModal();
-      if (typeof closeQuarantineModal === 'function') closeQuarantineModal();
-    }
+    // 모달 닫기(Esc)는 <dialog>의 cancel 이벤트가 맡는다(15_ux.js). 여기서 또 닫으면 한 번의 Esc가
+    // 아래에 깔린 모달까지 닫는다.
     if ((e.ctrlKey && e.key.toLowerCase() === 'k') || (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) {
       e.preventDefault();
       const sInput = document.getElementById('search-input');

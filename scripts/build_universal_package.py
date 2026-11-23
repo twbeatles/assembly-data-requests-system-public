@@ -64,6 +64,18 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
             shutil.copy2(item, dst_item)
     print("✓ 범용 스크립트 및 모듈 서브패키지 동기화 완료")
 
+    for relative_path in (
+        "requirements.txt",
+        "docs/COLLECTION_PORTAL.md",
+        "docs/COLLECTION_PORTAL_OPERATIONS.md",
+        "docs/COLLECTION_PORTAL_STATUS.md",
+        "docs/collection-portal-openapi.yaml",
+    ):
+        destination = target_dir / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(SYSTEM_DIR / relative_path, destination)
+    print("✓ 포털 실행 의존성 및 운영 문서 복사 완료")
+
     # 2. Config.json (Universal default)
     univ_config = {
         "department_name": "자료요구담당부서",

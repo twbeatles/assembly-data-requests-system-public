@@ -54,13 +54,13 @@ function openQuarantineModal() {
   }
   const bd = document.getElementById('quarantine-modal-backdrop');
   if (!bd) return;
-  bd.classList.add('open');
+  showModalDialog(bd);
   loadQuarantineList();
 }
 
 function closeQuarantineModal() {
   const bd = document.getElementById('quarantine-modal-backdrop');
-  if (bd) bd.classList.remove('open');
+  hideModalDialog(bd);
 }
 
 async function quarantineAction(opId, kind, button) {

@@ -277,6 +277,16 @@ class RequestLedgerHandler(
                 self.send_json_response({"success": True, "message": msg})
             return
 
+        if path == "/api/sync/cancel":
+            # 실행 중인 파이프라인 중단을 요청한다. 자식 트리째 끝낸 뒤
+            # 상태가 "사용자가 중단"으로 남는다. (GAP-001)
+            ok, msg = _sync_service.cancel_sync()
+            if not ok:
+                self.send_error_response(400, msg)
+            else:
+                self.send_json_response({"success": True, "message": msg})
+            return
+
         if path == "/api/sync/excel":
             from services.excel_sync_service import ExcelSyncService
 

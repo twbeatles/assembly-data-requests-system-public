@@ -78,6 +78,43 @@ function notifyDuration(kind, text) {
   return base + Math.min(String(text || '').length * 30, 4000);
 }
 
+// 알림 영역은 popover="manual"이라 맨 위 층에 올라간다. 열린 모달(<dialog>)도 맨 위 층이라, 모달 안에서 띄운
+// 알림이 모달 뒤에 깔리지 않게 알림을 뺐다 다시 올려 가장 위로 보낸다. popover를 모르는 브라우저는 속성을 떼어 일반 영역으로 쓴다.
+function showToastLayer(stack) {
+  if (typeof stack.showPopover !== 'function') {
+    stack.removeAttribute('popover');
+    return;
+  }
+  try {
+    if (stack.matches(':popover-open')) stack.hidePopover();
+    stack.showPopover();
+  } catch (e) { /* 맨 위 층에 못 올려도 알림 글은 화면에 있다 */ }
+}
+
+function hideToastLayer(stack) {
+  if (typeof stack.hidePopover !== 'function') return;
+  try { if (stack.matches(':popover-open')) stack.hidePopover(); } catch (e) { /* 이미 닫힘 */ }
+}
+
+// 모달(<dialog>) 열기·닫기. 상태는 .open 클래스에도 남긴다(isModalOpen·화면 코드가 이 클래스를 본다).
+function showModalDialog(el) {
+  if (!el) return;
+  el.classList.add('open');
+  if (el.open) return;
+  if (typeof el.showModal === 'function') {
+    try { el.showModal(); return; } catch (e) { /* 문서에 붙어 있지 않으면 아래로 */ }
+  }
+  el.setAttribute('open', '');
+}
+
+function hideModalDialog(el) {
+  if (!el) return;
+  el.classList.remove('open');
+  if (!el.open) return;
+  if (typeof el.close === 'function') el.close();
+  else el.removeAttribute('open');
+}
+
 function notify(message, type) {
   const text = String(message == null ? '' : message);
   const kind = type || inferNotifyType(text);
@@ -98,10 +135,14 @@ function notify(message, type) {
   close.textContent = '×';
   el.appendChild(body);
   el.appendChild(close);
-  const remove = () => { if (el.parentNode) el.parentNode.removeChild(el); };
+  const remove = () => {
+    if (el.parentNode) el.parentNode.removeChild(el);
+    if (!stack.children.length) hideToastLayer(stack);
+  };
   close.addEventListener('click', remove);
   stack.appendChild(el);
   while (stack.children.length > 4) stack.removeChild(stack.firstChild);
+  showToastLayer(stack);
   let timer = setTimeout(remove, notifyDuration(kind, text));
   el.addEventListener('mouseenter', () => clearTimeout(timer));
   el.addEventListener('mouseleave', () => { clearTimeout(timer); timer = setTimeout(remove, 2500); });

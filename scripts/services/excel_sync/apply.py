@@ -248,10 +248,18 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
         return None
 
     def _row_identity(self, wb, located: Tuple[str, int]) -> Dict[str, Any]:
+        from extractors.ledger.workbook import deneutralize_excel_value
+
         ws = wb[located[0]]
         cols = self._resolve_columns(ws)
+        # 쓰기 때 붙인 수식 무력화 접두(`'`)는 여기서 복원해야 DB에 저장된 지문과
+        # 대조된다. (PROJECT_AUDIT_SECURITY.md SEC-001)
         return {
-            field: (ws.cell(located[1], cols[field]).value if cols.get(field) else None)
+            field: (
+                deneutralize_excel_value(ws.cell(located[1], cols[field]).value)
+                if cols.get(field)
+                else None
+            )
             for field in ROW_IDENTITY_FIELDS
         }
 
@@ -505,7 +513,16 @@ class ExcelApplyMixin(_HostBase_ExcelApplyMixin):  # pyright: ignore[reportGener
             def set_val(col_idx, val, align="left"):
                 if not col_idx or val is None:
                     return
-                c = ws.cell(row=target_row, column=col_idx, value=str(val))
+                from extractors.ledger.workbook import neutralize_excel_value
+
+                # `=`·`+`·`-`·`@` 시작값은 수식으로 실행되지 않게 글자로 저장한다.
+                # 읽기(`_row_identity`·파서)에서는 접두를 복원해 DB 지문과 대조한다.
+                # (PROJECT_AUDIT_SECURITY.md SEC-001)
+                c = ws.cell(
+                    row=target_row,
+                    column=col_idx,
+                    value=neutralize_excel_value(str(val)),
+                )
                 c.font = regular_font
                 c.border = cell_border
                 c.alignment = Alignment(

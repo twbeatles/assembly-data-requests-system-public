@@ -56,9 +56,9 @@ async function render() {
   if (currentMode === 'docs' || currentMode === 'tables') {
     tableHead.innerHTML = `
       <tr>
-        <th class="cell-center">선택</th>
-        <th>문서 ID</th><th>요구일</th><th>요구자</th><th>제목</th>
-        <th>답변 미리보기</th><th class="cell-center">표</th><th>주제</th><th>파일</th>
+        <th scope="col" class="cell-center">선택</th>
+        <th scope="col">문서 ID</th><th scope="col">요구일</th><th scope="col">요구자</th><th scope="col">제목</th>
+        <th scope="col">답변 미리보기</th><th scope="col" class="cell-center">표</th><th scope="col">주제</th><th scope="col">파일</th>
       </tr>
     `;
     displayItems.forEach(doc => {
@@ -153,15 +153,15 @@ async function render() {
   } else if (currentMode === 'ledger') {
     tableHead.innerHTML = `
       <tr>
-        <th>대장 ID</th>
-        <th class="cell-center">연번</th>
-        <th>요구일</th>
-        <th>소속 / 요구자</th>
-        <th>요구자료 제목</th>
-        <th>세부 요구내역</th>
-        <th>제출 마감일</th>
-        <th class="cell-center">진행 상태</th>
-        <th class="cell-center">답변서</th>
+        <th scope="col">대장 ID</th>
+        <th scope="col" class="cell-center">연번</th>
+        <th scope="col">요구일</th>
+        <th scope="col">소속 / 요구자</th>
+        <th scope="col">요구자료 제목</th>
+        <th scope="col">세부 요구내역</th>
+        <th scope="col">제출 마감일</th>
+        <th scope="col" class="cell-center">진행 상태</th>
+        <th scope="col" class="cell-center">답변서</th>
       </tr>
     `;
     displayItems.forEach(item => {
@@ -233,8 +233,8 @@ async function render() {
   } else {
     tableHead.innerHTML = `
       <tr>
-        <th>질문 ID</th><th>문서 ID</th><th>요구일</th><th>요구자</th><th>질문</th>
-        <th>답변 미리보기</th><th class="cell-center">표</th><th>파일</th>
+        <th scope="col">질문 ID</th><th scope="col">문서 ID</th><th scope="col">요구일</th><th scope="col">요구자</th><th scope="col">질문</th>
+        <th scope="col">답변 미리보기</th><th scope="col" class="cell-center">표</th><th scope="col">파일</th>
       </tr>
     `;
     displayItems.forEach(qa => {

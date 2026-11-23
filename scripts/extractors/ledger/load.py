@@ -149,12 +149,16 @@ def load_request_ledger(
         for r in range(2, ws.max_row + 1):
 
             def gv(*names, _header_map=header_map, _ws=ws, _r=r):
+                from extractors.ledger.workbook import deneutralize_excel_value
+
                 for name in names:
                     c = _header_map.get(name)
                     if c:
                         v = _ws.cell(_r, c).value
                         if v is not None and str(v).strip():
-                            return str(v).strip()
+                            # 쓰기 때 붙인 수식 무력화 접두(`'`)를 복원해야
+                            # DB 값·지문과 대조된다. (SEC-001)
+                            return deneutralize_excel_value(str(v).strip())
                 return ""
 
             A = LEDGER_COLUMN_ALIAS_MAP

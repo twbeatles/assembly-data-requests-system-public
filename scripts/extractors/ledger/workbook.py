@@ -120,12 +120,47 @@ def backup_master_excel(
         return None
 
 
-def save_workbook_atomic(wb, excel_path, base_dir=None):
+# 수식을 시작시키는 문자. 이걸로 시작하는 문자열을 openpyxl에 그대로 넘기면
+# 수식(`data_type='f'`)으로 저장된다. Excel이 계산하기 전에 `data_only`로 읽으면
+# 캐시값이 없어 `None`이 되고, 다음 엑셀→DB 동기화가 DB 칸을 빈 값으로 덮어쓴다.
+# (PROJECT_AUDIT_SECURITY.md SEC-001)
+FORMULA_PREFIX_CHARS = ("=", "+", "-", "@")
+
+
+def neutralize_excel_value(val):
+    """엑셀 쓰기용 값. 수식 시작 문자 앞에 `'`를 붙여 글자로 저장한다.
+
+    Excel 표시·인쇄는 같고, CSV의 `csvCell`과 같은 기법이다. `'` 자체로 시작하는
+    정상값은 건드리지 않는다(Excel도 선행 `'`를 표식 취급하므로, 읽기에서 복원한다).
+    """
+    if isinstance(val, str) and val[:1] in FORMULA_PREFIX_CHARS:
+        return "'" + val
+    return val
+
+
+def deneutralize_excel_value(val):
+    """엑셀 읽기용 값. 무력화 접두를 복원한다. 비교·지문 대조 전에 쓴다."""
+    if (
+        isinstance(val, str)
+        and len(val) > 1
+        and val[0] == "'"
+        and val[1] in FORMULA_PREFIX_CHARS
+    ):
+        return val[1:]
+    return val
+
+
+def save_workbook_atomic(wb, excel_path, base_dir=None, *, backup: bool = True):
     """워크북을 임시 파일에 저장·검증한 뒤 원본을 교체한다.
 
     `wb.save()`는 대상 파일을 곧바로 덮어쓴다. 저장 중 크래시나 디스크 부족이면
     사용자의 마스터 대장 zip이 깨지고 되돌릴 방법이 없다. JSON 캐시와 대시보드
     HTML에는 이미 적용돼 있는 원자적 쓰기를, 가장 중요한 마스터 엑셀에도 쓴다.
+
+    성공하면 True를 돌려준다. 실패하면 예외를 낸다 — 마스터 대장 경로는
+    호출부가 `PermissionError` 등을 보류 큐로 넘겨야 해서 조용히 False를
+    돌려주지 않는다. `backup=False`는 파생 산출물(통합 DB XLSX)용으로,
+    교체 전 롤링 백업을 남기지 않는다. (PROJECT_AUDIT.md GAP-002)
     """
     excel_path = Path(excel_path)
     ensure_writable(excel_path, "마스터 엑셀")
@@ -140,7 +175,8 @@ def save_workbook_atomic(wb, excel_path, base_dir=None):
                 raise ValueError("저장된 워크북에 시트가 없습니다.")
         finally:
             probe.close()
-        backup_master_excel(excel_path, base_dir)
+        if backup:
+            backup_master_excel(excel_path, base_dir)
         os.replace(str(tmp_path), str(excel_path))
     finally:
         try:
@@ -148,3 +184,4 @@ def save_workbook_atomic(wb, excel_path, base_dir=None):
                 tmp_path.unlink()
         except OSError:
             pass
+    return True

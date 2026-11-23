@@ -183,12 +183,16 @@ def find_id_column(header_map: dict):
 
 
 def cell_text(ws, row: int, header_map: dict, names) -> str:
+    from extractors.ledger.workbook import deneutralize_excel_value
+
     for name in names:
         c = header_map.get(name)
         if c:
             v = ws.cell(row, c).value
             if v is not None and str(v).strip():
-                return str(v).strip()
+                # 쓰기 때 붙인 수식 무력화 접두(`'`)를 복원해야 DB 값과 대조된다.
+                # (PROJECT_AUDIT_SECURITY.md SEC-001)
+                return deneutralize_excel_value(str(v).strip())
     return ""
 
 

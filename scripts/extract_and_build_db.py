@@ -489,11 +489,20 @@ def _main_locked():
     DatabaseManager.atomic_swap(tmp_db_path, DB_PATH)
     print(f"SQLite 데이터베이스 고속 최적화 적재 완료: {DB_PATH.name}")
 
-    # JSON은 DB 스왑 성공 후에만 원자적으로 기록한다
-    write_json_atomic(JSON_PATH, combined_data)
-    print(
-        f"JSON 데이터베이스 저장 완료: {JSON_PATH.name} (문서 {len(records)}건, Q&A {len(all_qa_items)}건, 관리대장 {len(active_ledger_records)}건)"
-    )
+    # JSON은 DB 스왑 성공 후에만 원자적으로 기록한다.
+    # 교체 실패(다른 프로그램이 잠금)해도 DB 스왑을 되돌리지 않는다. 기존 JSON을
+    # 그대로 두고 실패를 결과에 기록한다. 찢긴 JSON을 덮어쓰지 않으므로 다음
+    # 00번·CRUD 동기화가 정상 JSON으로 복구한다. (PROJECT_AUDIT.md ISSUE-003)
+    json_error = None
+    try:
+        write_json_atomic(JSON_PATH, combined_data)
+    except Exception as e:
+        json_error = str(e)
+        print(f"⚠ JSON 캐시 기록 실패(다음 동기화 때 복구됩니다): {json_error}")
+    else:
+        print(
+            f"JSON 데이터베이스 저장 완료: {JSON_PATH.name} (문서 {len(records)}건, Q&A {len(all_qa_items)}건, 관리대장 {len(active_ledger_records)}건)"
+        )
 
     # 끊어진 문서 연결 복구 (제안서 D3). linked_doc_id는 파생값이라, 가리키던 문서가
     # 재빌드에서 사라지면 아무 뜻이 없는 값이 남는다. 다시 잇거나 비운다.
@@ -554,12 +563,12 @@ def _main_locked():
 
     # 검색 로그 정리 (감사 R6-04). 오래된 질의 기록은 rolling 삭제한다.
     # 0건 질의는 동의어 개선 재료라 남긴다. 실패해도 파이프라인을 세우지 않는다.
+    # 관측 로그는 전용 파일에 있다. 본체 DB에는 손대지 않는다.
+    # (PROJECT_AUDIT.md ISSUE-001)
     try:
-        _log_conn = DatabaseManager.get_connection(DB_PATH)
-        try:
-            pruned = DatabaseManager.prune_search_log(_log_conn)
-        finally:
-            _log_conn.close()
+        from db import search_log as search_log_store
+
+        pruned = search_log_store.prune(search_log_store.log_db_path_for(DB_PATH))
         if pruned:
             print(f"✓ 오래된 검색 로그 {pruned}건 정리")
     except Exception as e:
@@ -572,6 +581,7 @@ def _main_locked():
         "ledger": len(ledger_records),
         "health": health,
         "backup": backup,
+        "json_error": json_error,
     }
 
 

@@ -77,6 +77,16 @@ class TestMultiDepartmentAndPackaging(unittest.TestCase):
         self.assertFalse((dist_out / "국회_기관_자료요구_통합DB.xlsx").exists())
         self.assertTrue((dist_out / "사용설명서_및_안내.html").exists())
         self.assertTrue((dist_out / "README_배포안내.txt").exists())
+        for portal_file in (
+            "requirements.txt",
+            "docs/COLLECTION_PORTAL.md",
+            "docs/COLLECTION_PORTAL_OPERATIONS.md",
+            "docs/COLLECTION_PORTAL_STATUS.md",
+            "docs/collection-portal-openapi.yaml",
+            "scripts/collection_portal/__main__.py",
+            "scripts/collection_portal/portal.css",
+        ):
+            self.assertTrue((dist_out / portal_file).is_file(), portal_file)
 
         # Verify DB is clean (0 records)
         conn = sqlite3.connect(str(dist_out / "data_requests.db"))

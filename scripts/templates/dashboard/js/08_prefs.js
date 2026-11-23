@@ -119,7 +119,7 @@ function loadRecentSearches() {
   const box = document.getElementById('recent-chips');
   if (!box) return;
   const items = nextRecentSearches(safeStorageGet(RECENT_SEARCH_KEY, []), '').slice(0, 6);
-  box.innerHTML = '';
+  box.replaceChildren();
   if (!items.length) {
     box.hidden = true;
     return;

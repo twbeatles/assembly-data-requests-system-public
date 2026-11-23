@@ -145,6 +145,23 @@ window.addEventListener('error',e=>window.__auditErrors.push(e.message));
 (async()=>{
  try {
   for(let i=0;i<100 && (!DOCUMENTS.length || !DOCUMENTS[0].full_markdown);i++) await new Promise(r=>setTimeout(r,50));
+  const waitFor = async (selector) => {
+   for(let i=0;i<100;i++) {
+    const element = document.querySelector(selector);
+    if(element) return element;
+    await new Promise(r=>setTimeout(r,50));
+   }
+   throw Error('Missing after switching views: ' + selector);
+  };
+  await waitFor('#card-container > *');
+  document.getElementById('btn-view-table').click();
+  await waitFor('#table-body tr');
+  if(document.querySelector('#card-container > *') || document.querySelector('#table-head th:not([scope="col"])')) {
+   throw Error('Table view kept the hidden cards or omitted column header scope');
+  }
+  document.getElementById('btn-view-card').click();
+  await waitFor('#card-container > *');
+  if(document.querySelector('#table-body tr')) throw Error('Card view kept the hidden table rows');
   await openDocModal(DOCUMENTS[0]);
   const raw=document.getElementById('modal-text-content').textContent;
   const formatted=document.getElementById('modal-view-formatted').textContent;

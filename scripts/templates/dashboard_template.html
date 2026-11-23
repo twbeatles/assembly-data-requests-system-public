@@ -155,7 +155,7 @@
   .view-btn:focus-visible, .g-chip:focus-visible, .due-chip:focus-visible, .active-chip:focus-visible,
   .conn-status:focus-visible, .btn-close:focus-visible, .btn-star:focus-visible, .card:focus-visible,
   .modal-tab-btn:focus-visible, .modal-tab-action:focus-visible, .similar-item:focus-visible,
-  table.data-table tbody tr:focus-visible {
+  table.data-table tbody tr:focus-visible, .table-container:focus-visible {
     outline: 2px solid var(--accent); outline-offset: 2px;
   }
 
@@ -390,7 +390,7 @@
   /* ---------------- 표 보기 ---------------- */
   .table-container {
     background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
-    overflow: auto; display: none; max-height: calc(100vh - 140px);
+    overflow: auto; display: none; max-height: calc(100vh - 140px); max-height: calc(100dvh - 140px);
   }
   table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
   table.data-table th {
@@ -436,16 +436,27 @@
     justify-content: center; align-items: center; z-index: 1000; padding: 20px;
   }
   .modal-backdrop.open { display: flex; }
+  /* 네이티브 <dialog>: 맨 위 층·뒤 화면 비활성·Esc·포커스 가둠은 브라우저가 맡는다.
+     <dialog> 기본 모양(가운데 작은 상자, 테두리, 흰 배경)을 지워 예전 전체 화면 어두운 막으로 쓴다. */
+  dialog.modal-backdrop {
+    width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0;
+    box-sizing: border-box; color: inherit; overflow: hidden;
+  }
+  dialog.modal-backdrop:not([open]) { display: none; }
+  dialog.modal-backdrop[open] { display: flex; }
+  dialog.modal-backdrop::backdrop { background: transparent; overflow: hidden; overscroll-behavior: contain; }
+  /* 창 안에서 스크롤해도 뒤 화면이 따라 움직이지 않게 한다(html·body에 overflow:hidden을 걸지 않는다). */
+  dialog.modal-backdrop:modal { overscroll-behavior: contain; }
   /* 관리대장 상세창에서 수정창을 열면 두 모달이 동시에 남는다. 수정창이 DOM에서
      상세창보다 앞에 있어 같은 z-index에서는 상세창에 가려지므로 명시적으로 올린다. */
   #ledger-modal-backdrop { z-index: 1000; }
   #edit-ledger-backdrop { z-index: 1100; }
   #config-modal-backdrop { z-index: 1050; }
   .modal-dialog {
-    background: #fff; width: 100%; max-width: 1080px; max-height: 92vh; border-radius: 12px;
+    background: #fff; width: 100%; max-width: 1080px; max-height: 92vh; max-height: 92dvh; border-radius: 12px;
     display: flex; flex-direction: column; box-shadow: 0 20px 40px -8px rgba(0,0,0,.3); overflow: hidden;
   }
-  .modal-dialog.maximized { max-width: 98vw; max-height: 96vh; height: 96vh; border-radius: 8px; }
+  .modal-dialog.maximized { max-width: 98vw; max-height: 96vh; height: 96vh; max-height: 96dvh; height: 96dvh; border-radius: 8px; }
   .modal-dialog.modal-form { max-width: 780px; }
   .modal-dialog.modal-detail { max-width: 820px; }
   .modal-dialog.modal-small { max-width: 520px; }
@@ -650,11 +661,15 @@
 
   /* ---------------- 알림(토스트)·로딩 ---------------- */
   /* 화면 위쪽 가운데에 띄운다. 오른쪽 아래에 두면 창 아래의 [등록하기]·[닫기] 버튼을 덮어 몇 초 동안 누를 수 없었다. */
+  /* popover="manual": 맨 위 층에 올라가 열린 모달 위에서도 보인다. popover 기본 모양(inset·여백·테두리·배경)을 지운다. */
   #toast-stack {
-    position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 10000;
-    display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+    position: fixed; inset: auto; top: 14px; left: 50%; transform: translateX(-50%); z-index: 10000;
+    margin: 0; padding: 0; border: 0; background: transparent; color: inherit; overflow: visible;
+    flex-direction: column; gap: 8px; align-items: stretch;
     width: max-content; max-width: min(480px, calc(100vw - 32px)); pointer-events: none;
   }
+  /* display를 무조건 주면 닫힌 popover가 보인다. 열려 있을 때만(또는 popover 미지원으로 속성을 뗀 경우) 켠다. */
+  #toast-stack:where(:popover-open, :not([popover])) { display: flex; }
   .toast {
     pointer-events: auto; position: relative; background: #1e293b; color: #fff; padding: 11px 36px 11px 14px;
     border-radius: 8px; border-left: 4px solid #64748b; font-size: 13px; line-height: 1.55; white-space: pre-line;
@@ -708,7 +723,7 @@
     .top-tabs-row > * { min-width: 0; max-width: 100%; }
     .mode-switcher { overflow-x: auto; flex-wrap: nowrap; }
     .modal-backdrop { padding: 8px; }
-    .modal-dialog { max-height: 96vh; }
+    .modal-dialog { max-height: 96vh; max-height: 96dvh; }
     .compare-grid { grid-template-columns: 1fr; height: auto; }
     .compare-pane { max-height: 60vh; }
     .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -756,7 +771,7 @@
     <div id="app-loading-text">검색 데이터를 불러오는 중입니다… 문서가 많으면 몇 초 걸릴 수 있습니다.</div>
   </div>
 </div>
-<div id="toast-stack" aria-live="polite"></div>
+<div id="toast-stack" popover="manual" role="region" aria-label="알림" aria-live="polite"></div>
 
 <header>
   <div class="header-content">
@@ -802,6 +817,7 @@
     <div class="top-action-tools">
       <button class="btn btn-success" id="btn-open-add-ledger" onclick="openAddLedgerModal()" title="새로 받은 요구자료를 관리대장에 올립니다">＋ 요구자료 등록</button>
       <button class="btn btn-secondary" id="btn-trigger-sync" onclick="triggerServerSync()" title="새자료_투입폴더에 넣은 문서를 읽어 검색 자료에 추가합니다">새 문서 반영</button>
+      <button class="btn btn-secondary" id="btn-cancel-sync" onclick="cancelServerSync()" title="진행 중인 새 문서 반영을 중단합니다" disabled>반영 중단</button>
       <button class="btn btn-secondary" id="btn-toggle-analytics" onclick="toggleAnalytics()" aria-expanded="false">통계 보기</button>
       <button class="btn btn-secondary" id="btn-show-favs" onclick="filterFavorites()" aria-pressed="false">★ 즐겨찾기만</button>
       <button class="btn btn-secondary btn-icon" id="btn-open-config" onclick="openConfigModal()" title="부서명·화면 제목 설정" aria-label="설정">⚙</button>
@@ -991,7 +1007,7 @@
     </div>
   </div>
 
-  <div class="table-container" id="table-container">
+  <div class="table-container" id="table-container" role="region" aria-label="검색 결과 표" tabindex="0">
     <table class="data-table">
       <thead id="table-head"></thead>
       <tbody id="table-body"></tbody>
@@ -1018,7 +1034,7 @@
 </main>
 
 <!-- 요구자료 등록 -->
-<div class="modal-backdrop" id="add-ledger-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-ledger-title">
+<dialog class="modal-backdrop" id="add-ledger-backdrop" aria-labelledby="add-ledger-title">
   <div class="modal-dialog modal-form">
     <div class="modal-header">
       <div class="modal-title">
@@ -1131,10 +1147,10 @@
       </form>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 요구자료 수정 -->
-<div class="modal-backdrop" id="edit-ledger-backdrop" role="dialog" aria-modal="true" aria-labelledby="edit-ledger-title">
+<dialog class="modal-backdrop" id="edit-ledger-backdrop" aria-labelledby="edit-ledger-title">
   <div class="modal-dialog modal-form">
     <div class="modal-header">
       <div class="modal-title">
@@ -1241,10 +1257,10 @@
       </form>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 요구자료 상세 -->
-<div class="modal-backdrop" id="ledger-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ledger-detail-title">
+<dialog class="modal-backdrop" id="ledger-modal-backdrop" aria-labelledby="ledger-detail-title">
   <div class="modal-dialog modal-detail">
     <div class="modal-header">
       <div class="modal-title">
@@ -1314,10 +1330,10 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 엑셀에 반영하지 못한 변경 (02번 웹관리서버 전용) -->
-<div class="modal-backdrop" id="quarantine-modal-backdrop" role="dialog" aria-modal="true" aria-label="엑셀에 반영하지 못한 변경">
+<dialog class="modal-backdrop" id="quarantine-modal-backdrop" aria-label="엑셀에 반영하지 못한 변경">
   <div class="modal-dialog modal-detail">
     <div class="modal-header">
       <div class="modal-title">
@@ -1337,10 +1353,10 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 설정 -->
-<div class="modal-backdrop" id="config-modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-label="화면 설정">
+<dialog class="modal-backdrop" id="config-modal-backdrop" aria-label="화면 설정">
   <div class="modal-dialog modal-small">
     <div class="modal-header">
       <div class="modal-title">
@@ -1378,10 +1394,10 @@
       </div>
     </form>
   </div>
-</div>
+</dialog>
 
 <!-- 답변서 상세 -->
-<div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+<dialog class="modal-backdrop" id="modal-backdrop" aria-labelledby="modal-title">
   <div class="modal-dialog" id="main-modal-dialog">
     <div class="modal-header">
       <div class="modal-title">
@@ -1441,10 +1457,10 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 두 답변서 나란히 비교 -->
-<div class="modal-backdrop" id="compare-backdrop" role="dialog" aria-modal="true" aria-label="두 답변서 나란히 비교">
+<dialog class="modal-backdrop" id="compare-backdrop" aria-label="두 답변서 나란히 비교">
   <div class="modal-dialog compare-dialog">
     <div class="modal-header">
       <div class="modal-title">
@@ -1464,7 +1480,7 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <script id="COMPRESSED_DATA" type="text/plain">__B64_GZIP_DATA__</script>
 <script>
@@ -2330,7 +2346,7 @@ function buildCharts() {
   const sortedReqs = Object.entries(reqCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const maxReq = sortedReqs[0] ? sortedReqs[0][1] : 1;
   const reqContainer = document.getElementById('chart-requesters');
-  reqContainer.innerHTML = '';
+  reqContainer.replaceChildren();
   sortedReqs.forEach(([req, count]) => {
     const pct = (count / maxReq) * 100;
     const row = document.createElement('div');
@@ -2363,7 +2379,7 @@ function buildCharts() {
   const sortedTops = Object.entries(topCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const maxTop = sortedTops[0] ? sortedTops[0][1] : 1;
   const topContainer = document.getElementById('chart-topics');
-  topContainer.innerHTML = '';
+  topContainer.replaceChildren();
   sortedTops.forEach(([top, count]) => {
     const pct = (count / maxTop) * 100;
     const row = document.createElement('div');
@@ -3186,6 +3202,43 @@ function notifyDuration(kind, text) {
   return base + Math.min(String(text || '').length * 30, 4000);
 }
 
+// 알림 영역은 popover="manual"이라 맨 위 층에 올라간다. 열린 모달(<dialog>)도 맨 위 층이라, 모달 안에서 띄운
+// 알림이 모달 뒤에 깔리지 않게 알림을 뺐다 다시 올려 가장 위로 보낸다. popover를 모르는 브라우저는 속성을 떼어 일반 영역으로 쓴다.
+function showToastLayer(stack) {
+  if (typeof stack.showPopover !== 'function') {
+    stack.removeAttribute('popover');
+    return;
+  }
+  try {
+    if (stack.matches(':popover-open')) stack.hidePopover();
+    stack.showPopover();
+  } catch (e) { /* 맨 위 층에 못 올려도 알림 글은 화면에 있다 */ }
+}
+
+function hideToastLayer(stack) {
+  if (typeof stack.hidePopover !== 'function') return;
+  try { if (stack.matches(':popover-open')) stack.hidePopover(); } catch (e) { /* 이미 닫힘 */ }
+}
+
+// 모달(<dialog>) 열기·닫기. 상태는 .open 클래스에도 남긴다(isModalOpen·화면 코드가 이 클래스를 본다).
+function showModalDialog(el) {
+  if (!el) return;
+  el.classList.add('open');
+  if (el.open) return;
+  if (typeof el.showModal === 'function') {
+    try { el.showModal(); return; } catch (e) { /* 문서에 붙어 있지 않으면 아래로 */ }
+  }
+  el.setAttribute('open', '');
+}
+
+function hideModalDialog(el) {
+  if (!el) return;
+  el.classList.remove('open');
+  if (!el.open) return;
+  if (typeof el.close === 'function') el.close();
+  else el.removeAttribute('open');
+}
+
 function notify(message, type) {
   const text = String(message == null ? '' : message);
   const kind = type || inferNotifyType(text);
@@ -3206,10 +3259,14 @@ function notify(message, type) {
   close.textContent = '×';
   el.appendChild(body);
   el.appendChild(close);
-  const remove = () => { if (el.parentNode) el.parentNode.removeChild(el); };
+  const remove = () => {
+    if (el.parentNode) el.parentNode.removeChild(el);
+    if (!stack.children.length) hideToastLayer(stack);
+  };
   close.addEventListener('click', remove);
   stack.appendChild(el);
   while (stack.children.length > 4) stack.removeChild(stack.firstChild);
+  showToastLayer(stack);
   let timer = setTimeout(remove, notifyDuration(kind, text));
   el.addEventListener('mouseenter', () => clearTimeout(timer));
   el.addEventListener('mouseleave', () => { clearTimeout(timer); timer = setTimeout(remove, 2500); });
@@ -3451,7 +3508,7 @@ function loadRecentSearches() {
   const box = document.getElementById('recent-chips');
   if (!box) return;
   const items = nextRecentSearches(safeStorageGet(RECENT_SEARCH_KEY, []), '').slice(0, 6);
-  box.innerHTML = '';
+  box.replaceChildren();
   if (!items.length) {
     box.hidden = true;
     return;
@@ -3887,12 +3944,12 @@ function openConfigModal() {
   document.getElementById('cfg-title').value = (appConfig.system_title || '').replace(/^🛡️\s*/, '') || '';
   document.getElementById('cfg-subtitle').value = appConfig.system_subtitle || '';
   const bd = document.getElementById('config-modal-backdrop');
-  if (bd) { bd.style.display = 'flex'; bd.classList.add('open'); }
+  showModalDialog(bd);
 }
 
 function closeConfigModal() {
   const bd = document.getElementById('config-modal-backdrop');
-  if (bd) { bd.style.display = 'none'; bd.classList.remove('open'); }
+  hideModalDialog(bd);
 }
 
 function handleConfigSubmit(e) {
@@ -3970,11 +4027,11 @@ function openAddLedgerModal() {
   const todayStr = localDateString();
   const reqDateInput = document.getElementById('add-req-date');
   if (reqDateInput) reqDateInput.value = todayStr;
-  document.getElementById('add-ledger-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('add-ledger-backdrop'));
 }
 
 function closeAddLedgerModal() {
-  document.getElementById('add-ledger-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('add-ledger-backdrop'));
 }
 
 function submitNewLedgerItem() {
@@ -4190,7 +4247,7 @@ function openLedgerModal(item) {
     linkedBox.style.display = 'none';
   }
 
-  document.getElementById('ledger-modal-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('ledger-modal-backdrop'));
   if (item.ledger_id) {
     history.replaceState(null, null, `#ledger=${item.ledger_id}`);
   }
@@ -4199,7 +4256,7 @@ function openLedgerModal(item) {
 }
 
 function closeLedgerModal() {
-  document.getElementById('ledger-modal-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('ledger-modal-backdrop'));
   history.replaceState(null, null, ' ');
 }
 
@@ -4381,6 +4438,11 @@ async function importLocalLedgerFile(input) {
 const SYNC_BTN_LABEL = '새 문서 반영';
 const SYNC_BTN_BUSY_LABEL = '반영하는 중…';
 
+function setCancelSyncEnabled(on) {
+  const cancelBtn = document.getElementById('btn-cancel-sync');
+  if (cancelBtn) cancelBtn.disabled = !on;
+}
+
 async function triggerServerSync() {
   if (!window.location.protocol.startsWith('http')) {
     notify('서버 없이 연 화면(01번)에서는 쓸 수 없습니다.\n00_새자료_추가_및_DB동기화.bat을 직접 실행해 주세요.');
@@ -4394,6 +4456,7 @@ async function triggerServerSync() {
     syncBtn.disabled = true;
     syncBtn.innerText = SYNC_BTN_BUSY_LABEL;
   }
+  setCancelSyncEnabled(true);
   try {
     const res = await fetch('/api/sync', { method: 'POST' });
     const data = await res.json();
@@ -4405,6 +4468,7 @@ async function triggerServerSync() {
         syncBtn.disabled = false;
         syncBtn.innerText = SYNC_BTN_LABEL;
       }
+      setCancelSyncEnabled(false);
     }
   } catch (err) {
     notify(`❌ 서버에 연결하지 못했습니다: ${err.message}`);
@@ -4412,7 +4476,32 @@ async function triggerServerSync() {
       syncBtn.disabled = false;
       syncBtn.innerText = SYNC_BTN_LABEL;
     }
+    setCancelSyncEnabled(false);
   }
+}
+
+async function cancelServerSync() {
+  if (!window.location.protocol.startsWith('http')) {
+    notify('서버 없이 연 화면(01번)에서는 쓸 수 없습니다.');
+    return;
+  }
+  if (!confirm('진행 중인 새 문서 반영을 중단할까요?\n\n이미 반영된 문서는 유지되고, 나머지는 다음 반영 때 이어서 처리됩니다.')) {
+    return;
+  }
+  const cancelBtn = document.getElementById('btn-cancel-sync');
+  await runExclusive('cancel-sync', cancelBtn, async () => {
+    try {
+      const res = await fetch('/api/sync/cancel', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        notify('중단 요청을 전달했습니다. 잠시 후 상태를 확인하세요.');
+      } else {
+        notify(`❌ 반영 중단을 요청하지 못했습니다: ${data.error || data.message}`);
+      }
+    } catch (err) {
+      notify(`❌ 서버에 연결하지 못했습니다: ${err.message}`);
+    }
+  });
 }
 
 function pollSyncStatus() {
@@ -4428,6 +4517,7 @@ function pollSyncStatus() {
             syncBtn.disabled = false;
             syncBtn.innerText = SYNC_BTN_LABEL;
           }
+          setCancelSyncEnabled(false);
           if (status.last_success) {
             notify(`🎉 새 문서 반영이 끝났습니다 (${status.last_elapsed || 0}초 걸림). 새로고침하면 새 자료가 보입니다.`);
             const _stack = document.getElementById('toast-stack');
@@ -4452,6 +4542,7 @@ function pollSyncStatus() {
         syncBtn.disabled = false;
         syncBtn.innerText = SYNC_BTN_LABEL;
       }
+      setCancelSyncEnabled(false);
     }
   }, 2000);
 }
@@ -4534,11 +4625,11 @@ function openEditLedgerModal() {
   EDIT_LEDGER_SNAPSHOT = readEditLedgerForm();
   EDIT_LEDGER_VERSION = String(it.updated_at || "");
 
-  document.getElementById('edit-ledger-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('edit-ledger-backdrop'));
 }
 
 function closeEditLedgerModal() {
-  document.getElementById('edit-ledger-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('edit-ledger-backdrop'));
 }
 
 function submitEditLedgerItem() {
@@ -4832,9 +4923,9 @@ async function render() {
   if (currentMode === 'docs' || currentMode === 'tables') {
     tableHead.innerHTML = `
       <tr>
-        <th class="cell-center">선택</th>
-        <th>문서 ID</th><th>요구일</th><th>요구자</th><th>제목</th>
-        <th>답변 미리보기</th><th class="cell-center">표</th><th>주제</th><th>파일</th>
+        <th scope="col" class="cell-center">선택</th>
+        <th scope="col">문서 ID</th><th scope="col">요구일</th><th scope="col">요구자</th><th scope="col">제목</th>
+        <th scope="col">답변 미리보기</th><th scope="col" class="cell-center">표</th><th scope="col">주제</th><th scope="col">파일</th>
       </tr>
     `;
     displayItems.forEach(doc => {
@@ -4929,15 +5020,15 @@ async function render() {
   } else if (currentMode === 'ledger') {
     tableHead.innerHTML = `
       <tr>
-        <th>대장 ID</th>
-        <th class="cell-center">연번</th>
-        <th>요구일</th>
-        <th>소속 / 요구자</th>
-        <th>요구자료 제목</th>
-        <th>세부 요구내역</th>
-        <th>제출 마감일</th>
-        <th class="cell-center">진행 상태</th>
-        <th class="cell-center">답변서</th>
+        <th scope="col">대장 ID</th>
+        <th scope="col" class="cell-center">연번</th>
+        <th scope="col">요구일</th>
+        <th scope="col">소속 / 요구자</th>
+        <th scope="col">요구자료 제목</th>
+        <th scope="col">세부 요구내역</th>
+        <th scope="col">제출 마감일</th>
+        <th scope="col" class="cell-center">진행 상태</th>
+        <th scope="col" class="cell-center">답변서</th>
       </tr>
     `;
     displayItems.forEach(item => {
@@ -5009,8 +5100,8 @@ async function render() {
   } else {
     tableHead.innerHTML = `
       <tr>
-        <th>질문 ID</th><th>문서 ID</th><th>요구일</th><th>요구자</th><th>질문</th>
-        <th>답변 미리보기</th><th class="cell-center">표</th><th>파일</th>
+        <th scope="col">질문 ID</th><th scope="col">문서 ID</th><th scope="col">요구일</th><th scope="col">요구자</th><th scope="col">질문</th>
+        <th scope="col">답변 미리보기</th><th scope="col" class="cell-center">표</th><th scope="col">파일</th>
       </tr>
     `;
     displayItems.forEach(qa => {
@@ -5406,7 +5497,7 @@ async function openDocModal(doc, targetQNum = null) {
   // 3. QA Items View (Render full markdown tables)
   const docQas = DOC_QAS_MAP[doc.doc_id] || [];
   const qaContainer = document.getElementById('modal-view-qa');
-  qaContainer.innerHTML = '';
+  qaContainer.replaceChildren();
   if (docQas.length) {
     docQas.forEach((q, qIdx) => {
       const qBox = document.createElement('div');
@@ -5494,7 +5585,7 @@ async function openDocModal(doc, targetQNum = null) {
   setupModalCopyButtons(doc);
 
 
-  document.getElementById('modal-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('modal-backdrop'));
   // 다른 문서를 보다가 열어도 맨 위부터 보이게 한다(질문 위치로 가는 경우는 아래 scrollIntoView가 맡는다).
   if (!targetQNum) {
     const bodyEl = document.querySelector('#main-modal-dialog .modal-body');
@@ -5605,7 +5696,7 @@ function switchModalTab(tab) {
 }
 
 function closeModal() {
-  document.getElementById('modal-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('modal-backdrop'));
   // clear hash without jump
   history.replaceState(null, null, ' ');
 }
@@ -5614,7 +5705,7 @@ function closeModal() {
 function openComparePicker() {
   if (!currentSelectedDoc) return;
   const selectB = document.getElementById('compare-select-b');
-  selectB.innerHTML = '';
+  selectB.replaceChildren();
 
   // 같은 요구자의 답변서를 먼저, 그다음 최신순으로 보여 준다(비교는 대개 같은 의원의 지난 답변과 한다).
   const sameReq = (d) => (d.requester && d.requester === currentSelectedDoc.requester) ? 0 : 1;
@@ -5644,7 +5735,7 @@ function openComparePicker() {
     applyDomHighlight(leftPane, highlightTokens);
   }
   updateCompareRightPane();
-  document.getElementById('compare-backdrop').classList.add('open');
+  showModalDialog(document.getElementById('compare-backdrop'));
 }
 
 async function updateCompareRightPane() {
@@ -5684,7 +5775,7 @@ function gotoLinkedLedgerFromDoc() {
 }
 
 function closeCompareModal() {
-  document.getElementById('compare-backdrop').classList.remove('open');
+  hideModalDialog(document.getElementById('compare-backdrop'));
 }
 
 let searchDebounceTimer = null;
@@ -5775,11 +5866,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-view-card').addEventListener('click', () => {
     setView('card');
     saveViewPrefs();
+    render();
   });
 
   document.getElementById('btn-view-table').addEventListener('click', () => {
     setView('table');
     saveViewPrefs();
+    render();
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -5803,12 +5896,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (typeof closeTopModal === 'function' && closeTopModal()) return;
-      closeModal();
-      closeCompareModal();
-      if (typeof closeQuarantineModal === 'function') closeQuarantineModal();
-    }
+    // 모달 닫기(Esc)는 <dialog>의 cancel 이벤트가 맡는다(15_ux.js). 여기서 또 닫으면 한 번의 Esc가
+    // 아래에 깔린 모달까지 닫는다.
     if ((e.ctrlKey && e.key.toLowerCase() === 'k') || (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) {
       e.preventDefault();
       const sInput = document.getElementById('search-input');
@@ -5977,13 +6066,13 @@ function openQuarantineModal() {
   }
   const bd = document.getElementById('quarantine-modal-backdrop');
   if (!bd) return;
-  bd.classList.add('open');
+  showModalDialog(bd);
   loadQuarantineList();
 }
 
 function closeQuarantineModal() {
   const bd = document.getElementById('quarantine-modal-backdrop');
-  if (bd) bd.classList.remove('open');
+  hideModalDialog(bd);
 }
 
 async function quarantineAction(opId, kind, button) {
@@ -6157,7 +6246,7 @@ function afterLedgerFormOpen(prefix, item) {
   if (prefix === 'add') {
     try {
       const list = _UXD.getElementById('similar-list');
-      if (list) list.innerHTML = '';
+      if (list) list.replaceChildren();
       const count = _UXD.getElementById('similar-count');
       if (count) count.textContent = '';
     } catch (e) {}
@@ -6201,21 +6290,27 @@ MODAL_DEFS.forEach(def => {
   }
 });
 
-if (_UXD && _UXD.addEventListener) {
-  // Tab 순환을 맨 위 모달 안에 가둔다.
-  _UXD.addEventListener('keydown', (e) => {
-    if (!e || e.key !== 'Tab' || !MODAL_STACK.length) return;
-    const top = MODAL_STACK[MODAL_STACK.length - 1];
-    if (!top || !isModalOpen(top.id)) return;
-    const el = _UXD.getElementById(top.id);
-    const dlg = el ? el.querySelector('.modal-dialog') : null;
-    if (!dlg) return;
-    const f = focusablesOf(dlg);
-    if (!f.length) { e.preventDefault(); return; }
-    const first = f[0];
-    const last = f[f.length - 1];
-    if (e.shiftKey && _UXD.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && _UXD.activeElement === last) { e.preventDefault(); first.focus(); }
+// 모달은 네이티브 <dialog>(showModal)라 Tab 가둠·뒤 화면 비활성·Esc 처리를 브라우저가 한다.
+// 여기서는 Esc(cancel)와 브라우저가 직접 닫은 경우(close)를 이 화면의 닫기 함수로 돌려 보내
+// 입력 중인 등록·수정 폼의 "저장하지 않고 닫을까요?" 확인이 그대로 동작하게 한다.
+if (_UXD && _UXD.getElementById) {
+  MODAL_DEFS.forEach(def => {
+    const dlg = _UXD.getElementById(def.id);
+    if (!dlg || !dlg.addEventListener) return;
+    dlg.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      const fn = modalCloser(def.id);
+      if (fn) fn();
+      else hideModalDialog(dlg);
+    });
+    // 사용자 동작 없이 Esc를 거듭 누르면 cancel을 막아도 브라우저가 닫는다. 우리 닫기 함수를 거치지 않았으면
+    // (.open이 남아 있음) 닫기 함수로 상태를 정리하고, 폼 확인에서 취소하면 다시 연다.
+    dlg.addEventListener('close', () => {
+      if (!dlg.classList.contains('open')) return;
+      const fn = modalCloser(def.id);
+      if (fn) fn();
+      if (dlg.classList.contains('open') && !dlg.open) showModalDialog(dlg);
+    });
   });
 }
 
@@ -6230,6 +6325,11 @@ function updateOfflineUi() {
     syncBtn.disabled = true;
     syncBtn.title = '서버 없이 연 화면(01번)에서는 쓸 수 없습니다. 02_웹관리서버_실행.bat으로 연 화면에서 눌러 주세요.';
     syncBtn.setAttribute('aria-disabled', 'true');
+  }
+  const cancelBtn = _UXD.getElementById('btn-cancel-sync');
+  if (cancelBtn && offline) {
+    cancelBtn.disabled = true;
+    cancelBtn.setAttribute('aria-disabled', 'true');
   }
   const sub = _UXD.getElementById('add-ledger-sub');
   if (sub && offline) {
@@ -6415,7 +6515,7 @@ function refreshSearchExtras(currentFiltered) {
 function renderActiveChips() {
   const box = _UXD.getElementById('active-filter-chips');
   if (!box) return;
-  box.innerHTML = '';
+  box.replaceChildren();
   const f = (typeof activeFilters !== 'undefined' && activeFilters) || {};
   const chips = [];
   if (f.query) chips.push({ key: 'query', label: `검색어 “${f.query}”` });
@@ -6649,7 +6749,7 @@ function refreshRequesterCandidates() {
   if (!_UXD) return;
   const dl = _UXD.getElementById('requester-candidates');
   if (!dl) return;
-  dl.innerHTML = '';
+  dl.replaceChildren();
   requesterStats().forEach((e, name) => {
     const o = _UXD.createElement('option');
     o.value = name;
@@ -6720,7 +6820,7 @@ function refreshSimilarPanel() {
   const count = _UXD.getElementById('similar-count');
   const keys = similarKeywords();
   if (!keys.length) {
-    list.innerHTML = '';
+    list.replaceChildren();
     if (count) count.textContent = '';
     return;
   }
@@ -6759,7 +6859,7 @@ function refreshSimilarPanel() {
   scored.sort((a, b) => (b.hits - a.hits) || (b.score - a.score));
   const top = scored.slice(0, 5);
   if (count) count.textContent = top.length ? `${top.length}건` : '';
-  list.innerHTML = '';
+  list.replaceChildren();
   if (!top.length) {
     list.innerHTML = '<div class="similar-hint">비슷한 과거 답변을 찾지 못했습니다.</div>';
     return;
@@ -6790,7 +6890,7 @@ function loadLedgerHistory(item) {
   if (!list) return;
   const count = _UXD.getElementById('ledger-history-count');
   const off = _UXD.getElementById('ledger-history-offline');
-  list.innerHTML = '';
+  list.replaceChildren();
   if (count) count.textContent = '';
   const isHttp = ((typeof window !== 'undefined' && window.location && window.location.protocol) || '').startsWith('http');
   if (off) off.style.display = 'none';
@@ -6874,7 +6974,7 @@ function initLedgerLinkRow(item) {
   if (!_UXD || !item) return;
   const sel = _UXD.getElementById('ledger-link-select');
   if (!sel) return;
-  sel.innerHTML = '';
+  sel.replaceChildren();
   const cur = item.linked_doc_id || '';
   const docs = ((typeof DOCUMENTS !== 'undefined' && DOCUMENTS) || [])
     .slice()
@@ -7052,7 +7152,7 @@ function emptyJumpTargets(counts, mode, synonymsOn, query) {
 function renderEmptyJumps() {
   const box = _UXD && _UXD.getElementById('empty-state-jumps');
   if (!box) return;
-  box.innerHTML = '';
+  box.replaceChildren();
   const syn = _UXD.getElementById('chk-synonyms');
   const targets = emptyJumpTargets(SEARCH_TAB_COUNTS, currentMode, !syn || syn.checked, activeFilters.query);
   targets.forEach(t => {

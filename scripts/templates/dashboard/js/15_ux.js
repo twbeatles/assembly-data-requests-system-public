@@ -133,7 +133,7 @@ function afterLedgerFormOpen(prefix, item) {
   if (prefix === 'add') {
     try {
       const list = _UXD.getElementById('similar-list');
-      if (list) list.innerHTML = '';
+      if (list) list.replaceChildren();
       const count = _UXD.getElementById('similar-count');
       if (count) count.textContent = '';
     } catch (e) {}
@@ -177,21 +177,27 @@ MODAL_DEFS.forEach(def => {
   }
 });
 
-if (_UXD && _UXD.addEventListener) {
-  // Tab 순환을 맨 위 모달 안에 가둔다.
-  _UXD.addEventListener('keydown', (e) => {
-    if (!e || e.key !== 'Tab' || !MODAL_STACK.length) return;
-    const top = MODAL_STACK[MODAL_STACK.length - 1];
-    if (!top || !isModalOpen(top.id)) return;
-    const el = _UXD.getElementById(top.id);
-    const dlg = el ? el.querySelector('.modal-dialog') : null;
-    if (!dlg) return;
-    const f = focusablesOf(dlg);
-    if (!f.length) { e.preventDefault(); return; }
-    const first = f[0];
-    const last = f[f.length - 1];
-    if (e.shiftKey && _UXD.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && _UXD.activeElement === last) { e.preventDefault(); first.focus(); }
+// 모달은 네이티브 <dialog>(showModal)라 Tab 가둠·뒤 화면 비활성·Esc 처리를 브라우저가 한다.
+// 여기서는 Esc(cancel)와 브라우저가 직접 닫은 경우(close)를 이 화면의 닫기 함수로 돌려 보내
+// 입력 중인 등록·수정 폼의 "저장하지 않고 닫을까요?" 확인이 그대로 동작하게 한다.
+if (_UXD && _UXD.getElementById) {
+  MODAL_DEFS.forEach(def => {
+    const dlg = _UXD.getElementById(def.id);
+    if (!dlg || !dlg.addEventListener) return;
+    dlg.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      const fn = modalCloser(def.id);
+      if (fn) fn();
+      else hideModalDialog(dlg);
+    });
+    // 사용자 동작 없이 Esc를 거듭 누르면 cancel을 막아도 브라우저가 닫는다. 우리 닫기 함수를 거치지 않았으면
+    // (.open이 남아 있음) 닫기 함수로 상태를 정리하고, 폼 확인에서 취소하면 다시 연다.
+    dlg.addEventListener('close', () => {
+      if (!dlg.classList.contains('open')) return;
+      const fn = modalCloser(def.id);
+      if (fn) fn();
+      if (dlg.classList.contains('open') && !dlg.open) showModalDialog(dlg);
+    });
   });
 }
 
@@ -206,6 +212,11 @@ function updateOfflineUi() {
     syncBtn.disabled = true;
     syncBtn.title = '서버 없이 연 화면(01번)에서는 쓸 수 없습니다. 02_웹관리서버_실행.bat으로 연 화면에서 눌러 주세요.';
     syncBtn.setAttribute('aria-disabled', 'true');
+  }
+  const cancelBtn = _UXD.getElementById('btn-cancel-sync');
+  if (cancelBtn && offline) {
+    cancelBtn.disabled = true;
+    cancelBtn.setAttribute('aria-disabled', 'true');
   }
   const sub = _UXD.getElementById('add-ledger-sub');
   if (sub && offline) {
@@ -391,7 +402,7 @@ function refreshSearchExtras(currentFiltered) {
 function renderActiveChips() {
   const box = _UXD.getElementById('active-filter-chips');
   if (!box) return;
-  box.innerHTML = '';
+  box.replaceChildren();
   const f = (typeof activeFilters !== 'undefined' && activeFilters) || {};
   const chips = [];
   if (f.query) chips.push({ key: 'query', label: `검색어 “${f.query}”` });
@@ -625,7 +636,7 @@ function refreshRequesterCandidates() {
   if (!_UXD) return;
   const dl = _UXD.getElementById('requester-candidates');
   if (!dl) return;
-  dl.innerHTML = '';
+  dl.replaceChildren();
   requesterStats().forEach((e, name) => {
     const o = _UXD.createElement('option');
     o.value = name;
@@ -696,7 +707,7 @@ function refreshSimilarPanel() {
   const count = _UXD.getElementById('similar-count');
   const keys = similarKeywords();
   if (!keys.length) {
-    list.innerHTML = '';
+    list.replaceChildren();
     if (count) count.textContent = '';
     return;
   }
@@ -735,7 +746,7 @@ function refreshSimilarPanel() {
   scored.sort((a, b) => (b.hits - a.hits) || (b.score - a.score));
   const top = scored.slice(0, 5);
   if (count) count.textContent = top.length ? `${top.length}건` : '';
-  list.innerHTML = '';
+  list.replaceChildren();
   if (!top.length) {
     list.innerHTML = '<div class="similar-hint">비슷한 과거 답변을 찾지 못했습니다.</div>';
     return;
@@ -766,7 +777,7 @@ function loadLedgerHistory(item) {
   if (!list) return;
   const count = _UXD.getElementById('ledger-history-count');
   const off = _UXD.getElementById('ledger-history-offline');
-  list.innerHTML = '';
+  list.replaceChildren();
   if (count) count.textContent = '';
   const isHttp = ((typeof window !== 'undefined' && window.location && window.location.protocol) || '').startsWith('http');
   if (off) off.style.display = 'none';
@@ -850,7 +861,7 @@ function initLedgerLinkRow(item) {
   if (!_UXD || !item) return;
   const sel = _UXD.getElementById('ledger-link-select');
   if (!sel) return;
-  sel.innerHTML = '';
+  sel.replaceChildren();
   const cur = item.linked_doc_id || '';
   const docs = ((typeof DOCUMENTS !== 'undefined' && DOCUMENTS) || [])
     .slice()
@@ -1028,7 +1039,7 @@ function emptyJumpTargets(counts, mode, synonymsOn, query) {
 function renderEmptyJumps() {
   const box = _UXD && _UXD.getElementById('empty-state-jumps');
   if (!box) return;
-  box.innerHTML = '';
+  box.replaceChildren();
   const syn = _UXD.getElementById('chk-synonyms');
   const targets = emptyJumpTargets(SEARCH_TAB_COUNTS, currentMode, !syn || syn.checked, activeFilters.query);
   targets.forEach(t => {

@@ -271,6 +271,9 @@ def test_client_edit_keeps_original_version_and_empty_list_clears(tmp_path):
     )
     harness = r"""
 const assert = require('assert');
+// <dialog> 열기·닫기 도우미(07_excel_status.js)는 DOM이 없는 이 하네스에서 비워 둔다.
+function showModalDialog() {}
+function hideModalDialog() {}
 const nodes = {};
 const document = {getElementById(id) { return nodes[id] ||= {value:'',innerText:'',classList:{add(){},remove(){}},querySelectorAll(){return []},options:[]}; }};
 const window = {location:{protocol:'http:'}};

@@ -1,6 +1,4 @@
 import json
-import os
-import shutil
 import sys
 from pathlib import Path
 from typing import Any, cast
@@ -89,58 +87,43 @@ def main():
 
 
 def save_workbook_atomic(wb, excel_path: Path) -> bool:
-    """xlsx를 tmp에 저장한 뒤 원자적으로 교체한다. 잠금 시 대기 파일을 남기고 False."""
+    """통합 DB xlsx를 원자적으로 교체한다. 잠금 시 대기 파일을 남기고 False.
+
+    실제 tmp 저장·검증·교체는 정본
+    `extractors.ledger.workbook.save_workbook_atomic`에 위임한다. 파생 산출물이라
+    교체 전 롤링 백업은 남기지 않는다(`backup=False`). 엑셀 잠금 정책(대기 파일)은
+    통합 DB 전용이라 이 wrapper에 둔다. (PROJECT_AUDIT.md GAP-002)
+    """
+    from extractors.ledger.workbook import save_workbook_atomic as _canonical
+
     excel_path = Path(excel_path)
-    tmp_path = excel_path.with_name(excel_path.stem + ".tmp.xlsx")
     try:
-        wb.save(tmp_path)
-        # 저장 결과가 실제로 열리는지 확인한 뒤에만 원본을 교체한다. (감사 5회차 ISSUE-002)
-        probe = openpyxl.load_workbook(tmp_path, read_only=True)
+        _canonical(wb, excel_path, backup=False)
+    except PermissionError:
+        backup_path = excel_path.with_name(f"{excel_path.stem}_최신동기화_대기.xlsx")
         try:
-            if not probe.sheetnames:
-                raise ValueError("저장된 워크북에 시트가 없습니다.")
-        finally:
-            probe.close()
-        try:
-            os.replace(tmp_path, excel_path)
-        except PermissionError:
-            try:
-                shutil.copy2(tmp_path, excel_path)
-                tmp_path.unlink(missing_ok=True)
-            except PermissionError:
-                backup_path = excel_path.with_name(
-                    f"{excel_path.stem}_최신동기화_대기.xlsx"
-                )
-                try:
-                    os.replace(tmp_path, backup_path)
-                except Exception:
-                    wb.save(backup_path)
-                    tmp_path.unlink(missing_ok=True)
-                print("\n" + "!" * 65)
-                print(
-                    f"⚠️ 경고: {excel_path.name} 파일이 엑셀에서 열려 있어 덮어쓰지 못했습니다."
-                )
-                print(
-                    f"최신본은 {backup_path.name} 에 저장했습니다. 엑셀을 닫은 뒤 03 배치로 열어 주세요."
-                )
-                print("!" * 65 + "\n")
-                return False
-        print("=" * 60)
+            wb.save(backup_path)
+        except Exception as e:
+            print(f"엑셀 저장 실패: {e}")
+            return False
+        print("\n" + "!" * 65)
         print(
-            f"고도화 엑셀 통합 DB 생성 완료: {excel_path.name} ({excel_path.stat().st_size:,} bytes)"
+            f"⚠️ 경고: {excel_path.name} 파일이 엑셀에서 열려 있어 덮어쓰지 못했습니다."
         )
-        print("=" * 60)
-        return True
+        print(
+            f"최신본은 {backup_path.name} 에 저장했습니다. 엑셀을 닫은 뒤 03 배치로 열어 주세요."
+        )
+        print("!" * 65 + "\n")
+        return False
     except Exception as e:
         print(f"엑셀 저장 실패: {e}")
         return False
-    finally:
-        # 실패 잔재(tmp)가 다음 실행의 대장으로 오인되지 않게 정리한다.
-        try:
-            if tmp_path.exists():
-                tmp_path.unlink()
-        except OSError:
-            pass
+    print("=" * 60)
+    print(
+        f"고도화 엑셀 통합 DB 생성 완료: {excel_path.name} ({excel_path.stat().st_size:,} bytes)"
+    )
+    print("=" * 60)
+    return True
 
 
 if __name__ == "__main__":

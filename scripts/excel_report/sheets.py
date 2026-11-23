@@ -6,7 +6,7 @@ from collections import Counter
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
-from excel_report.links import resolve_excel_hyperlink_path
+from excel_report.links import hyperlink_literal, resolve_excel_hyperlink_path
 from excel_report.styles import (
     accent_fill,
     apply_table_header,
@@ -260,20 +260,24 @@ def build_master_list_sheet(wb, records):
         ledger_cell = ws.cell(row=row, column=18)
         ledger_cell.alignment = Alignment(horizontal="center", vertical="top")
         if linked_ledger:
-            ledger_cell.value = f'=HYPERLINK("#\'📋 국회_요구자료_관리대장\'!A1", "{sanitize_text(linked_ledger)}")'
+            ledger_cell.value = f'=HYPERLINK("#\'📋 국회_요구자료_관리대장\'!A1", "{hyperlink_literal(sanitize_text(linked_ledger))}")'
             ledger_cell.font = link_font
         else:
             ledger_cell.value = "-"
 
         md_cell = ws.cell(row=row, column=19)
         md_path_norm = resolve_excel_hyperlink_path(r.get("parsed_md_path", ""))
-        md_cell.value = f'=HYPERLINK("{md_path_norm}", "마크다운 보기")'
+        md_cell.value = (
+            f'=HYPERLINK("{hyperlink_literal(md_path_norm)}", "마크다운 보기")'
+        )
         md_cell.font = link_font
         md_cell.alignment = Alignment(horizontal="center", vertical="top")
 
         orig_cell = ws.cell(row=row, column=20)
         orig_path_norm = resolve_excel_hyperlink_path(r.get("original_path", ""))
-        orig_cell.value = f'=HYPERLINK("{orig_path_norm}", "원본 열기")'
+        orig_cell.value = (
+            f'=HYPERLINK("{hyperlink_literal(orig_path_norm)}", "원본 열기")'
+        )
         orig_cell.font = link_font
         orig_cell.alignment = Alignment(horizontal="center", vertical="top")
 
@@ -384,13 +388,17 @@ def build_qa_detail_sheet(wb, qa_items):
 
         md_cell = ws.cell(row=row, column=13)
         md_path_norm = resolve_excel_hyperlink_path(q.get("parsed_md_path", ""))
-        md_cell.value = f'=HYPERLINK("{md_path_norm}", "마크다운 보기")'
+        md_cell.value = (
+            f'=HYPERLINK("{hyperlink_literal(md_path_norm)}", "마크다운 보기")'
+        )
         md_cell.font = link_font
         md_cell.alignment = Alignment(horizontal="center", vertical="top")
 
         orig_cell = ws.cell(row=row, column=14)
         orig_path_norm = resolve_excel_hyperlink_path(q.get("original_path", ""))
-        orig_cell.value = f'=HYPERLINK("{orig_path_norm}", "원본 열기")'
+        orig_cell.value = (
+            f'=HYPERLINK("{hyperlink_literal(orig_path_norm)}", "원본 열기")'
+        )
         orig_cell.font = link_font
         orig_cell.alignment = Alignment(horizontal="center", vertical="top")
 
@@ -487,13 +495,17 @@ def build_statistics_index_sheet(wb, records):
 
         md_cell = ws.cell(row=row, column=10)
         md_path_norm = resolve_excel_hyperlink_path(r.get("parsed_md_path", ""))
-        md_cell.value = f'=HYPERLINK("{md_path_norm}", "마크다운 보기")'
+        md_cell.value = (
+            f'=HYPERLINK("{hyperlink_literal(md_path_norm)}", "마크다운 보기")'
+        )
         md_cell.font = link_font
         md_cell.alignment = Alignment(horizontal="center", vertical="top")
 
         orig_cell = ws.cell(row=row, column=11)
         orig_path_norm = resolve_excel_hyperlink_path(r.get("original_path", ""))
-        orig_cell.value = f'=HYPERLINK("{orig_path_norm}", "원본 열기")'
+        orig_cell.value = (
+            f'=HYPERLINK("{hyperlink_literal(orig_path_norm)}", "원본 열기")'
+        )
         orig_cell.font = link_font
         orig_cell.alignment = Alignment(horizontal="center", vertical="top")
 
@@ -607,7 +619,7 @@ def build_ledger_sheet(wb, ledger_items):
         doc_cell = ws.cell(row=row, column=17)
         doc_cell.alignment = Alignment(horizontal="center", vertical="top")
         if linked_doc:
-            doc_cell.value = f'=HYPERLINK("#\'📋 자료요구_통합목록\'!A1", "{sanitize_text(linked_doc)}")'
+            doc_cell.value = f'=HYPERLINK("#\'📋 자료요구_통합목록\'!A1", "{hyperlink_literal(sanitize_text(linked_doc))}")'
             doc_cell.font = link_font
         else:
             doc_cell.value = "-"

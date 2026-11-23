@@ -13,7 +13,6 @@ JSON 캐시는 문서 전문을 담아 DB가 커지면 수백 MB가 된다. 예�
 
 import json
 import os
-import shutil
 import time
 from pathlib import Path
 
@@ -53,20 +52,29 @@ def _write_rows(fp, cursor) -> int:
     return count
 
 
-def replace_with_retry(tmp_path: Path, path: Path, attempts: int = 3):
-    """Windows에서 다른 프로세스가 잠깐 열고 있어도 교체되게 짧게 재시도한다."""
+def replace_with_retry(tmp_path: Path, path: Path, attempts: int = 3) -> bool:
+    """tmp 파일을 원자적으로 교체한다. 성공하면 True.
+
+    Windows에서 다른 프로세스가 잠깐 열고 있어도 교체되게 짧게 재시도한다.
+    그래도 잠겨 있으면 **기존 파일을 유지하고 False를 돌려준다.**
+    예전에는 여기서 `shutil.copy2`로 직접 덮어썼는데, 복사 도중 읽는 리더는
+    찢긴 JSON을 읽고 파싱에 실패했다. (PROJECT_AUDIT.md ISSUE-003)
+    """
     for attempt in range(1, attempts + 1):
         try:
             os.replace(tmp_path, path)
-            return
+            return True
         except PermissionError:
             time.sleep(0.1 * attempt)
-    shutil.copy2(tmp_path, path)
-    Path(tmp_path).unlink(missing_ok=True)
+    return False
 
 
 def export_combined_json(conn, path) -> dict:
-    """DB 연결에서 문서·Q&A·대장을 읽어 JSON 캐시를 원자적으로 다시 쓴다. 반환: 테이블별 행 수."""
+    """DB 연결에서 문서·Q&A·대장을 읽어 JSON 캐시를 원자적으로 다시 쓴다. 반환: 테이블별 행 수.
+
+    교체에 실패하면 기존 파일을 그대로 두고 `RuntimeError`를 낸다. 호출부는
+    예외를 삼키고 로그만 남기므로 정본 무결성이 깨지지 않는다.
+    """
     path = Path(path)
     tmp = path.with_name(f"{path.name}.tmp")
     counts = {}
@@ -78,7 +86,10 @@ def export_combined_json(conn, path) -> dict:
                 counts[key] = _write_rows(fp, conn.execute(sql))
                 fp.write("\n]")
             fp.write("\n}\n")
-        replace_with_retry(tmp, path)
+        if not replace_with_retry(tmp, path):
+            raise RuntimeError(
+                f"JSON 캐시를 교체하지 못했습니다(다른 프로그램이 파일을 잠금): {path}"
+            )
     finally:
         if tmp.exists():
             try:
@@ -89,7 +100,11 @@ def export_combined_json(conn, path) -> dict:
 
 
 def write_json_compact(path, data: dict):
-    """메모리에 이미 있는 결합 데이터를 같은 형식(행마다 한 줄)으로 원자 저장한다."""
+    """메모리에 이미 있는 결합 데이터를 같은 형식(행마다 한 줄)으로 원자 저장한다.
+
+    교체에 실패하면 기존 파일을 그대로 두고 `RuntimeError`를 낸다.
+    (PROJECT_AUDIT.md ISSUE-003)
+    """
     path = Path(path)
     tmp = path.with_name(f"{path.name}.tmp")
     try:
@@ -110,7 +125,10 @@ def write_json_compact(path, data: dict):
                         json.dumps(value, ensure_ascii=False, separators=_SEPARATORS)
                     )
             fp.write("\n}\n")
-        replace_with_retry(tmp, path)
+        if not replace_with_retry(tmp, path):
+            raise RuntimeError(
+                f"JSON 캐시를 교체하지 못했습니다(다른 프로그램이 파일을 잠금): {path}"
+            )
     finally:
         if tmp.exists():
             try:

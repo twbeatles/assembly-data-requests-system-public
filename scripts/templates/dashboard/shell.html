@@ -19,7 +19,7 @@
     <div id="app-loading-text">검색 데이터를 불러오는 중입니다… 문서가 많으면 몇 초 걸릴 수 있습니다.</div>
   </div>
 </div>
-<div id="toast-stack" aria-live="polite"></div>
+<div id="toast-stack" popover="manual" role="region" aria-label="알림" aria-live="polite"></div>
 
 <header>
   <div class="header-content">
@@ -65,6 +65,7 @@
     <div class="top-action-tools">
       <button class="btn btn-success" id="btn-open-add-ledger" onclick="openAddLedgerModal()" title="새로 받은 요구자료를 관리대장에 올립니다">＋ 요구자료 등록</button>
       <button class="btn btn-secondary" id="btn-trigger-sync" onclick="triggerServerSync()" title="새자료_투입폴더에 넣은 문서를 읽어 검색 자료에 추가합니다">새 문서 반영</button>
+      <button class="btn btn-secondary" id="btn-cancel-sync" onclick="cancelServerSync()" title="진행 중인 새 문서 반영을 중단합니다" disabled>반영 중단</button>
       <button class="btn btn-secondary" id="btn-toggle-analytics" onclick="toggleAnalytics()" aria-expanded="false">통계 보기</button>
       <button class="btn btn-secondary" id="btn-show-favs" onclick="filterFavorites()" aria-pressed="false">★ 즐겨찾기만</button>
       <button class="btn btn-secondary btn-icon" id="btn-open-config" onclick="openConfigModal()" title="부서명·화면 제목 설정" aria-label="설정">⚙</button>
@@ -254,7 +255,7 @@
     </div>
   </div>
 
-  <div class="table-container" id="table-container">
+  <div class="table-container" id="table-container" role="region" aria-label="검색 결과 표" tabindex="0">
     <table class="data-table">
       <thead id="table-head"></thead>
       <tbody id="table-body"></tbody>
@@ -281,7 +282,7 @@
 </main>
 
 <!-- 요구자료 등록 -->
-<div class="modal-backdrop" id="add-ledger-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-ledger-title">
+<dialog class="modal-backdrop" id="add-ledger-backdrop" aria-labelledby="add-ledger-title">
   <div class="modal-dialog modal-form">
     <div class="modal-header">
       <div class="modal-title">
@@ -394,10 +395,10 @@
       </form>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 요구자료 수정 -->
-<div class="modal-backdrop" id="edit-ledger-backdrop" role="dialog" aria-modal="true" aria-labelledby="edit-ledger-title">
+<dialog class="modal-backdrop" id="edit-ledger-backdrop" aria-labelledby="edit-ledger-title">
   <div class="modal-dialog modal-form">
     <div class="modal-header">
       <div class="modal-title">
@@ -504,10 +505,10 @@
       </form>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 요구자료 상세 -->
-<div class="modal-backdrop" id="ledger-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ledger-detail-title">
+<dialog class="modal-backdrop" id="ledger-modal-backdrop" aria-labelledby="ledger-detail-title">
   <div class="modal-dialog modal-detail">
     <div class="modal-header">
       <div class="modal-title">
@@ -577,10 +578,10 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 엑셀에 반영하지 못한 변경 (02번 웹관리서버 전용) -->
-<div class="modal-backdrop" id="quarantine-modal-backdrop" role="dialog" aria-modal="true" aria-label="엑셀에 반영하지 못한 변경">
+<dialog class="modal-backdrop" id="quarantine-modal-backdrop" aria-label="엑셀에 반영하지 못한 변경">
   <div class="modal-dialog modal-detail">
     <div class="modal-header">
       <div class="modal-title">
@@ -600,10 +601,10 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 설정 -->
-<div class="modal-backdrop" id="config-modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-label="화면 설정">
+<dialog class="modal-backdrop" id="config-modal-backdrop" aria-label="화면 설정">
   <div class="modal-dialog modal-small">
     <div class="modal-header">
       <div class="modal-title">
@@ -641,10 +642,10 @@
       </div>
     </form>
   </div>
-</div>
+</dialog>
 
 <!-- 답변서 상세 -->
-<div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+<dialog class="modal-backdrop" id="modal-backdrop" aria-labelledby="modal-title">
   <div class="modal-dialog" id="main-modal-dialog">
     <div class="modal-header">
       <div class="modal-title">
@@ -704,10 +705,10 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- 두 답변서 나란히 비교 -->
-<div class="modal-backdrop" id="compare-backdrop" role="dialog" aria-modal="true" aria-label="두 답변서 나란히 비교">
+<dialog class="modal-backdrop" id="compare-backdrop" aria-label="두 답변서 나란히 비교">
   <div class="modal-dialog compare-dialog">
     <div class="modal-header">
       <div class="modal-title">
@@ -727,7 +728,7 @@
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <script id="COMPRESSED_DATA" type="text/plain">__B64_GZIP_DATA__</script>
 <!-- __DASHBOARD_JS__ -->

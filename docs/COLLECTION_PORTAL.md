@@ -1,0 +1,74 @@
+# 요구자료 취합 포털 시범 운영
+
+취합팀은 요구 건을 등록하고 내부 마감일과 제출 부서를 지정합니다. 부서는 자기 배정 건에 답변과 첨부를 제출합니다. 취합팀은 부서별 상태를 보면서 제출을 승인하거나 보완을 요청하고, 취합 초안을 작성합니다. 책임자는 최종본을 확정하고, 실제 대외 제출일과 대장 반영 확인을 기록합니다. 요청서 양식, 부서별 답변, 최종본에 HWP·HWPX 원본을 사용할 수 있습니다.
+
+## 시범 계정으로 실행
+
+저장소 루트의 PowerShell에서 실행합니다. `demo`는 새 DB에 예제 요구 건과 계정을 만들고 임시 비밀번호를 한 번 출력합니다.
+
+```powershell
+python -m pip install -r requirements.txt
+$portalDb = Join-Path $env:LOCALAPPDATA 'assembly-collection-demo.sqlite3'
+python -m scripts.collection_portal --db $portalDb demo
+python -m scripts.collection_portal --db $portalDb serve
+```
+
+[로컬 취합 포털](http://127.0.0.1:8090)에서 `planning`과 `operations`는 각각 한 부서의 배정을 확인합니다. `reviewer`는 취합팀 담당자, `lead`는 책임자입니다. 서로 다른 브라우저 프로필을 쓰거나 로그아웃 후 다른 계정으로 들어가 비교할 수 있습니다. 기존 시범 DB를 다시 쓰는 경우 `serve`부터 실행하세요. 비밀번호를 잃어버리면 아래의 `account` 명령으로 다시 지정할 수 있습니다.
+
+요구 건 목록은 조회 권한이 있는 제목·요구자·요구 내용·답변과 첨부 이름에서 검색할 수 있습니다. 진행 중과 대외 제출 완료로 좁힐 수도 있습니다. 제출자는 카드에서 바로 답변이나 보완을 작성할 수 있고, 취합 담당자는 부서별 제출 현황에서 검토할 답변을 엽니다. 답변 화면의 **초안 저장**은 부서 안에 내용을 저장하며, **취합팀에 제출**을 누르면 검토 대기로 바뀝니다. 파일 오류가 나면 입력한 답변은 화면에 남고 필요한 파일은 다시 선택할 수 있습니다.
+
+1. 한글 양식을 배포하려면 `lead`나 `reviewer`로 새 요구 건을 등록하면서 요청서 또는 작성 양식을 첨부한 뒤 부서를 배정합니다.
+2. `planning`으로 배정된 요청의 양식을 내려받고 답변을 제출합니다. 작성한 HWP·HWPX만 첨부해 제출할 수 있습니다. `operations`로는 해당 없음과 사유를 제출합니다.
+3. `reviewer`가 첫 부서에 보완을 요청하고 다른 부서를 승인합니다. 재제출된 버전을 승인한 뒤 취합 초안을 저장합니다. 기관 서식으로 편집한 HWP·HWPX를 취합 문서로 첨부할 수 있습니다.
+4. `lead`가 취합 초안을 확인해 최종 확정합니다. 확정된 HWP·HWPX는 단독으로 내려받을 수 있습니다. 취합 ZIP에는 확정 한글 문서, 입력한 답변 텍스트, 취합 근거 목록, 해당 확정본에서 사용한 승인 판의 첨부가 담깁니다. 취합 ZIP에는 내부 부서별 원본과 근거가 들어 있으므로 대외 전달 시에는 제출 범위를 확인하고 필요한 파일을 선택합니다.
+5. 현행 제출 경로에서 실제로 대외 제출한 뒤 포털에 제출일을 기록합니다. 기존 02번에서 대장 상태와 제출일을 수정해 마스터 엑셀 적용까지 확인한 뒤, 포털의 **대장 반영 수동 확인**에 대장 ID를 기록합니다.
+
+기존 포털을 업데이트할 때는 포털 DB를 백업하고 이전 서버를 종료한 뒤 기존 경로로 `serve`를 실행합니다. 첫 실행 시 DB 스키마가 4로 올라가며 기존 계정, 요구 건, 제출과 첨부는 이어서 사용할 수 있습니다. 업데이트 이후 업무 변경부터 공지함에 표시됩니다. 회사 포털 연결, 키 회수, 복구 시험 절차는 [외부 연동 및 정식 운영 설계](COLLECTION_PORTAL_OPERATIONS.md)를 참고하세요.
+
+### 취합에서 공지와 검색으로 이동
+
+- 새 요구 건은 취합팀에, 부서 배정은 해당 부서에 표시됩니다. 부서가 답변을 제출하면 취합팀에, 승인이나 보완 요청을 하면 해당 부서에 공지가 생깁니다. 최종 확정·대외 제출 확인·취합 재개는 그 시점에 배정된 부서가 확인할 수 있습니다.
+- 취합팀은 요구 건 상세의 **업무 공지 작성**에서 부서 하나 또는 현재 배정된 부서 전체에 안내를 보낼 수 있습니다. 나중에 새로 배정된 부서에는 기존 공지가 추가되지 않습니다.
+- **공지함**에서 읽지 않은 업무를 고르고 **읽고 관련 화면 열기**를 누르면 해당 요구 건이나 부서 답변을 엽니다. 읽음은 계정별로 기록됩니다. 요구 건 검색에서도 볼 수 있는 업무 공지의 내용으로 요구 건을 찾을 수 있습니다.
+- 공지 목록, 검색 결과, 읽음 처리와 관련 화면은 요청 시점의 부서·취합팀 권한을 확인합니다. 권한 회수 직후에는 기존에 보았던 공지도 다시 열 수 있는지 재검사합니다.
+
+## 계정·부서 설정
+
+시범 데이터와 별도의 DB 경로를 사용합니다. 파일은 포털을 실행할 서비스 계정과 승인된 운영자만 접근할 수 있는 폴더에 둡니다. 첨부 파일도 SQLite 안에 함께 저장되므로, 서버를 멈춘 뒤 DB 파일을 백업하고 별도 경로에서 복원본을 확인할 수 있습니다.
+
+```powershell
+$portalDb = Join-Path $env:LOCALAPPDATA 'assembly-collection.sqlite3'
+python -m scripts.collection_portal --db $portalDb scope team collection 취합관리팀
+python -m scripts.collection_portal --db $portalDb scope department planning 기획부서
+python -m scripts.collection_portal --db $portalDb account reviewer01
+python -m scripts.collection_portal --db $portalDb account manager01
+python -m scripts.collection_portal --db $portalDb account staff01
+python -m scripts.collection_portal --db $portalDb grant reviewer01 collection collector
+python -m scripts.collection_portal --db $portalDb grant manager01 collection lead
+python -m scripts.collection_portal --db $portalDb grant staff01 planning department
+python -m scripts.collection_portal --db $portalDb serve
+```
+
+같은 계정에 다른 부서 권한을 부여하려면 `grant`를 한 번 더 실행합니다. `revoke staff01 planning department`는 해당 부서 권한만 회수하고, `disable staff01`은 계정과 기존 세션을 중지합니다. 두 명령도 `python -m scripts.collection_portal --db $portalDb` 뒤에 붙입니다. 계정 비밀번호를 재설정하면 이전 세션이 종료됩니다.
+
+### 부서 전용 검색과 조회
+
+메인 취합 부서가 사용하는 포털 DB에 모든 요구 건과 부서별 답변을 함께 저장합니다. 부서 직원 계정에는 지정 부서의 `department` 역할을 부여하고, 취합 담당자가 해당 부서를 각 요구 건에 배정합니다. 이 두 조건이 맞는 요구 건만 직원의 로그인 화면에 표시됩니다. 취합팀 전체 조회가 필요한 계정에만 해당 팀의 `collector` 또는 `lead`를 부여합니다.
+
+```powershell
+python -m scripts.collection_portal --db $portalDb grant staff01 planning department
+python -m scripts.collection_portal --db $portalDb access staff01
+```
+
+`access`는 활성 상태와 현재 적용되는 부서·취합팀 역할을 보여줍니다. 한 부서 전용 계정이면 그 부서의 `department` 역할만 표시되도록 확인하세요. 여러 부서 또는 취합팀 역할을 부여한 계정에는 부여된 범위가 합산됩니다. 인사 이동으로 기존 부서 권한을 회수하면 이미 로그인한 세션에도 다음 요청부터 반영됩니다.
+
+공동 배정 건은 공통 요구 내용과 배포 양식을 볼 수 있습니다. 부서 직원의 검색과 상세 조회에는 자기 부서의 초안·제출본·첨부만 포함됩니다. 취합팀은 관리 범위의 부서 제출본을 검색하고 조회할 수 있으며, 제출 전 초안은 해당 부서에 남습니다. 한글 등 첨부 파일의 본문 검색은 별도 추출이 필요한 범위입니다. 부서에 배포할 접속 경로는 포털 주소이며, 포털 DB 파일은 서버 계정과 승인된 운영자만 직접 접근할 수 있는 위치에 둡니다.
+
+## 적용 범위
+
+- 기본 접속은 127.0.0.1이며 계정은 포털에서 관리합니다. 부서 간 실사용 배포 전에는 기관 계정 연동 여부와 HTTPS 프록시, 서버 파일 권한, 보관 정책, 첨부 악성코드 검사 절차를 정해야 합니다. 내부 HTTPS 프록시를 시험할 경우 `serve --https-origin https://기관-포털-주소`를 사용하고, 프록시가 해당 외부 Host와 브라우저 Origin을 보존하도록 설정합니다. 수신 서버는 이 경우에도 루프백에 바인딩합니다.
+- 부서 답변에 HWP 5.x, HWPX, PDF, PNG, JPEG, UTF-8 TXT, DOCX, XLSX를 첨부할 수 있습니다. 한글은 파일당 20 MiB, 기타 형식은 파일당 5 MiB입니다. 제출본당 최대 5개, 합계 40 MiB입니다. 요청서 양식과 취합 한글 문서는 각각 한 개입니다. 확정 한글 문서와 승인 첨부의 합계가 100 MiB를 넘으면 각각 내려받을 수 있습니다.
+- 포털은 입수한 한글 문서의 형식과 용량을 확인하고 원본을 보관합니다. 브라우저는 파일을 내려받고, 서식 편집과 열람은 한글에서 수행합니다. HWP 3.x 자료는 현행 한글에서 HWP 5.x 또는 HWPX로 다시 저장해 제출합니다. 형식 확인과 악성코드 검사는 별개이며, 암호나 배포용 읽기 제한은 원본에 그대로 남습니다.
+- 요구 건 하나에 여러 부서를 배정하며, 세부 질의는 요구 내용란에, 답변은 부서별 본문에 기록합니다. 기존 웹·엑셀 대장과 포털의 자료는 독립적으로 저장되며, 화면은 포털에 기록된 대장 확인을 운영자의 수동 확인으로 표시합니다.
+
+본 제품은 한컴의 HWP 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다. [한컴 문서 형식 공개](https://swlab.hancom.com/support/downloadCenter/hwpOwpml) · [한컴테크 HWPX 구조](https://tech.hancom.com/hwpxformat/)

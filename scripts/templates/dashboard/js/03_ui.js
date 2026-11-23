@@ -217,7 +217,7 @@ function buildCharts() {
   const sortedReqs = Object.entries(reqCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const maxReq = sortedReqs[0] ? sortedReqs[0][1] : 1;
   const reqContainer = document.getElementById('chart-requesters');
-  reqContainer.innerHTML = '';
+  reqContainer.replaceChildren();
   sortedReqs.forEach(([req, count]) => {
     const pct = (count / maxReq) * 100;
     const row = document.createElement('div');
@@ -250,7 +250,7 @@ function buildCharts() {
   const sortedTops = Object.entries(topCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const maxTop = sortedTops[0] ? sortedTops[0][1] : 1;
   const topContainer = document.getElementById('chart-topics');
-  topContainer.innerHTML = '';
+  topContainer.replaceChildren();
   sortedTops.forEach(([top, count]) => {
     const pct = (count / maxTop) * 100;
     const row = document.createElement('div');

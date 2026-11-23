@@ -19,6 +19,14 @@ def _excel_body(record, canonical_key, legacy_key):
 
 
 def sanitize_text(val):
+    """엑셀 셀 정제. 제어문자를 떼고, 수식 시작 값은 글자로 무력화한다.
+
+    수식 무력화 정본은 `extractors.ledger.workbook.neutralize_excel_value`다.
+    (PROJECT_AUDIT_SECURITY.md SEC-001)
+    """
     if isinstance(val, str):
-        return ILLEGAL_CHARACTERS_RE.sub("", val)
+        cleaned = ILLEGAL_CHARACTERS_RE.sub("", val)
+        from extractors.ledger.workbook import neutralize_excel_value
+
+        return neutralize_excel_value(cleaned)
     return val
