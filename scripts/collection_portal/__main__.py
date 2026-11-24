@@ -3,6 +3,7 @@
 import argparse
 import getpass
 import logging
+import os
 import re
 import secrets
 import sqlite3
@@ -10,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from . import integrations, operations, store
+from . import auth, integrations, oidc, operations, scanning, store
 from .http import PortalServer
 
 
@@ -54,6 +55,28 @@ def parser():
     flags = serve.add_mutually_exclusive_group()
     flags.add_argument("--enable-integrations", action="store_true")
     flags.add_argument("--local-test-integrations", action="store_true")
+    serve.add_argument(
+        "--idle-minutes",
+        type=int,
+        default=auth.IDLE_SECONDS // 60,
+        help="유휴 세션 만료(5~240분, 기본 30)",
+    )
+    serve.add_argument(
+        "--require-mfa",
+        action="store_true",
+        help="인증 앱 미등록 계정의 비밀번호 로그인 거부",
+    )
+    serve.add_argument(
+        "--oidc-config", type=Path, help="기관 SSO(OpenID Connect) 설정 JSON"
+    )
+    serve.add_argument(
+        "--sso-only", action="store_true", help="비밀번호 로그인을 끄고 SSO만 허용"
+    )
+    serve.add_argument(
+        "--scan-command",
+        type=scan_command,
+        help='첨부 검사 명령 JSON 배열, 예: ["scanner.exe","{path}"]',
+    )
     scope = sub.add_parser("scope")
     scope.add_argument("kind", choices=("department", "team"))
     scope.add_argument("id", type=identifier)
@@ -85,7 +108,25 @@ def parser():
         permission.add_argument("login", type=identifier)
         permission.add_argument("scope", type=identifier)
         permission.add_argument("role", choices=store.ROLES)
+    for name in ("unlock", "logout", "sessions", "mfa-enroll", "mfa-reset"):
+        sub.add_parser(name).add_argument("login", type=identifier)
+    link = sub.add_parser("sso-link")
+    link.add_argument("login", type=identifier)
+    link.add_argument("issuer")
+    link.add_argument("subject")
+    unlink = sub.add_parser("sso-unlink")
+    unlink.add_argument("issuer")
+    unlink.add_argument("subject")
+    sub.add_parser("sso-list")
+    sub.add_parser("audit-head")
     return cli
+
+
+def scan_command(value):
+    try:
+        return scanning.parse_command(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from None
 
 
 def set_account(conn, login, password):
@@ -95,7 +136,19 @@ def set_account(conn, login, password):
         (login, store.password_hash(password)),
     )
     conn.execute("DELETE FROM sessions WHERE login=?", (login,))
+    conn.execute(
+        "UPDATE accounts SET failed_logins=0, locked_until=0 WHERE login=?", (login,)
+    )
     store.event(conn, "포털 콘솔", "계정 설정", detail=login)
+
+
+def validate_password(login, password):
+    if not 12 <= len(password) <= 256:
+        return "비밀번호는 12~256자입니다."
+    lowered = password.casefold()
+    if login.casefold() in lowered or len(set(password)) < 5:
+        return "계정 이름을 포함하거나 같은 글자를 반복한 비밀번호는 쓸 수 없습니다."
+    return ""
 
 
 def set_grant(conn, login, scope, role, grant):
@@ -174,9 +227,19 @@ def main():
     credentials = []
     password = ""
     try:
-        if args.command in ("backup", "check", "audit", "integration-list", "access"):
+        if args.command in (
+            "backup",
+            "check",
+            "audit",
+            "integration-list",
+            "access",
+            "sessions",
+            "sso-list",
+            "audit-head",
+        ):
             run_inspection(args)
             return
+        provider = None
         if args.command == "serve":
             if args.enable_integrations and not args.https_origin:
                 cli.error("--enable-integrations에는 --https-origin이 필요합니다.")
@@ -184,6 +247,15 @@ def main():
                 cli.error(
                     "--local-test-integrations는 루프백 HTTP 시험에서만 사용합니다."
                 )
+            if not 5 <= args.idle_minutes <= 240:
+                cli.error("--idle-minutes는 5~240 사이로 지정해 주세요.")
+            if args.sso_only and not args.oidc_config:
+                cli.error("--sso-only에는 --oidc-config가 필요합니다.")
+            if args.oidc_config:
+                try:
+                    provider = oidc.load_provider(args.oidc_config, os.environ)
+                except oidc.OidcError as exc:
+                    cli.error(f"OIDC 설정 오류: {exc}")
         store.initialize(args.db)
         if args.command == "serve":
             logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -193,6 +265,13 @@ def main():
                 args.https_origin,
                 enable_integrations=args.enable_integrations
                 or args.local_test_integrations,
+                idle_seconds=args.idle_minutes * 60,
+                require_mfa=args.require_mfa,
+                oidc_provider=provider,
+                password_login=not args.sso_only,
+                scanner=scanning.Scanner(args.scan_command)
+                if args.scan_command
+                else None,
             ) as server:
                 print(f"요구자료 취합 포털  {server.origin}", flush=True)
                 try:
@@ -202,10 +281,18 @@ def main():
             return
         if args.command == "account":
             password = getpass.getpass("비밀번호 (12~256자) ")
-            if not 12 <= len(password) <= 256 or password != getpass.getpass(
-                "비밀번호 확인 "
-            ):
-                cli.error("비밀번호 길이와 확인값을 확인해 주세요.")
+            problem = validate_password(args.login, password)
+            if problem or password != getpass.getpass("비밀번호 확인 "):
+                cli.error(problem or "비밀번호 확인값이 다릅니다.")
+        secret = ""
+        if args.command == "mfa-enroll":
+            secret = auth.new_totp_secret()
+            print(
+                "인증 앱에 아래 주소(QR 생성기) 또는 비밀값을 등록하세요. 이 화면 밖에 보관하지 마세요."
+            )
+            print(auth.provisioning_uri(args.login, secret))
+            print(f"비밀값: {secret}")
+            password = input("인증 앱에 표시된 현재 6자리 코드: ")
         with store.connect(args.db, write=True) as conn:
             if args.command == "demo":
                 credentials = demo(conn)
@@ -261,7 +348,37 @@ def main():
                 integrations.disable_client(conn, args.client)
             elif args.command == "invalidate-access":
                 operations.invalidate_access(conn)
-    except (store.PortalError, sqlite3.Error, OSError) as exc:
+            elif args.command == "unlock":
+                auth.unlock(conn, args.login)
+            elif args.command == "logout":
+                store.require_row(
+                    conn.execute(
+                        "SELECT 1 FROM accounts WHERE login=?", (args.login,)
+                    ).fetchone()
+                )
+                count = auth.end_sessions(conn, args.login)
+                store.event(
+                    conn,
+                    "포털 콘솔",
+                    "세션 강제 종료",
+                    detail=f"{args.login} / {count}",
+                )
+                credentials = [("ended_sessions", str(count))]
+            elif args.command == "mfa-enroll":
+                auth.enroll_totp(conn, args.login, secret, password)
+                password = ""
+                credentials = [("mfa", "등록 완료")]
+            elif args.command == "mfa-reset":
+                auth.reset_totp(conn, args.login)
+            elif args.command == "sso-link":
+                oidc.link_identity(
+                    conn, store, args.login, args.issuer, args.subject, "포털 콘솔"
+                )
+            elif args.command == "sso-unlink":
+                oidc.unlink_identity(
+                    conn, store, args.issuer, args.subject, "포털 콘솔"
+                )
+    except (store.PortalError, sqlite3.Error, OSError, oidc.OidcError) as exc:
         cli.error(str(exc))
     for account, password in credentials:
         print(f"{account}: {password}")
@@ -283,6 +400,14 @@ def run_inspection(args):
                 print(line)
         elif args.command == "access":
             print(operations.account_access(conn, args.login))
+        elif args.command == "sessions":
+            for line in operations.session_lines(conn, args.login):
+                print(line)
+        elif args.command == "sso-list":
+            for line in operations.identity_lines(conn):
+                print(line)
+        elif args.command == "audit-head":
+            print(operations.audit_head(conn))
 
 
 if __name__ == "__main__":

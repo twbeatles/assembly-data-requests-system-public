@@ -18,6 +18,33 @@
 
 서버 연동 호출에 브라우저 쿠키나 Origin은 사용하지 않는다. 웹 사이트 로그인은 별도 사용자 세션을 이용한다. 회사 포털에서 필요한 경우 직원에게 취합 포털 링크를 제공하고, 외부의 브라우저 스크립트에 연동 키를 넣지 않는다. 429·503 또는 응답 유실에는 지연 후 같은 외부 ID와 내용으로 재시도한다. 400·401·403·409는 연동 담당자가 원인과 입력을 확인한다. 문의 시 응답의 `X-Request-ID`를 기록하면 서버 로그와 연결할 수 있다. [OWASP REST 보안 지침](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html) · [OWASP 비밀 관리 지침](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)
 
+## 기관 SSO (OpenID Connect)
+
+포털은 인가 코드 흐름과 PKCE(S256)로 기관 IdP에 로그인합니다. IdP에는 기밀 클라이언트로 등록하고 리디렉션 URI를 `https://<포털 주소>/sso/callback` 하나만 허용합니다. 클라이언트 비밀은 설정 파일이 아닌 서비스 계정의 환경 변수에 둡니다.
+
+```json
+{
+  "issuer": "https://login.example.org/realms/agency",
+  "client_id": "collection-portal",
+  "client_secret_env": "COLLECTION_OIDC_SECRET",
+  "scopes": "openid",
+  "required_amr": ["mfa"],
+  "label": "기관 계정",
+  "token_auth": "client_secret_basic"
+}
+```
+
+```powershell
+python -m scripts.collection_portal --db $portalDb sso-link staff01 https://login.example.org/realms/agency 3f1c9a0e-...
+python -m scripts.collection_portal --db $portalDb serve --https-origin https://collection.example.org --oidc-config C:\portal\oidc.json --sso-only
+```
+
+- 포털 계정은 IdP의 `iss`와 `sub` 조합으로만 찾습니다. 이메일·이름·요청 헤더는 권한 근거가 아닙니다. 연결되지 않은 IdP 계정은 로그인할 수 없으며, 거부 기록이 감사 이력에 남습니다. `sub` 값은 IdP 관리 화면이나 ID 토큰에서 확인합니다.
+- ID 토큰은 RS256 서명(2048비트 이상), `iss`, `aud`(다중이면 `azp`), `exp`·`iat`(오차 60초), `nonce`를 검사합니다. `required_amr`를 넣으면 IdP가 그 인증 수단(예: `mfa`)을 `amr`로 알려야 합니다. 실제 IdP가 보내는 `amr` 값을 먼저 확인하세요.
+- 로그인 요청(state)은 10분 동안 한 번만 쓸 수 있고, 시작한 브라우저에만 묶입니다. 서명 키가 바뀌면 포털이 JWKS를 다시 읽습니다(분당 최대 1회).
+- `--sso-only`는 비밀번호 로그인 화면과 요청을 모두 끕니다. 비상 접속용 계정이 필요하면 `--sso-only` 없이 별도 시간대에 열고 `--require-mfa`를 함께 씁니다.
+- 인사 이동·퇴직 시 `revoke`·`disable`과 함께 `sso-unlink <issuer> <subject>`를 실행합니다. 연결 해제는 SSO 세션을 즉시 끝냅니다. `sso-list`로 연결 현황을 봅니다.
+
 ## 권한 및 보안 감사
 
 | 점검 대상 | 이번에 적용한 제어 | 배포 환경에서 확인할 항목 |
@@ -26,7 +53,8 @@
 | 결재 충돌 | 제출 부서와 취합 역할을 함께 가진 사용자라도 본인 제출본 승인은 거부한다. | 제출 담당자와 승인 담당자 계정을 나누고, 직무별 권한표와 대리·휴가 시 승인 절차를 정한다. |
 | 키 수명과 회수 | 키는 해시로 저장하며, 만료·폐기·연동 중지와 접수 권한을 요청마다 재검사한다. 중복 접수는 외부 ID와 요청 내용 지문으로 확인한다. | 팀별 서비스 계정 소유자와 비밀 저장소를 지정하고, 유효기간 만료와 교체 실패를 모니터링한다. |
 | 브라우저 보안과 처리량 | HTTPS 모드에서 HSTS와 `__Host-` 보안 쿠키를 적용한다. 대용량 폼을 읽기 전에 세션을 확인하고, 작업 시작 시 세션을 다시 확인한다. 로그인·인증된 연동의 빈도와 HTTP 동시 요청 수를 제한한다. | 프록시에 출처별 요청 제한·본문 제한·전송 시간 제한을 둔다. TLS 인증서와 갱신, 로그의 인증 헤더 제거, 업로드 악성코드 검사 절차를 검증한다. |
-| 감사 추적 | 포털 DB에 권한 변경·키 발급·폐기·로그인·업무 상태 변경을 남긴다. 승인된 다운로드 요청과 인증된 연동 성공은 서버 로그에 대상 종류·주체를 기록한다. | 서버 로그와 `audit` 출력을 접근이 제한된 중앙 저장소로 수집한다. 다운로드 이벤트는 권한 승인 시점이며 실제 파일 수신 완료와 구분한다. |
+| 로그인 보호 | 계정 잠금(5회·15분)을 DB에 기록해 재시작 후에도 유지한다. 유휴 30분·절대 8시간 세션, TOTP 2차 인증과 `--require-mfa`, OIDC SSO(PKCE·서명·nonce 검증, `iss`+`sub` 매핑)와 `--sso-only`를 제공한다. | 실제 IdP의 `amr` 값과 MFA 정책, 비상 접속 계정의 보관·사용 절차를 정한다. |
+| 감사 추적 | 포털 DB에 권한 변경·키 발급·폐기·로그인·로그인 실패·잠금·SSO 연결·업무 상태 변경을 남기고, 행마다 해시 체인을 잇는다. `check`가 체인을 검증한다. 승인된 다운로드 요청과 인증된 연동 성공은 서버 로그에 대상 종류·주체를 기록한다. | 서버 로그와 `audit` 출력을 접근이 제한된 중앙 저장소로 수집한다. 다운로드 이벤트는 권한 승인 시점이며 실제 파일 수신 완료와 구분한다. |
 
 다른 팀 또는 다른 연동의 건에 대한 조회, 쿠키와 연동 키의 혼용, 키 폐기·만료, 접수 권한 회수, 중복 접수와 본인 승인 차단을 회귀 테스트로 관리한다. DB와 프록시에 직접 접근할 수 있는 계정, 회사 직원의 IdP 계정, 외부 연동을 운영하는 서버 계정은 각자 다른 운영 경계로 관리한다. [OWASP 접근 권한 지침](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) · [OWASP 로그 지침](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
 
@@ -39,7 +67,10 @@ python -m scripts.collection_portal --db $portalDb check
 python -m scripts.collection_portal --db $portalDb backup $backupPath
 python -m scripts.collection_portal --db $backupPath check
 python -m scripts.collection_portal --db $portalDb audit --after 0 --limit 1000
+python -m scripts.collection_portal --db $portalDb audit-head
 ```
+
+`audit-head`의 마지막 번호와 체인 값을 감사 수집 때마다 포털 밖에 보관한다. DB 쓰기 권한이 있는 사람은 체인을 처음부터 다시 계산할 수 있으므로, 외부에 남긴 값과 대조해야 끝부분 삭제나 전체 재작성까지 찾을 수 있다.
 
 `backup`은 SQLite 온라인 백업으로 일관된 사본을 만들고 무결성·외래 키를 확인한 뒤 지정 경로에 공개한다. 같은 이름의 백업을 덮어쓰지 않는다. 백업 대상 폴더는 하드 링크를 지원해야 한다. `audit`는 다음 정기 수집 때 마지막으로 수집한 ID를 `--after`에 넣어 이어서 받을 수 있다. 사유에 업무 정보가 포함될 수 있어 감사 출력도 보호한다. [SQLite 온라인 백업 API](https://www.sqlite.org/backup.html)
 

@@ -3,7 +3,7 @@
 from html import escape
 from urllib.parse import urlencode
 
-from . import documents, notices, store
+from . import documents, gongmun, notices, questions, store
 
 STATUS = {
     "open": "미작성",
@@ -14,7 +14,10 @@ STATUS = {
     "collecting": "취합 중",
     "finalized": "최종 확정",
     "sent": "대외 제출 완료",
+    "disputed": "소관 이의",
+    "cancelled": "배정 취소",
 }
+DUE_SOON_DAYS = 2
 
 
 def e(value):
@@ -80,15 +83,16 @@ def area(name, label, value="", attrs="required", prefix=""):
     )
 
 
-def dropdown(name, label, options, prefix="", selected=""):
+def dropdown(name, label, options, prefix="", selected="", *, optional=False):
     field_id = prefix + name
-    choices = ['<option value="">선택하세요</option>']
+    choices = [] if optional else ['<option value="">선택하세요</option>']
     for value, text in options:
         active = " selected" if value == selected else ""
         choices.append(f'<option value="{e(value)}"{active}>{e(text)}</option>')
+    required = "" if optional else " required"
     return (
         f'<label for="{field_id}">{e(label)}</label>'
-        f'<select id="{field_id}" name="{name}" required>{"".join(choices)}</select>'
+        f'<select id="{field_id}" name="{name}"{required}>{"".join(choices)}</select>'
     )
 
 
@@ -113,23 +117,32 @@ def form(path, csrf, content, version=None, enctype=""):
     )
 
 
-def login(csrf, message=""):
+def login(csrf, message="", *, password=True, sso_label=None):
     error = error_notice(message)
-    fields = input_field(
-        "login", "계정", attrs='required maxlength="80" autocomplete="username"'
-    )
-    fields += input_field(
-        "password",
-        "비밀번호",
-        kind="password",
-        attrs='required maxlength="256" autocomplete="current-password"',
-    )
+    content = ""
+    if sso_label:
+        content += f'<p><a class="action" href="/sso/start">{e(sso_label)}(으)로 로그인</a></p>'
+    if password:
+        fields = input_field(
+            "login", "계정", attrs='required maxlength="80" autocomplete="username"'
+        )
+        fields += input_field(
+            "password",
+            "비밀번호",
+            kind="password",
+            attrs='required maxlength="256" autocomplete="current-password"',
+        )
+        fields += input_field(
+            "code",
+            "인증 코드 (인증 앱을 등록한 계정)",
+            attrs=(
+                'maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"'
+            ),
+        )
+        content += form("/login", csrf, fields + button("로그인"))
     return layout(
         "로그인",
-        '<section class="panel login">'
-        + error
-        + form("/login", csrf, fields + button("로그인"))
-        + "</section>",
+        '<section class="panel login">' + error + content + "</section>",
         subtitle="부서 답변 제출과 취합 업무를 시작하려면 로그인하세요.",
     )
 
@@ -149,10 +162,21 @@ def badge(status):
 
 
 def progress(row):
-    overdue = (
-        row["status"] in ("open", "draft", "returned") and row["due"] < store.today()
-    )
-    return badge(row["status"]) + (' <span class="late">지연</span>' if overdue else "")
+    if row["status"] not in ("open", "draft", "returned"):
+        return badge(row["status"])
+    remaining = (
+        store.date.fromisoformat(row["due"]) - store.date.fromisoformat(store.today())
+    ).days
+    if remaining < 0:
+        return badge(row["status"]) + f' <span class="late">지연 {-remaining}일</span>'
+    if remaining <= DUE_SOON_DAYS:
+        label = "오늘 마감" if remaining == 0 else f"마감 D-{remaining}"
+        return badge(row["status"]) + f' <span class="late">{label}</span>'
+    return badge(row["status"])
+
+
+def meta_summary(meta):
+    return f'<p class="muted">{e(gongmun.describe(meta))}</p>'
 
 
 REQUEST_FILTERS = {"all": "전체", "active": "진행 중", "done": "대외 제출 완료"}
@@ -188,9 +212,11 @@ def request_card(conn, row, actor):
     own = store.assigned(conn, actor, request_id)
     primary = (f"/requests/{request_id}", "요구 내용 보기")
     if manager:
-        assignments = get_assignments(conn, request_id)
+        assignments = [
+            a for a in get_assignments(conn, request_id) if a["status"] != "cancelled"
+        ]
         approved = sum(a["status"] == "approved" for a in assignments)
-        waiting = sum(a["status"] == "submitted" for a in assignments)
+        waiting = sum(a["status"] in ("submitted", "disputed") for a in assignments)
         detail = f"부서 승인 {approved} / {len(assignments)}"
         if collecting:
             if not assignments:
@@ -198,7 +224,12 @@ def request_card(conn, row, actor):
                 detail = "아직 배정된 부서가 없습니다."
             elif waiting:
                 primary = (f"/requests/{request_id}#assignments", "제출 현황 보기")
-                detail += f" · 검토 대기 {waiting}건"
+                detail += f" · 검토·이의 처리 대기 {waiting}건"
+            late = sum(
+                a["status"] in WORKING and a["due"] < store.today() for a in assignments
+            )
+            if late:
+                detail += f" · 지연 {late}개 부서"
         summary = f'<p class="muted">{e(detail)}</p>'
     else:
         summary = (
@@ -414,6 +445,31 @@ def new_request(conn, actor, csrf, *, values=None, message=""):
     )
     fields += input_field("due", "대외 마감일", values.get("due", ""), "date")
     fields += input_field(
+        "committee",
+        "수신(요구 기관·위원회, 선택) · 제출 공문의 수신자",
+        values.get("committee", ""),
+        attrs='maxlength="120" placeholder="예: 국회 ○○위원회 위원장"',
+    )
+    fields += input_field(
+        "doc_no",
+        "요구 문서번호 (선택)",
+        values.get("doc_no", ""),
+        attrs='maxlength="100" placeholder="예: ○○위원회-1234"',
+    )
+    fields += input_field(
+        "received_on",
+        "요구 접수일 (선택)",
+        values.get("received_on", ""),
+        "date",
+        attrs="",
+    )
+    fields += input_field(
+        "basis",
+        "요구 근거 (선택)",
+        values.get("basis", ""),
+        attrs='maxlength="200" placeholder="예: 「국회법」 제128조"',
+    )
+    fields += input_field(
         "ledger_id",
         "기존 대장 ID (선택)",
         values.get("ledger_id", ""),
@@ -483,8 +539,27 @@ def request_page(conn, actor, csrf, request_id):
     basic = (
         f"<p>{badge(request['status'])} · 요구자 {e(request['requester'])}"
         f" · 대외 마감 <time>{e(request['due'])}</time></p>"
-        f'<h2>요구 내용</h2><p class="body">{e(request["instructions"])}</p>'
     )
+    official = [
+        (label, request[key])
+        for key, label in (
+            ("committee", "수신"),
+            ("doc_no", "요구 문서번호"),
+            ("received_on", "접수일"),
+            ("basis", "요구 근거"),
+        )
+        if request[key]
+    ]
+    if official:
+        basic += (
+            '<p class="muted">'
+            + " · ".join(
+                f"{e(label)} {e(gongmun.korean_date(value) if label == '접수일' else value)}"
+                for label, value in official
+            )
+            + "</p>"
+        )
+    basic += f'<h2>요구 내용</h2><p class="body">{e(request["instructions"])}</p>'
     template = conn.execute(
         "SELECT name FROM request_documents WHERE request_id=?", (request_id,)
     ).fetchone()
@@ -511,7 +586,7 @@ def request_page(conn, actor, csrf, request_id):
     if manager and request["status"] == "collecting":
         departments = conn.execute(
             "SELECT id, name FROM scopes WHERE kind='department' AND id NOT IN "
-            "(SELECT department FROM assignments WHERE request_id=?) ORDER BY name",
+            "(SELECT department FROM assignments WHERE request_id=? AND status<>'cancelled') ORDER BY name",
             (request_id,),
         ).fetchall()
         if departments:
@@ -538,12 +613,151 @@ def request_page(conn, actor, csrf, request_id):
             content += (
                 "<p>등록된 부서가 없습니다. 운영 담당자에게 부서 등록을 요청하세요.</p>"
             )
+    pending = [a for a in assignments if a["status"] in WORKING]
+    if manager and request["status"] == "collecting" and pending:
+        names = ", ".join(a["department_name"] for a in pending)
+        content += (
+            "<details><summary>미제출 부서 독촉 공지</summary>"
+            + form(
+                f"/requests/{request_id}/remind",
+                csrf,
+                f'<p class="muted">대상 · {e(names)}</p>'
+                + area(
+                    "notice_body",
+                    "독촉 내용 (비우면 기본 문구)",
+                    attrs='maxlength="2000"',
+                    prefix="remind-",
+                )
+                + button("미제출 부서에 공지", True),
+            )
+            + "</details>"
+        )
     content += "</section>"
+    content += question_panel(conn, csrf, request, manager, own)
     content += request_notices(conn, actor, csrf, request_id, manager, assignments)
     if manager:
         content += finals_panel(conn, actor, csrf, request, assignments)
         content += events(conn, request_id)
     return layout(request["title"], content, actor, csrf, trail=HOME_TRAIL)
+
+
+def question_panel(conn, csrf, request, manager, own):
+    """질의별 답변 부서 지정(취합팀)과 배정 질의 목록(부서)."""
+    request_id = request["id"]
+    items = questions.for_request(conn, request_id)
+    if not manager:
+        mine = {}
+        for assignment in own:
+            for question in questions.for_assignment(conn, assignment["id"]):
+                mine[question["id"]] = question
+        if not mine:
+            return ""
+        rows = "".join(
+            f'<li><strong>{q["seq"]}.</strong> <span class="body">{e(q["body"])}</span></li>'
+            for q in sorted(mine.values(), key=lambda q: q["seq"])
+        )
+        return (
+            '<section class="panel" id="questions"><h2>우리 부서 배정 질의</h2>'
+            f'<ol class="small-list" aria-label="배정 질의">{rows}</ol>'
+            '<p class="muted">답변은 부서 답변 화면에서 질의별로 작성합니다.</p></section>'
+        )
+    collecting = request["status"] == "collecting"
+    if not items and not collecting:
+        return ""
+    routes = questions.routing(conn, request_id)
+    answered = questions.answered(conn, request_id)
+    departments = conn.execute(
+        "SELECT id, name FROM scopes WHERE kind='department' ORDER BY name"
+    ).fetchall()
+    content = (
+        '<section class="panel" id="questions"><h2>질의별 답변 부서</h2>'
+        '<p class="muted">질의마다 답변할 부서를 고릅니다. 여러 부서를 고르면 공동 답변을 받고, '
+        "부서는 자기에게 배정된 질의만 봅니다. 이미 제출한 부서에 질의를 더하면 보완 요청으로 돌아갑니다.</p>"
+    )
+    if items:
+        content += '<ol class="question-list" aria-label="질의 목록">'
+        for question in items:
+            current = routes.get(question["id"], [])
+            status = (
+                ", ".join(
+                    f"{a['department_name']} {STATUS[a['status']]}"
+                    + (
+                        " · 답변"
+                        if a["assignment"] in answered.get(question["id"], set())
+                        else ""
+                    )
+                    for a in current
+                )
+                or "배정 부서 없음"
+            )
+            content += (
+                f'<li class="question-item"><p><strong>질의 {question["seq"]}.</strong> '
+                f'<span class="body">{e(question["body"])}</span></p>'
+                f'<p class="muted">{e(status)}</p>'
+            )
+            if collecting:
+                chosen = {a["department"] for a in current}
+                boxes = "".join(
+                    f'<label class="check"><input type="checkbox" name="dept-{e(d["id"])}" value="1"'
+                    f"{' checked' if d['id'] in chosen else ''}> {e(d['name'])}</label>"
+                    for d in departments
+                )
+                fields = (
+                    hidden("question", question["id"])
+                    + f"<fieldset><legend>질의 {question['seq']} 답변 부서</legend>{boxes}</fieldset>"
+                    + input_field(
+                        "due",
+                        "새로 배정하는 부서의 내부 마감일",
+                        request["due"],
+                        "date",
+                        prefix=f"q{question['id']}-",
+                    )
+                    + button("답변 부서 저장", True)
+                )
+                content += "<details><summary>답변 부서 지정</summary>" + form(
+                    f"/requests/{request_id}/route", csrf, fields, request["version"]
+                )
+                if question["id"] not in answered:
+                    content += form(
+                        f"/requests/{request_id}/unquestion",
+                        csrf,
+                        hidden("question", question["id"]) + button("질의 삭제", True),
+                        request["version"],
+                    )
+                content += "</details>"
+            content += "</li>"
+        content += "</ol>"
+    if collecting:
+        fields = area(
+            "questions",
+            "질의 (한 줄에 하나, 앞 번호는 자동으로 뗍니다)",
+            attrs='required maxlength="200000" rows="6"',
+            prefix="new-",
+        )
+        summary = "질의 추가" if items else "요구 내용을 질의로 나누기"
+        content += (
+            f"<details{'' if items else ' open'}><summary>{summary}</summary>"
+            + form(
+                f"/requests/{request_id}/questions",
+                csrf,
+                fields + button("질의 등록", True),
+                request["version"],
+            )
+            + "</details>"
+        )
+    return content + "</section>"
+
+
+def question_answer_fields(mine, answers):
+    fields = '<fieldset class="answers"><legend>질의별 답변</legend>'
+    for question in mine:
+        fields += area(
+            f"answer-{question['id']}",
+            f"질의 {question['seq']}. {question['body']}",
+            answers.get(question["id"], ""),
+            f'maxlength="{questions.MAX_ANSWER}"',
+        )
+    return fields + "</fieldset>"
 
 
 def request_notices(conn, actor, csrf, request_id, manager, assignments):
@@ -568,7 +782,11 @@ def request_notices(conn, actor, csrf, request_id, manager, assignments):
         content += "</ul>"
     if manager and assignments:
         choices = [("all", "현재 배정된 부서 전체")]
-        choices += [(a["id"], a["department_name"]) for a in assignments]
+        choices += [
+            (a["id"], a["department_name"])
+            for a in assignments
+            if a["status"] != "cancelled"
+        ]
         fields = dropdown("department", "공지 대상", choices, prefix="notice-")
         fields += area(
             "notice_body",
@@ -603,7 +821,10 @@ def finals_panel(conn, actor, csrf, request, assignments):
             sent = f" · 대외 제출 {e(item['sent_on'])}" if item["sent_on"] else ""
             exception = f" · 예외 {e(item['exception'])}" if item["exception"] else ""
             export = (
-                f' · <a href="/finals/{item["id"]}/download">취합 ZIP</a>'
+                (
+                    f' · <a href="/finals/{item["id"]}/download">취합 ZIP</a>'
+                    f' · <a href="/finals/{item["id"]}/letter">제출 공문 초안</a>'
+                )
                 if lead
                 else ""
             )
@@ -616,17 +837,25 @@ def finals_panel(conn, actor, csrf, request, assignments):
         content += "<ul>" + "".join(links) + "</ul>"
     if request["status"] == "collecting" and assignments:
         sources = store.approved_sources(conn, request_id)
+        metas = {s["id"]: store.load_meta(s["meta"]) for s in sources}
         content += (
             "<ul>"
             + "".join(
-                f"<li>{e(s['department_name'])} {s['revision']}판</li>" for s in sources
+                f"<li>{e(s['department_name'])} {s['revision']}판 · "
+                f"{e(gongmun.describe(metas[s['id']]))}</li>"
+                for s in sources
             )
             + "</ul>"
             if sources
             else "<p>승인된 제출본이 없습니다.</p>"
         )
+        restricted = [
+            s["department_name"] for s in sources if gongmun.restricted(metas[s["id"]])
+        ]
         missing = [
-            a["department_name"] for a in assignments if a["status"] != "approved"
+            a["department_name"]
+            for a in assignments
+            if a["status"] not in ("approved", "cancelled")
         ]
         if missing:
             content += f'<p class="alert">아직 승인되지 않은 부서 · {e(", ".join(missing))}</p>'
@@ -638,12 +867,13 @@ def finals_panel(conn, actor, csrf, request, assignments):
         native = conn.execute(
             "SELECT name FROM draft_documents WHERE request_id=?", (request_id,)
         ).fetchone()
-        generated = "\n\n".join(
-            f"{s['department_name']}\n"
-            + ("해당 없음 · " if s["na"] else "")
-            + (s["body"] or "첨부 문서로 제출")
-            for s in sources
-        )
+        generated = questions.compiled_text(conn, request_id, sources)
+        open_questions = questions.unanswered(conn, request_id, sources)
+        if open_questions:
+            content += (
+                f'<p class="alert">승인된 답변이 없는 질의 · '
+                f"{e(', '.join(map(str, open_questions)))}</p>"
+            )
         draft = saved["body"] if saved else generated
         if saved and saved["stamp"] != stamp:
             content += (
@@ -660,11 +890,17 @@ def finals_panel(conn, actor, csrf, request, assignments):
                 "저장된 한글 초안 제외</label>"
             )
         fields += hancom_file("한글 취합 문서")
-        if lead and missing:
+        if lead and (missing or open_questions):
             fields += area(
                 "exception",
-                "미승인 부서가 있는 경우 최종 확정에 필요한 사유",
+                "미승인 부서·미답변 질의가 있는 경우 최종 확정에 필요한 사유",
                 attrs='maxlength="3000"',
+            )
+        if lead and restricted:
+            fields += (
+                f'<p class="alert">공개 제한 또는 개인정보 포함 제출본 · {e(", ".join(restricted))}</p>'
+                '<label class="check"><input type="checkbox" name="privacy_ack" value="1"> '
+                "공개 구분과 개인정보 가림 처리를 확인했습니다(최종 확정 시 필요)</label>"
             )
         fields += '<div class="buttons">' + button("취합 초안 저장", True)
         if lead:
@@ -724,7 +960,24 @@ def assignment_page(conn, actor, csrf, assignment_id, *, values=None, message=""
     version = row["version"]
     details = f"<p>{progress(row)} · 내부 마감 <time>{e(row['due'])}</time></p>"
     if row["note"]:
-        details += f'<p class="alert body">보완 사유 · {e(row["note"])}</p>'
+        label = {"returned": "보완 사유", "cancelled": "배정 취소 사유"}.get(
+            row["status"], "취합팀 안내"
+        )
+        details += f'<p class="alert body">{label} · {e(row["note"])}</p>'
+    if row["status"] == "disputed":
+        reason = conn.execute(
+            "SELECT detail FROM events WHERE assignment=? AND action='소관 이의' "
+            "ORDER BY id DESC LIMIT 1",
+            (assignment_id,),
+        ).fetchone()
+        details += (
+            f'<p class="alert body">소관 이의 · {e(reason["detail"] if reason else "")}</p>'
+            + (
+                '<p class="muted">취합팀이 배정을 취소하거나 회신할 때까지 기다려 주세요.</p>'
+                if own
+                else ""
+            )
+        )
     template = conn.execute(
         "SELECT name FROM request_documents WHERE request_id=?", (request["id"],)
     ).fetchone()
@@ -769,9 +1022,23 @@ def assignment_page(conn, actor, csrf, assignment_id, *, values=None, message=""
         ).fetchall()
         body = values.get("body", "") if values is not None else row["draft"]
         na = values.get("na") == "1" if values is not None else row["na"]
-        fields = area(
+        mine = questions.for_assignment(conn, assignment_id)
+        fields = ""
+        if mine:
+            answers = (
+                values.get("answers", {})
+                if values is not None
+                else questions.draft_answers(conn, assignment_id)
+            )
+            fields += question_answer_fields(mine, answers)
+        body_label = (
+            "질의 외 의견 또는 해당 없음 사유 (선택)"
+            if mine
+            else "답변 또는 해당 없음 사유"
+        )
+        fields += area(
             "body",
-            "답변 또는 해당 없음 사유",
+            body_label,
             body,
             'maxlength="100000" aria-describedby="submission-help"',
         )
@@ -781,6 +1048,12 @@ def assignment_page(conn, actor, csrf, assignment_id, *, values=None, message=""
         )
         checked = " checked" if na else ""
         fields += f'<label class="check"><input type="checkbox" name="na" value="1"{checked}> 해당 없음</label>'
+        meta = (
+            values.get("meta")
+            if values is not None and values.get("meta")
+            else store.load_meta(row["draft_meta"])
+        )
+        fields += submission_meta_fields(meta)
         for f in files:
             remove = (
                 " checked"
@@ -809,10 +1082,25 @@ def assignment_page(conn, actor, csrf, assignment_id, *, values=None, message=""
             + f'<button formaction="{path}/submit">취합팀에 제출</button></div>'
         )
         heading = "보완 답변 작성" if row["status"] == "returned" else "답변 작성"
+        content += f'<section class="panel"><h2>{heading}</h2>' + form(
+            path + "/draft", csrf, fields, version, "multipart/form-data"
+        )
         content += (
-            f'<section class="panel"><h2>{heading}</h2>'
-            + form(path + "/draft", csrf, fields, version, "multipart/form-data")
-            + "</section>"
+            "<details><summary>우리 부서 소관이 아닌 경우</summary>"
+            '<p class="muted">취합팀에 재배정을 요청합니다. 이의를 보내면 취합팀 회신 전까지 작성할 수 없습니다.</p>'
+            + form(
+                path + "/dispute",
+                csrf,
+                area(
+                    "note",
+                    "소관 이의 사유와 담당으로 보이는 부서",
+                    attrs='required maxlength="1000"',
+                    prefix="dispute-",
+                )
+                + button("소관 이의 보내기", True),
+                version,
+            )
+            + "</details></section>"
         )
     if archived:
         content += submission_panel(conn, archived[0])
@@ -832,6 +1120,44 @@ def assignment_page(conn, actor, csrf, assignment_id, *, values=None, message=""
             path + "/return", csrf, fields + button("보완 요청", True), version
         )
         content += "</details></section>"
+    if (
+        manager
+        and collecting
+        and row["status"] not in ("approved", "cancelled", "submitted")
+    ):
+        disputed = row["status"] == "disputed"
+        fields = input_field(
+            "due", "내부 마감일", row["due"], "date", prefix="schedule-"
+        )
+        fields += area(
+            "note",
+            "부서에 보낼 회신" if disputed else "부서 안내 (선택)",
+            attrs='required maxlength="1000"' if disputed else 'maxlength="1000"',
+            prefix="schedule-",
+        )
+        content += (
+            '<section class="panel"><h2>배정 관리</h2>'
+            + form(
+                path + "/reschedule",
+                csrf,
+                fields + button("소관 유지로 회신" if disputed else "마감 변경", True),
+                version,
+            )
+            + "<details><summary>배정 취소</summary>"
+            + form(
+                path + "/cancel",
+                csrf,
+                area(
+                    "note",
+                    "배정 취소 사유",
+                    attrs='required maxlength="1000"',
+                    prefix="cancel-",
+                )
+                + button("배정 취소", True),
+                version,
+            )
+            + "</details></section>"
+        )
     if len(archived) > 1:
         content += '<details class="panel"><summary>이전 제출본 보기</summary>'
         content += "".join(
@@ -849,6 +1175,53 @@ def assignment_page(conn, actor, csrf, assignment_id, *, values=None, message=""
     )
 
 
+def submission_meta_fields(meta):
+    """국회 제출자료 작성자·기준일과 정보공개법 제9조제1항에 따른 공개 구분 입력."""
+    fields = input_field(
+        "contact",
+        "작성자·연락처 (제출 시 필수)",
+        meta.get("contact", ""),
+        attrs='maxlength="120" autocomplete="off" placeholder="예: 기획과 주무관 홍길동 02-000-0000"',
+    )
+    fields += input_field(
+        "base_date",
+        "자료 기준일 (수치 자료인 경우)",
+        meta.get("base_date", ""),
+        "date",
+        attrs="",
+    )
+    fields += dropdown(
+        "disclosure",
+        "공개 구분",
+        [(value, value) for value in gongmun.DISCLOSURE],
+        selected=meta.get("disclosure", "공개"),
+        optional=True,
+    )
+    grounds = [("", "해당 없음(공개)")] + [
+        (key, f"제{key}호 {label}")
+        for key, label in gongmun.NONDISCLOSURE_GROUNDS.items()
+    ]
+    fields += dropdown(
+        "ground",
+        "비공개·부분공개 근거 (정보공개법 제9조제1항)",
+        grounds,
+        selected=meta.get("ground", ""),
+        optional=True,
+    )
+    fields += area(
+        "disclosure_reason",
+        "공개 제한 사유 (부분공개·비공개 시 필수)",
+        meta.get("disclosure_reason", ""),
+        'maxlength="1000"',
+    )
+    checked = " checked" if meta.get("personal_info") else ""
+    fields += (
+        f'<label class="check"><input type="checkbox" name="personal_info" value="1"{checked}> '
+        "개인정보(성명·연락처·주민등록번호 등)가 포함되어 있음</label>"
+    )
+    return fields
+
+
 def submission_panel(conn, submission):
     attachments = conn.execute(
         "SELECT id, name FROM attachments WHERE submission=? ORDER BY id",
@@ -857,7 +1230,28 @@ def submission_panel(conn, submission):
     content = f'<section class="panel"><h2>제출 {submission["revision"]}판</h2>'
     content += f'<p class="muted">{e(submission["actor"])} · {e(submission["created"][:16].replace("T", " "))}</p>'
     na = "해당 없음 · " if submission["na"] else ""
-    content += f'<p class="body">{na}{e(submission["body"] or "첨부 문서로 제출")}</p>'
+    meta = store.load_meta(submission["meta"])
+    content += meta_summary(meta)
+    if meta["disclosure"] != "공개" and meta["disclosure_reason"]:
+        content += (
+            f'<p class="body">공개 제한 사유 · {e(meta["disclosure_reason"])}</p>'
+        )
+    answers = questions.submission_answers(conn, submission["id"])
+    if answers:
+        content += (
+            '<ol class="answer-list" aria-label="질의별 답변">'
+            + "".join(
+                f'<li><p><strong>질의 {a["seq"]}.</strong> {e(a["question"])}</p><p class="body">{e(a["body"])}</p></li>'
+                for a in answers
+            )
+            + "</ol>"
+        )
+        if submission["body"] or submission["na"]:
+            content += f'<p class="body">{na}{e(submission["body"])}</p>'
+    else:
+        content += (
+            f'<p class="body">{na}{e(submission["body"] or "첨부 문서로 제출")}</p>'
+        )
     if attachments:
         content += '<ul class="small-list" aria-label="제출 첨부">'
         content += "".join(

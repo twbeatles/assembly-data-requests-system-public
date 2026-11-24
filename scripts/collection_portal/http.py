@@ -19,15 +19,30 @@ from typing import Union, cast
 from urllib.parse import parse_qs, quote, urlsplit
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from . import documents, integrations, notices, pages, store
+from . import (
+    auth,
+    documents,
+    gongmun,
+    integrations,
+    notices,
+    oidc,
+    pages,
+    questions,
+    store,
+)
 
 COOKIE = "collection_session"
-SESSION_SECONDS = 8 * 3600
+SSO_COOKIE = "collection_sso"
+SESSION_SECONDS = auth.SESSION_SECONDS
+SSO_START = "/sso/start"
+SSO_CALLBACK = "/sso/callback"
 TOKEN = re.compile(r"[A-Za-z0-9_-]{43}")
 ITEM = re.compile(
     r"/(requests|assignments|attachments|finals|notices)/([1-9][0-9]{0,17})(?:/([a-z]+))?"
 )
 MAX_BODY = documents.MAX_SUBMISSION_FILES_SIZE + 7 * documents.MIB
+# 질의별 답변(최대 200)·부서 체크 상자를 담을 수 있게 한다.
+MAX_FORM_FIELDS = questions.MAX_QUESTIONS + 60
 MULTIPART_FIELDS = {
     "csrf",
     "version",
@@ -42,6 +57,17 @@ MULTIPART_FIELDS = {
     "collection",
     "exception",
     "clear_document",
+    "doc_no",
+    "received_on",
+    "committee",
+    "basis",
+    "privacy_ack",
+    "contact",
+    "base_date",
+    "disclosure",
+    "ground",
+    "disclosure_reason",
+    "personal_info",
 }
 ATTACHMENT_SQL = (
     "SELECT a.id, a.name, a.sha256, length(a.content) AS size, "
@@ -56,12 +82,31 @@ Response = Union[
 
 
 class PortalServer(ThreadingHTTPServer):
-    def __init__(self, address, db, origin=None, *, enable_integrations=False):
+    def __init__(
+        self,
+        address,
+        db,
+        origin=None,
+        *,
+        enable_integrations=False,
+        idle_seconds=auth.IDLE_SECONDS,
+        require_mfa=False,
+        oidc_provider=None,
+        password_login=True,
+        scanner=None,
+    ):
+        if not password_login and oidc_provider is None:
+            raise ValueError("비밀번호 로그인을 끄려면 OIDC 설정이 필요합니다.")
         self.db = db
         self.secret = secrets.token_bytes(32)
         self.login_attempts = []
         self.integration_attempts = {}
         self.enable_integrations = enable_integrations
+        self.idle_seconds = idle_seconds
+        self.require_mfa = require_mfa
+        self.oidc = oidc_provider
+        self.password_login = password_login
+        self.scanner = scanner
         self.request_slots = BoundedSemaphore(24)
         self.attempt_lock = Lock()
         super().__init__(address, Handler)
@@ -138,6 +183,7 @@ class Handler(BaseHTTPRequestHandler):
     def setup(self):
         self.request_id = secrets.token_hex(12)
         self.verified_actor = None
+        self.session_stale = False
         self.body_read_started = False
         self.request.settimeout(20)
         super().setup()
@@ -190,7 +236,8 @@ class Handler(BaseHTTPRequestHandler):
             "default-src 'none'; style-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
         )
         for key, value in (headers or {}).items():
-            self.send_header(key, value)
+            for item in value if isinstance(value, list) else [value]:
+                self.send_header(key, item)
         self.end_headers()
         if body:
             self.wfile.write(body)
@@ -199,15 +246,29 @@ class Handler(BaseHTTPRequestHandler):
         secure = "; Secure" if self.portal.secure_cookie else ""
         return f"{self.cookie_name()}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={age}{secure}"
 
-    def cookie_name(self):
-        return "__Host-" + COOKIE if self.portal.secure_cookie else COOKIE
+    def cookie_name(self, base=COOKIE):
+        return "__Host-" + base if self.portal.secure_cookie else base
 
-    def get_token(self):
+    def sso_cookie(self, token, age):
+        # Lax: the IdP returns the browser with a cross-site top-level GET, which drops Strict cookies.
+        secure = "; Secure" if self.portal.secure_cookie else ""
+        return f"{self.cookie_name(SSO_COOKIE)}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={age}{secure}"
+
+    def get_token(self, base=COOKIE):
         try:
-            cookie = SimpleCookie(self.header("Cookie")).get(self.cookie_name())
+            cookie = SimpleCookie(self.header("Cookie")).get(self.cookie_name(base))
         except CookieError:
             return ""
         return cookie.value if cookie and TOKEN.fullmatch(cookie.value) else ""
+
+    def login_page(self, token, message=""):
+        provider = self.portal.oidc
+        return pages.login(
+            self.csrf(token),
+            message,
+            password=self.portal.password_login,
+            sso_label=provider.label if provider else None,
+        )
 
     def csrf(self, token):
         return hmac.digest(self.portal.secret, token.encode(), "sha256").hex()
@@ -244,6 +305,21 @@ class Handler(BaseHTTPRequestHandler):
                     Path(__file__).with_name("portal.css").read_bytes(),
                     "text/css; charset=utf-8",
                 )
+            if path in (SSO_START, SSO_CALLBACK):
+                if self.command != "GET":
+                    store.not_found()
+                response = (
+                    self.sso_start()
+                    if path == SSO_START
+                    else self.sso_callback(url.query)
+                )
+                return self.respond(*response)
+            if (
+                path == "/login"
+                and self.command == "POST"
+                and not self.portal.password_login
+            ):
+                store.not_found()
             token = self.get_token()
             form, files = {}, []
             if self.command == "POST":
@@ -253,7 +329,7 @@ class Handler(BaseHTTPRequestHandler):
                     )
                 if path != "/login":
                     with store.connect(self.portal.db) as conn:
-                        if not session_actor(conn, token):
+                        if not session_actor(conn, token, self.portal.idle_seconds):
                             raise store.PortalError(401, "다시 로그인해 주세요.")
                 form, files = self.read_form(login=(path == "/login"))
                 value = form.get("csrf", "")
@@ -267,10 +343,16 @@ class Handler(BaseHTTPRequestHandler):
                         403, "페이지를 새로고침한 뒤 다시 시도해 주세요."
                     )
                 retry = (path, token, form)
+                if files and self.portal.scanner:
+                    # Scan before the write transaction so a slow scanner does not hold the DB lock.
+                    self.portal.scanner.scan(files)
             if path == "/login" and self.command == "POST":
                 self.portal.throttle_login(form.get("login", ""))
             with store.connect(self.portal.db, write=self.command == "POST") as conn:
                 response = self.route(conn, path, url.query, token, form, files)
+            if self.session_stale and token:
+                with store.connect(self.portal.db, write=True) as conn:
+                    auth.touch_session(conn, token)
             if len(response) == 4:
                 self.respond(response[0], response[1], response[2], response[3])
             elif len(response) == 3:
@@ -322,7 +404,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         try:
             with store.connect(self.portal.db) as conn:
-                actor = session_actor(conn, token)
+                actor = session_actor(conn, token, self.portal.idle_seconds)
                 if not actor:
                     return None
                 csrf = self.csrf(token)
@@ -332,6 +414,17 @@ class Handler(BaseHTTPRequestHandler):
                         "body": form.get("body", "")[:100000],
                         "na": form.get("na"),
                         "remove": removed if isinstance(removed, list) else [],
+                    }
+                    values["meta"] = {
+                        name: str(form.get(name, ""))[:1000]
+                        for name in gongmun.META_FIELDS
+                    }
+                    values["meta"]["personal_info"] = form.get("personal_info") == "1"
+                    values["answers"] = {
+                        int(m[1]): str(value)[: questions.MAX_ANSWER]
+                        for key, value in form.items()
+                        if isinstance(key, str)
+                        and (m := questions.ANSWER_FIELD.fullmatch(key))
                     }
                     return pages.assignment_page(
                         conn, actor, csrf, int(match[2]), values=values, message=message
@@ -343,6 +436,10 @@ class Handler(BaseHTTPRequestHandler):
                     "due": 10,
                     "ledger_id": 100,
                     "instructions": 30000,
+                    "doc_no": 100,
+                    "received_on": 10,
+                    "committee": 120,
+                    "basis": 200,
                 }
                 values = {
                     name: form.get(name, "")[:size] for name, size in limits.items()
@@ -447,7 +544,7 @@ class Handler(BaseHTTPRequestHandler):
                 values = parse_qs(
                     body.decode("ascii"),
                     keep_blank_values=True,
-                    max_num_fields=30,
+                    max_num_fields=MAX_FORM_FIELDS,
                     encoding="utf-8",
                     errors="strict",
                 )
@@ -473,7 +570,7 @@ class Handler(BaseHTTPRequestHandler):
         files = []
         for index, part in enumerate(message.iter_parts()):
             if (
-                index >= 25
+                index >= MAX_FORM_FIELDS
                 or part.get_content_disposition() != "form-data"
                 or part.is_multipart()
             ):
@@ -489,7 +586,11 @@ class Handler(BaseHTTPRequestHandler):
                 continue
             elif name == "remove":
                 removed.append(data.decode("ascii"))
-            elif name in MULTIPART_FIELDS and name not in form:
+            elif (
+                isinstance(name, str)
+                and name not in form
+                and (name in MULTIPART_FIELDS or questions.ANSWER_FIELD.fullmatch(name))
+            ):
                 form[name] = data.decode("utf-8")
             else:
                 raise ValueError
@@ -502,7 +603,11 @@ class Handler(BaseHTTPRequestHandler):
         return 303, b"", "text/plain", headers
 
     def route(self, conn, path, query, token, form, files) -> Response:
-        actor = session_actor(conn, token)
+        session = auth.session_row(conn, token, self.portal.idle_seconds)
+        actor = session["login"] if session else None
+        self.session_stale = (
+            bool(session) and int(time()) - session["last_seen"] >= auth.TOUCH_SECONDS
+        )
         self.verified_actor = actor
         if self.command == "POST" and path == "/login":
             return self.login(conn, token, form)
@@ -512,7 +617,7 @@ class Handler(BaseHTTPRequestHandler):
                     token = token or secrets.token_urlsafe(32)
                     return (
                         200,
-                        pages.login(self.csrf(token)),
+                        self.login_page(token),
                         "text/html; charset=utf-8",
                         {"Set-Cookie": self.cookie(token, 600)},
                     )
@@ -533,26 +638,145 @@ class Handler(BaseHTTPRequestHandler):
 
     def login(self, conn, token, form):
         username, password = form.get("login", "").strip(), form.get("password", "")
-        if (
-            len(username) > 80
-            or len(password) > 256
-            or not store.verify_login(conn, username, password)
-        ):
-            return 401, pages.login(
-                self.csrf(token), "계정 또는 비밀번호를 확인해 주세요."
+        code = form.get("code", "")
+        if len(username) > 80 or len(password) > 256 or len(code) > 12:
+            return 401, self.login_page(token, auth.FAILED)
+        login, message = auth.password_login(
+            conn, username, password, code, require_mfa=self.portal.require_mfa
+        )
+        if not login:
+            # The failure counter must be committed, so this is a normal response, not an exception.
+            return 401, self.login_page(token, message or auth.FAILED)
+        self.verified_actor = login
+        return self.redirect("/", auth.create_session(conn, login, "password", token))
+
+    def sso_start(self):
+        provider = self.portal.oidc
+        if provider is None:
+            store.not_found()
+        state, nonce, verifier, challenge = oidc.new_state()
+        binding = secrets.token_urlsafe(32)
+        with store.connect(self.portal.db, write=True) as conn:
+            conn.execute("DELETE FROM sso_states WHERE expiry<=?", (int(time()),))
+            if conn.execute("SELECT count(*) FROM sso_states").fetchone()[0] >= 5000:
+                raise store.PortalError(
+                    503, "로그인 요청이 많습니다. 잠시 뒤 다시 시도해 주세요."
+                )
+            conn.execute(
+                "INSERT INTO sso_states VALUES (?, ?, ?, ?, ?)",
+                (
+                    store.token_hash(state),
+                    store.token_hash(binding),
+                    nonce,
+                    verifier,
+                    int(time()) + oidc.STATE_SECONDS,
+                ),
             )
-        conn.execute(
-            "DELETE FROM sessions WHERE expiry<=? OR token=?",
-            (int(time()), store.token_hash(token)),
+        location = provider.authorization_url(
+            self.portal.origin + SSO_CALLBACK, state, nonce, challenge
         )
-        token = secrets.token_urlsafe(32)
-        conn.execute(
-            "INSERT INTO sessions VALUES (?, ?, ?)",
-            (store.token_hash(token), username, int(time()) + SESSION_SECONDS),
+        return (
+            303,
+            b"",
+            "text/plain",
+            {
+                "Location": location,
+                "Set-Cookie": self.sso_cookie(binding, oidc.STATE_SECONDS),
+            },
         )
-        self.verified_actor = username
-        store.event(conn, username, "로그인")
-        return self.redirect("/", token)
+
+    def sso_callback(self, query):
+        provider = self.portal.oidc
+        if provider is None:
+            store.not_found()
+        clear = self.sso_cookie("", 0)
+        try:
+            values = parse_qs(
+                query,
+                keep_blank_values=True,
+                max_num_fields=10,
+                strict_parsing=bool(query),
+            )
+        except ValueError:
+            raise store.PortalError(400, "로그인 응답 주소를 확인해 주세요.") from None
+        state = values.get("state", [""])[0]
+        code = values.get("code", [""])[0]
+        binding = self.get_token(SSO_COOKIE)
+        with store.connect(self.portal.db, write=True) as conn:
+            row = (
+                conn.execute(
+                    "SELECT * FROM sso_states WHERE state_hash=?",
+                    (store.token_hash(state),),
+                ).fetchone()
+                if state
+                else None
+            )
+            if row:
+                # One use only, even when the rest of the sign-in fails.
+                conn.execute(
+                    "DELETE FROM sso_states WHERE state_hash=?", (row["state_hash"],)
+                )
+        failure = pages.layout(
+            "기관 계정 로그인 실패",
+            '<p class="alert" role="alert">기관 계정 로그인을 확인하지 '
+            '못했습니다. 처음부터 다시 로그인해 주세요.</p><p><a href="/">로그인 화면</a></p>',
+            error=True,
+        )
+        if (
+            not row
+            or row["expiry"] <= int(time())
+            or not binding
+            or not hmac.compare_digest(row["binding_hash"], store.token_hash(binding))
+        ):
+            logging.warning("SSO 콜백 거부 id=%s reason=state", self.request_id)
+            return 400, failure, "text/html; charset=utf-8", {"Set-Cookie": clear}
+        if "error" in values or not code or len(code) > 2048:
+            logging.warning("SSO 콜백 거부 id=%s reason=idp-error", self.request_id)
+            return 401, failure, "text/html; charset=utf-8", {"Set-Cookie": clear}
+        try:
+            id_token = provider.exchange(
+                code, row["verifier"], self.portal.origin + SSO_CALLBACK
+            )
+            claims = provider.verify_id_token(id_token, row["nonce"])
+        except oidc.OidcError as exc:
+            logging.warning("SSO 토큰 거부 id=%s reason=%s", self.request_id, exc)
+            return 401, failure, "text/html; charset=utf-8", {"Set-Cookie": clear}
+        with store.connect(self.portal.db, write=True) as conn:
+            account = conn.execute(
+                "SELECT a.login FROM identities i JOIN accounts a ON a.login=i.login "
+                "WHERE i.issuer=? AND i.subject=? AND a.enabled=1",
+                (claims["iss"], claims["sub"]),
+            ).fetchone()
+            if not account:
+                store.event(
+                    conn,
+                    "SSO",
+                    "SSO 로그인 거부(미연결 계정)",
+                    detail=f"{claims['iss']} / {claims['sub']}",
+                )
+                denied = pages.layout(
+                    "포털 계정 없음",
+                    '<p class="alert" role="alert">이 기관 계정에 연결된 포털 '
+                    "계정이 없습니다. 운영 담당자에게 계정 연결을 요청해 주세요.</p>",
+                    error=True,
+                )
+                return 403, denied, "text/html; charset=utf-8", {"Set-Cookie": clear}
+            login = account["login"]
+            token = auth.create_session(conn, login, "sso")
+        self.verified_actor = login
+        # Strict session cookies are not sent on the IdP-initiated redirect chain; a same-site
+        # navigation from this page carries them.
+        page = (
+            '<!doctype html><html lang="ko"><head><meta charset="utf-8">'
+            '<meta http-equiv="refresh" content="0;url=/"><title>로그인 완료</title></head>'
+            '<body><p><a href="/">요구 건 목록으로 이동</a></p></body></html>'
+        )
+        return (
+            200,
+            page,
+            "text/html; charset=utf-8",
+            {"Set-Cookie": [self.cookie(token), clear]},
+        )
 
     def get_page(self, conn, path, query, actor, csrf) -> Response:
         if path in ("/", "/notices"):
@@ -600,6 +824,17 @@ class Handler(BaseHTTPRequestHandler):
                 action,
                 self.final_document(conn, actor, object_id),
             )
+        if group == "finals" and action == "letter":
+            final, request = self.final_for(conn, actor, object_id)
+            letter = final_letter(conn, final, request)
+            return (
+                200,
+                letter.encode("utf-8"),
+                "text/plain; charset=utf-8",
+                download_headers(
+                    f"request-{request['id']}-v{final['revision']}-제출공문초안.txt"
+                ),
+            )
         store.not_found()
 
     def change(self, conn, path, actor, form, files) -> Response:
@@ -613,11 +848,31 @@ class Handler(BaseHTTPRequestHandler):
         object_id = int(raw_id)
         if group == "notices" and action == "open":
             return self.redirect(notices.open_notice(conn, actor, object_id))
-        if group == "requests" and action == "announce":
+        if group == "requests" and action in ("announce", "remind"):
             if files:
                 raise store.PortalError(400, "업무 공지는 메시지만 입력해 주세요.")
-            notices.publish(conn, actor, object_id, form)
+            if action == "remind":
+                request, manager, _ = store.request_for(conn, actor, object_id)
+                if not manager:
+                    store.not_found()
+                store.remind_pending(conn, actor, request, form)
+            else:
+                notices.publish(conn, actor, object_id, form)
             return self.redirect(f"/requests/{object_id}#request-notices")
+        if group == "assignments" and action in ("cancel", "reschedule", "dispute"):
+            if files:
+                raise store.PortalError(400, "이 작업에는 파일을 첨부할 수 없습니다.")
+            row, request, manager, own = store.assignment_for(conn, actor, object_id)
+            if (action == "dispute" and not own) or (
+                action != "dispute" and not manager
+            ):
+                store.not_found()
+            store.check_state(request["status"] == "collecting")
+            if action == "dispute":
+                store.dispute_assignment(conn, actor, row, request, form)
+            else:
+                store.manage_assignment(conn, actor, row, request, form, action)
+            return self.redirect(f"/assignments/{object_id}")
         if group == "requests" and action in (
             "assign",
             "prepare",
@@ -625,11 +880,21 @@ class Handler(BaseHTTPRequestHandler):
             "sent",
             "ledger",
             "reopen",
+            "questions",
+            "route",
+            "unquestion",
         ):
             request, manager, _ = store.request_for(conn, actor, object_id)
+            collector_actions = (
+                "assign",
+                "prepare",
+                "questions",
+                "route",
+                "unquestion",
+            )
             allowed = (
                 manager
-                if action in ("assign", "prepare")
+                if action in collector_actions
                 else store.team_allowed(conn, actor, request["team"], lead=True)
             )
             if not allowed:
@@ -730,17 +995,15 @@ class Handler(BaseHTTPRequestHandler):
                 413,
                 "첨부 묶음이 100 MiB를 넘습니다. 제출본에서 개별 파일을 내려받아 주세요.",
             )
-        sources = conn.execute(
-            "SELECT d.name, s.revision FROM final_sources f JOIN submissions s ON s.id=f.submission "
-            "JOIN assignments p ON p.id=s.assignment JOIN scopes d ON d.id=p.department "
-            "WHERE f.final=? ORDER BY p.id",
-            (final_id,),
-        ).fetchall()
+        sources = final_sources(conn, final_id)
         manifest = [
             f"요구 건 {request['id']} · {final['revision']}판",
             f"확정 시각 {final['created']}",
         ]
-        manifest.extend(f"{s['name']} 제출 {s['revision']}판" for s in sources)
+        manifest.extend(
+            f"{s['name']} 제출 {s['revision']}판 · {gongmun.describe(store.load_meta(s['meta']))}"
+            for s in sources
+        )
         if final["exception"]:
             manifest.append("예외 승인 " + final["exception"])
         with SpooledTemporaryFile(max_size=1024 * 1024) as buffer:
@@ -767,6 +1030,16 @@ class Handler(BaseHTTPRequestHandler):
                         f"{entry} · {item['department']} {item['revision']}판 · {item['sha256']}"
                     )
                 archive.writestr("취합근거.txt", "\n".join(manifest) + "\n")
+                archive.writestr(
+                    "제출공문_초안.txt", final_letter(conn, final, request)
+                )
+                if questions.for_request(conn, request["id"]):
+                    archive.writestr(
+                        "질의별답변.txt",
+                        questions.compiled_text(
+                            conn, request["id"], final_submissions(conn, final_id)
+                        ),
+                    )
             buffer.seek(0)
             data = buffer.read()
         return (
@@ -775,6 +1048,46 @@ class Handler(BaseHTTPRequestHandler):
             "application/zip",
             download_headers(f"request-{request['id']}-v{final['revision']}.zip"),
         )
+
+
+def final_submissions(conn, final_id):
+    """확정 판에 고정된 승인 제출본(`store.approved_sources`와 같은 열)."""
+    return conn.execute(
+        "SELECT s.*, d.name AS department_name FROM final_sources f JOIN submissions s ON s.id=f.submission "
+        "JOIN assignments p ON p.id=s.assignment JOIN scopes d ON d.id=p.department "
+        "WHERE f.final=? ORDER BY p.id",
+        (final_id,),
+    ).fetchall()
+
+
+def final_sources(conn, final_id):
+    return conn.execute(
+        "SELECT d.name, s.revision, s.meta FROM final_sources f JOIN submissions s ON s.id=f.submission "
+        "JOIN assignments p ON p.id=s.assignment JOIN scopes d ON d.id=p.department "
+        "WHERE f.final=? ORDER BY p.id",
+        (final_id,),
+    ).fetchall()
+
+
+def final_letter(conn, final, request):
+    """제출 공문 기안 초안. 붙임은 확정 한글 문서(없으면 답변서)와 승인 첨부 순서다."""
+    attachments = []
+    native = conn.execute(
+        "SELECT name FROM final_documents WHERE final_id=?", (final["id"],)
+    ).fetchone()
+    if native:
+        attachments.append(native["name"])
+    elif final["body"]:
+        attachments.append(f"{request['title']} 답변서")
+    attachments.extend(
+        row["name"] for row in conn.execute(ATTACHMENT_SQL, (final["id"],))
+    )
+    restricted = [
+        (row["name"], meta)
+        for row in final_sources(conn, final["id"])
+        if gongmun.restricted(meta := store.load_meta(row["meta"]))
+    ]
+    return gongmun.cover_letter(request, attachments, restricted)
 
 
 def download_headers(name):
@@ -792,14 +1105,8 @@ def document_response(row):
     )
 
 
-def session_actor(conn, token):
-    if not token:
-        return None
-    row = conn.execute(
-        "SELECT s.login FROM sessions s JOIN accounts a ON a.login=s.login "
-        "WHERE token=? AND expiry>? AND a.enabled=1",
-        (store.token_hash(token), int(time())),
-    ).fetchone()
+def session_actor(conn, token, idle=auth.IDLE_SECONDS):
+    row = auth.session_row(conn, token, idle)
     return row["login"] if row else None
 
 

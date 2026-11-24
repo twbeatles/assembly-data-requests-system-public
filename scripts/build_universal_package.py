@@ -69,6 +69,7 @@ def build_universal_package(target_dir: Optional[Path] = None) -> Path:
         "docs/COLLECTION_PORTAL.md",
         "docs/COLLECTION_PORTAL_OPERATIONS.md",
         "docs/COLLECTION_PORTAL_STATUS.md",
+        "docs/COLLECTION_PORTAL_FLOW_REVIEW.md",
         "docs/collection-portal-openapi.yaml",
     ):
         destination = target_dir / relative_path

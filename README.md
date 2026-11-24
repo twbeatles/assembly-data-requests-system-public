@@ -12,7 +12,7 @@
 
 ## 🚀 빠른 실행 방식 선택 가이드
 
-부서별 계정으로 요구자료를 제출하고 취합팀이 검토하는 기능은 [요구자료 취합 포털 시범 운영 가이드](docs/COLLECTION_PORTAL.md)를 참고하세요. 구현 범위, 정식 운영 전 할 일, 범용 배포본 빌드는 [취합 포털 구현 현황](docs/COLLECTION_PORTAL_STATUS.md)에 정리했습니다.
+부서별 계정으로 요구자료를 제출하고 취합팀이 검토하는 기능은 [요구자료 취합 포털 시범 운영 가이드](docs/COLLECTION_PORTAL.md)를 참고하세요. 구현 범위, 정식 운영 전 할 일, 범용 배포본 빌드는 [취합 포털 구현 현황](docs/COLLECTION_PORTAL_STATUS.md)에 정리했습니다. 계정 잠금·2차 인증·기관 SSO·감사 체인·첨부 검사는 [취합 포털 시범 운영 가이드](docs/COLLECTION_PORTAL.md#로그인-보안-db-스키마-5)와 [외부 연동 및 정식 운영 설계](docs/COLLECTION_PORTAL_OPERATIONS.md#기관-sso-openid-connect)를, 질의별 답변 부서 지정·소관 이의·공개 구분·제출 공문 초안 등 업무 흐름 보완은 [업무 흐름 점검과 공문서 기준 보완](docs/COLLECTION_PORTAL_FLOW_REVIEW.md)을 참고하세요.
 
 사용자의 업무 환경과 목적에 따라 가장 알맞은 실행 파일을 더블클릭하세요:
 

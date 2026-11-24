@@ -82,8 +82,11 @@ class TestMultiDepartmentAndPackaging(unittest.TestCase):
             "docs/COLLECTION_PORTAL.md",
             "docs/COLLECTION_PORTAL_OPERATIONS.md",
             "docs/COLLECTION_PORTAL_STATUS.md",
+            "docs/COLLECTION_PORTAL_FLOW_REVIEW.md",
             "docs/collection-portal-openapi.yaml",
             "scripts/collection_portal/__main__.py",
+            "scripts/collection_portal/questions.py",
+            "scripts/collection_portal/gongmun.py",
             "scripts/collection_portal/portal.css",
         ):
             self.assertTrue((dist_out / portal_file).is_file(), portal_file)

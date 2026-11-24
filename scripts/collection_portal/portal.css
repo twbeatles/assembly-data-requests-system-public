@@ -194,3 +194,11 @@ header :focus-visible { outline-color: #ffcb75; }
   .task { grid-template-columns: minmax(0, 1fr) auto; }
   .task .action { grid-column: 1 / -1; justify-self: start; }
 }
+
+/* 질의별 배정·답변 */
+.question-list, .answer-list { display: grid; gap: .75rem; padding-inline-start: 0; list-style: none; margin-block: .75rem; }
+.question-item, .answer-list > li { border-block-start: 1px solid var(--line, #d6dde0); padding-block-start: .6rem; }
+.question-item p, .answer-list p { margin-block: .25rem; }
+fieldset { border: 1px solid var(--line, #d6dde0); border-radius: 6px; padding: .6rem .8rem; margin: .5rem 0; min-inline-size: 0; }
+fieldset .check { display: inline-flex; margin-inline-end: 1rem; }
+legend { font-weight: 600; padding-inline: .3rem; }

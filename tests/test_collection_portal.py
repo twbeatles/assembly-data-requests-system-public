@@ -149,7 +149,12 @@ def test_portal_submission_review_export_and_scope_revocation(pilot):
     assert planning.send("GET", "/attachments/1")[1] == "첨부 보존".encode()
     assert (
         planning.send(
-            "POST", "/assignments/1/submit", draft, version=version, body="오래된 요청"
+            "POST",
+            "/assignments/1/submit",
+            draft,
+            contact="담당자 02-000-0000",
+            version=version,
+            body="오래된 요청",
         )[0]
         == 409
     )
@@ -160,6 +165,7 @@ def test_portal_submission_review_export_and_scope_revocation(pilot):
             "POST",
             "/assignments/1/submit",
             draft,
+            contact="담당자 02-000-0000",
             version=field(draft, "version"),
             body="계획 1판 <script>",
         )[0]
@@ -187,6 +193,7 @@ def test_portal_submission_review_export_and_scope_revocation(pilot):
             "POST",
             "/assignments/1/submit",
             draft,
+            contact="담당자 02-000-0000",
             version=field(draft, "version"),
             body="계획 2판",
         )[0]
@@ -198,6 +205,7 @@ def test_portal_submission_review_export_and_scope_revocation(pilot):
             "POST",
             "/assignments/2/submit",
             draft,
+            contact="담당자 02-000-0000",
             version=field(draft, "version"),
             body="해당 업무 없음",
             na="1",
@@ -434,6 +442,7 @@ def test_hancom_templates_submissions_and_finals_preserve_original_bytes(pilot):
             "/assignments/3/submit",
             draft,
             version=field(draft, "version"),
+            contact="담당자 02-000-0000",
             na="1",
             upload=("원본.hwp", submitted),
         )[0]
@@ -445,6 +454,7 @@ def test_hancom_templates_submissions_and_finals_preserve_original_bytes(pilot):
             "/assignments/3/submit",
             draft,
             version=field(draft, "version"),
+            contact="담당자 02-000-0000",
             upload=("부서 답변.hwp", submitted),
         )[0]
         == 303
@@ -535,7 +545,7 @@ def test_version_one_migration_keeps_existing_requests_and_attachments(tmp_path)
     store.initialize(db)
     store.initialize(db)
     with store.connect(db) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == store.SCHEMA_VERSION
         assert conn.execute("SELECT count(*) FROM requests").fetchone()[0] == 1
         assert conn.execute("SELECT content FROM attachments").fetchone()[0] == b"old"
         assert conn.execute("SELECT count(*) FROM final_documents").fetchone()[0] == 0
@@ -679,6 +689,7 @@ def test_dual_role_cannot_approve_own_submission(pilot):
             "/assignments/1/submit",
             page,
             version=field(page, "version"),
+            contact="담당자 02-000-0000",
             body="본인 제출",
         )[0]
         == 303
@@ -713,6 +724,7 @@ def test_portal_filters_and_retains_reply_when_attachment_is_rejected(pilot):
         "/assignments/1/submit",
         page,
         version=field(page, "version"),
+        contact="담당자 02-000-0000",
         body="보존할 답변 <초안>",
         upload=("실패.pdf", b"not pdf"),
     )
@@ -779,6 +791,7 @@ def test_search_scope_includes_only_the_actors_authorized_department_content(pil
             "/assignments/2/submit",
             submission,
             version=field(submission, "version"),
+            contact="담당자 02-000-0000",
             body="운영제출문구",
             upload=("운영증빙자료.txt", b"submitted"),
         )[0]
@@ -817,7 +830,7 @@ def test_verified_backup_and_audit(pilot, tmp_path):
     target = tmp_path / "verified-copy.sqlite3"
     operations.snapshot(db, target)
     with operations.open_portal(target) as conn:
-        assert operations.verify(conn) == 4
+        assert operations.verify(conn) == store.SCHEMA_VERSION
         assert conn.execute("SELECT count(*) FROM requests").fetchone()[0] == 1
         log = [json.loads(line) for line in operations.audit_lines(conn, 0, 1000)]
         assert any(row["action"] == "권한 부여" for row in log)
@@ -898,7 +911,7 @@ def test_portal_migrates_without_losing_hancom_data_or_publishing_old_activity(
         )
     store.initialize(path)
     with operations.open_portal(path) as conn:
-        assert operations.verify(conn) == 4
+        assert operations.verify(conn) == store.SCHEMA_VERSION
         assert (
             conn.execute(
                 "SELECT content FROM request_documents WHERE request_id=1"
@@ -954,6 +967,7 @@ def test_workflow_notices_open_authorized_task_and_keep_separate_read_receipts(p
             "/assignments/1/submit",
             draft,
             version=field(draft, "version"),
+            contact="담당자 02-000-0000",
             body="제출 문구",
         )[0]
         == 303

@@ -8,7 +8,7 @@ from pathlib import Path
 from tempfile import mkstemp
 from time import time
 
-from . import store
+from . import auth, store
 
 
 def open_portal(path):
@@ -33,7 +33,34 @@ def verify(conn):
         raise store.PortalError(400, "포털 DB 무결성 검사에 실패했습니다.")
     if conn.execute("PRAGMA foreign_key_check").fetchone():
         raise store.PortalError(400, "포털 DB 참조 무결성 검사에 실패했습니다.")
+    if version >= 5:
+        verify_chain(conn)
     return version
+
+
+def verify_chain(conn):
+    """Recompute the audit hash chain. Returns (last id, last chain) or raises on any break."""
+    cursor = conn.cursor()
+    cursor.row_factory = sqlite3.Row
+    previous, last_id = store.CHAIN_GENESIS, 0
+    for row in cursor.execute("SELECT * FROM events ORDER BY id"):
+        expected = store.chain_value(previous, row)
+        if row["chain"] != expected:
+            raise store.PortalError(
+                400,
+                f"감사 이력 {row['id']}번에서 변경 또는 삭제 흔적이 발견되었습니다.",
+            )
+        previous, last_id = expected, row["id"]
+    return last_id, previous
+
+
+def audit_head(conn):
+    if schema_version(conn) < 5:
+        raise store.PortalError(
+            400, "감사 체인을 쓰려면 포털 DB를 5 버전으로 업데이트하세요."
+        )
+    last_id, chain = verify_chain(conn)
+    return json.dumps({"last_event_id": last_id, "chain": chain}, ensure_ascii=True)
 
 
 def snapshot(source, destination):
@@ -63,9 +90,11 @@ def audit_lines(conn, after, limit):
             400, "이력 시작 번호와 출력 개수(1~1000)를 확인해 주세요."
         )
     conn.row_factory = sqlite3.Row
-    schema_version(conn)
+    chain = ", chain" if schema_version(conn) >= 5 else ""
     for row in conn.execute(
-        "SELECT id, request_id, assignment, actor, action, detail, created "
+        "SELECT id, request_id, assignment, actor, action, detail, created"
+        + chain
+        + " "
         "FROM events WHERE id>? ORDER BY id LIMIT ?",
         (after, limit),
     ):
@@ -93,18 +122,41 @@ def account_access(conn, login):
         conn.execute("SELECT enabled FROM accounts WHERE login=?", (login,)).fetchone()
     )
     grants = store.visible_grants(conn, login)
-    return json.dumps(
-        {
-            "login": login,
-            "enabled": bool(account["enabled"]),
-            "effective_grants": [dict(row) for row in grants],
-        },
-        ensure_ascii=True,
-    )
+    result = {
+        "login": login,
+        "enabled": bool(account["enabled"]),
+        "effective_grants": [dict(row) for row in grants],
+    }
+    if schema_version(conn) >= 5:
+        result.update(auth.account_status(conn, login))
+    return json.dumps(result, ensure_ascii=True)
+
+
+def session_lines(conn, login):
+    conn.row_factory = sqlite3.Row
+    if schema_version(conn) < 5:
+        raise store.PortalError(
+            400, "세션 목록을 보려면 포털 DB를 5 버전으로 업데이트하세요."
+        )
+    for row in auth.list_sessions(conn, login):
+        yield json.dumps(dict(row), ensure_ascii=True)
+
+
+def identity_lines(conn):
+    conn.row_factory = sqlite3.Row
+    if schema_version(conn) < 5:
+        raise store.PortalError(
+            400, "SSO 연결 목록을 보려면 포털 DB를 5 버전으로 업데이트하세요."
+        )
+    for row in conn.execute(
+        "SELECT login, issuer, subject, created FROM identities ORDER BY login, issuer"
+    ):
+        yield json.dumps(dict(row), ensure_ascii=True)
 
 
 def invalidate_access(conn):
     conn.execute("DELETE FROM sessions")
+    conn.execute("DELETE FROM sso_states")
     conn.execute(
         "UPDATE integration_keys SET revoked=? WHERE revoked IS NULL", (int(time()),)
     )
