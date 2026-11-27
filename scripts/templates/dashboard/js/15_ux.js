@@ -324,70 +324,107 @@ function hasActiveSearch() {
     || (f.due && f.due !== 'ALL') || f.tablesOnly || f.onlyFavorites);
 }
 
-// 탭별 건수 계산 차례. 새 검색이 시작되면 하던 계산은 버린다.
-let SEARCH_EXTRAS_SEQ = 0;
-
-// 같은 matchSearchItem으로 목록을 시간 조각(약 12ms)으로 나눠 평가한다(불변조건 51 — 결과 일치).
-// 예전에는 렌더할 때마다 네 목록을 한 번에 동기로 다시 훑어, 시간 조각으로 나눈 화면 검색의
-// 이득을 이 계산이 다 까먹었다(문서가 많으면 입력이 멈췄다).
-async function collectMatchesAsync(items, prepared, isStale) {
-  const out = [];
-  const list = items || [];
-  let i = 0;
-  while (i < list.length) {
-    const started = Date.now();
-    while (i < list.length) {
-      if (matchSearchItem(list[i], prepared, false) >= 0) out.push(list[i]);
-      i += 1;
-      if ((i & 7) === 0 && Date.now() - started >= 12) break;
-    }
-    if (i < list.length) {
-      await new Promise(r => setTimeout(r, 0));
-      if (isStale()) return null;
-    }
-  }
-  return out;
-}
-
-async function refreshTabCounts(currentFiltered, setTab) {
-  const seq = ++SEARCH_EXTRAS_SEQ;
-  const isStale = () => seq !== SEARCH_EXTRAS_SEQ;
-  // 결과 목록을 먼저 그리고 나서 센다.
-  await new Promise(r => setTimeout(r, 0));
-  if (isStale()) return;
-  const prepared = prepareSearchQuery(activeFilters.query);
-  const mode = (typeof currentMode !== 'undefined') ? currentMode : 'docs';
-  const reuse = (m) => (mode === m && Array.isArray(currentFiltered)) ? currentFiltered : null;
-  try {
-    // '표 있는 답변서' = 답변서 가운데 표가 있는 것. 같은 조건이므로 답변서 결과에서 바로 센다.
-    const docs = reuse('docs') || await collectMatchesAsync(DOCUMENTS, prepared, isStale);
-    if (docs === null || isStale()) return;
-    setTab('tab-count-docs', docs.length);
-    const tables = docs.filter(d => d && d.has_tables === 'Y').length;
-    setTab('tab-count-tables', tables);
-    const ledger = reuse('ledger') || await collectMatchesAsync(REQUEST_LEDGER, prepared, isStale);
-    if (ledger === null || isStale()) return;
-    setTab('tab-count-ledger', ledger.length);
-    const qas = reuse('qa') || await collectMatchesAsync(QA_ITEMS, prepared, isStale);
-    if (qas === null || isStale()) return;
-    setTab('tab-count-qa', qas.length);
-    SEARCH_TAB_COUNTS = { docs: docs.length, qa: qas.length, tables, ledger: ledger.length };
-    renderEmptyJumps();
-  } catch (e) { /* 본문 로딩 중 실패하면 예전 값을 둔다 */ }
-}
-
-function refreshSearchExtras(currentFiltered) {
+function refreshSearchExtras(seq, precomputedFiltered) {
   if (!_UXD) return;
-  const show = hasActiveSearch() && (typeof matchSearchItem === 'function');
+  const show = hasActiveSearch() && (typeof filterItemsFromList === 'function');
   const setTab = (id, v) => {
     const el = _UXD.getElementById(id);
     if (el) el.textContent = show ? ` · ${v}건` : '';
   };
   if (show) {
-    SEARCH_TAB_COUNTS = null;
-    refreshTabCounts(currentFiltered, setTab);
+    const mode = (typeof currentMode !== 'undefined') ? currentMode : 'docs';
+    const isStale = () => (typeof RENDER_SEQ !== 'undefined' && seq != null && seq !== RENDER_SEQ);
+
+    if (typeof countSearchMatchesAsync === 'function' && typeof prepareSearchQuery === 'function') {
+      (async () => {
+        let prepared;
+        try {
+          prepared = prepareSearchQuery(activeFilters.query);
+        } catch (e) {
+          return;
+        }
+        let docs = null;
+        let tables = null;
+        let qas = null;
+        let ledger = null;
+        const pre = Array.isArray(precomputedFiltered) ? precomputedFiltered : null;
+        if (pre) {
+          if (mode === 'docs') {
+            docs = pre.length;
+            tables = pre.filter(d => d && d.has_tables === 'Y').length;
+          } else if (mode === 'tables') {
+            tables = pre.length;
+          } else if (mode === 'qa') {
+            qas = pre.length;
+          } else if (mode === 'ledger') {
+            ledger = pre.length;
+          }
+        }
+        try {
+          if (docs === null) {
+            let docCount = 0;
+            let tableCount = 0;
+            const list = (typeof DOCUMENTS !== 'undefined' && DOCUMENTS) || [];
+            let i = 0;
+            const sliceMs = (typeof SEARCH_SLICE_MS === 'number') ? SEARCH_SLICE_MS : 12;
+            while (i < list.length) {
+              const started = Date.now();
+              while (i < list.length) {
+                const d = list[i++];
+                if (matchSearchItem(d, prepared, false) >= 0) {
+                  docCount += 1;
+                  if (d && d.has_tables === 'Y') tableCount += 1;
+                }
+                if ((i & 7) === 0 && Date.now() - started >= sliceMs) break;
+              }
+              if (i < list.length) {
+                await ((typeof yieldToMain === 'function') ? yieldToMain() : new Promise(r => setTimeout(r, 0)));
+                if (isStale()) return;
+              }
+            }
+            if (isStale()) return;
+            docs = docCount;
+            if (tables === null) tables = tableCount;
+          }
+          if (qas === null) {
+            qas = await countSearchMatchesAsync((typeof QA_ITEMS !== 'undefined' && QA_ITEMS) || [], prepared, isStale);
+            if (qas === null || isStale()) return;
+          }
+          if (ledger === null) {
+            ledger = await countSearchMatchesAsync((typeof REQUEST_LEDGER !== 'undefined' && REQUEST_LEDGER) || [], prepared, isStale);
+            if (ledger === null || isStale()) return;
+          }
+        } catch (e) {
+          return;
+        }
+        if (isStale()) return;
+        setTab('tab-count-docs', docs);
+        setTab('tab-count-qa', qas);
+        setTab('tab-count-tables', tables);
+        setTab('tab-count-ledger', ledger);
+        SEARCH_TAB_COUNTS = { docs, qa: qas, tables, ledger };
+        try { renderEmptyJumps(); } catch (e) {}
+      })();
+    } else {
+      // 폴백 (단위 테스트 등)
+      let docs = 0;
+      let qas = 0;
+      let ledger = 0;
+      let tables = 0;
+      try {
+        const docHits = filterItemsFromList(DOCUMENTS, false);
+        docs = docHits.length;
+        tables = docHits.filter(d => d && d.has_tables === 'Y').length;
+        qas = filterItemsFromList(QA_ITEMS, false).length;
+        ledger = filterItemsFromList(REQUEST_LEDGER, false).length;
+      } catch (e) { /* 본문 로딩 중 실패하면 0건으로 둔다 */ }
+      setTab('tab-count-docs', docs);
+      setTab('tab-count-qa', qas);
+      setTab('tab-count-tables', tables);
+      setTab('tab-count-ledger', ledger);
+      SEARCH_TAB_COUNTS = { docs, qa: qas, tables, ledger };
+    }
   } else {
-    SEARCH_EXTRAS_SEQ += 1;
     ['tab-count-docs', 'tab-count-qa', 'tab-count-tables', 'tab-count-ledger'].forEach(id => setTab(id, ''));
     SEARCH_TAB_COUNTS = null;
   }

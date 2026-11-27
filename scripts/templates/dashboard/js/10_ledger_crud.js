@@ -366,7 +366,9 @@ function openLedgerModal(item) {
 
 function closeLedgerModal() {
   hideModalDialog(document.getElementById('ledger-modal-backdrop'));
-  history.replaceState(null, null, ' ');
+  try {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch (e) {}
 }
 
 function copyLedgerDetails() {

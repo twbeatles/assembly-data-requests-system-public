@@ -326,7 +326,7 @@ class GetRoutesMixin(_HostBase_GetRoutesMixin):  # pyright: ignore[reportGeneral
             return
 
         if path.startswith("/api/ledger/"):
-            ledger_id = path.replace("/api/ledger/", "").strip()
+            ledger_id = unquote(path[len("/api/ledger/") :]).strip()
             item = self.get_ledger_item(ledger_id)
             if item:
                 self.send_json_response({"success": True, "data": item})

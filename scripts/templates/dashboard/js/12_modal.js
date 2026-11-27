@@ -91,8 +91,11 @@ async function ensureDocBody(doc) {
 }
 
 // Modal open
+let DOC_MODAL_SEQ = 0;
 async function openDocModal(doc, targetQNum = null) {
+  const modalSeq = ++DOC_MODAL_SEQ;
   doc = await ensureDocBody(doc);
+  if (modalSeq !== DOC_MODAL_SEQ || !doc) return;
   currentSelectedDoc = doc;
   const { allHighlightTokens } = parseSearchTokens(activeFilters.query);
   const highlightTokens = allHighlightTokens || [];
@@ -351,13 +354,18 @@ function switchModalTab(tab) {
 
 function closeModal() {
   hideModalDialog(document.getElementById('modal-backdrop'));
-  // clear hash without jump
-  history.replaceState(null, null, ' ');
+  // clear hash without leaving trailing space (%20)
+  try {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch (e) {}
 }
 
 // Side-by-Side Compare Feature
+let COMPARE_PANE_SEQ = 0;
 function openComparePicker() {
   if (!currentSelectedDoc) return;
+  const { allHighlightTokens } = parseSearchTokens(activeFilters.query);
+  const highlightTokens = allHighlightTokens || [];
   const selectB = document.getElementById('compare-select-b');
   selectB.replaceChildren();
 
@@ -385,7 +393,7 @@ function openComparePicker() {
   `;
 
   enhanceTablesInElement(leftPane);
-  if (typeof highlightTokens !== 'undefined' && highlightTokens.length) {
+  if (highlightTokens.length) {
     applyDomHighlight(leftPane, highlightTokens);
   }
   updateCompareRightPane();
@@ -393,6 +401,7 @@ function openComparePicker() {
 }
 
 async function updateCompareRightPane() {
+  const seq = ++COMPARE_PANE_SEQ;
   const selectB = document.getElementById('compare-select-b');
   const docBId = selectB.value;
   const found = DOCUMENTS.find(d => d.doc_id === docBId);
@@ -402,6 +411,9 @@ async function updateCompareRightPane() {
     return;
   }
   const docB = await ensureDocBody(found);
+  if (seq !== COMPARE_PANE_SEQ) return;
+  const { allHighlightTokens } = parseSearchTokens(activeFilters.query);
+  const highlightTokens = allHighlightTokens || [];
   rightPane.innerHTML = `
     <div class="compare-pane-header">
       <div class="side">고른 답변서</div>
@@ -411,7 +423,7 @@ async function updateCompareRightPane() {
     <div class="modal-rendered-view">${safeMarkedParse(fixDocMediaPaths(docDisplayBody(docB), docB))}</div>
   `;
   enhanceTablesInElement(rightPane);
-  if (typeof highlightTokens !== 'undefined' && highlightTokens.length) {
+  if (highlightTokens.length) {
     applyDomHighlight(rightPane, highlightTokens);
   }
 }

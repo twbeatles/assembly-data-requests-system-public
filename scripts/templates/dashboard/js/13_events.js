@@ -96,15 +96,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
-  document.getElementById('modal-backdrop').addEventListener('click', (e) => {
-    if (e.target.id === 'modal-backdrop') closeModal();
-  });
-  document.getElementById('compare-backdrop').addEventListener('click', (e) => {
-    if (e.target.id === 'compare-backdrop') closeCompareModal();
-  });
   // 읽기만 하는 창은 바깥(어두운 부분)을 눌러도 닫힌다. 입력 폼(등록·수정)은 실수로 닫히지 않게 뺀다.
   // 창 안에서 글자를 끌어 선택하다가 바깥에서 손을 떼는 경우는 닫지 않는다(누른 곳도 바깥이어야 한다).
-  [['ledger-modal-backdrop', () => closeLedgerModal()],
+  [['modal-backdrop', () => closeModal()],
+    ['compare-backdrop', () => closeCompareModal()],
+    ['ledger-modal-backdrop', () => closeLedgerModal()],
     ['quarantine-modal-backdrop', () => closeQuarantineModal()],
     ['config-modal-backdrop', () => closeConfigModal()]].forEach(([id, close]) => {
     const bd = document.getElementById(id);

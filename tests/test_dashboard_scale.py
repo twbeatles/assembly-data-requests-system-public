@@ -352,6 +352,79 @@ for (let i = 0; i < 20000; i++) items.push({ doc_id: 'D' + i, year: '2026', titl
 """)
         self.assertIsNone(out["result"])
 
+    def test_search_crash_regressions_redos_and_prototype_keys(self):
+        """ReDoS(다중 행 테이블 구분선), 프로토타입 키(constructor), 엔티티 깨짐 회귀 방지."""
+        src = TEMPLATE.read_text(encoding="utf-8")
+        extra_funcs = [
+            "escapeHtml",
+            "__highlightRegexCache",
+            "highlightRegexFor",
+            "highlightTextString",
+            "getSnippet",
+            "cleanSnippetText",
+            "snippetSourceText",
+            "cardPreviewText",
+            "countSearchMatchesAsync",
+        ]
+        names = (
+            SEARCH_FUNCS + ["SEARCH_SLICE_MS", "filterItemsFromListAsync"] + extra_funcs
+        )
+        prelude = """
+const document = { getElementById: () => null };
+const localStorage = { getItem: () => null, setItem: () => {} };
+let favorites = [];
+let activeFilters = { query: '', year: 'ALL', inst: 'ALL', topic: 'ALL', onlyFavorites: false, tablesOnly: false, sort: 'relevance' };
+"""
+        code = (
+            prelude
+            + "\n".join(extract_js(src, n) for n in names)
+            + """
+(async () => {
+  // 1. Multi-line markdown table + trailing non-matching lines (ReDoS guard)
+  const evil = ('| --- | --- | --- |\\n\\n| a | b | c |\\n'.repeat(1500)) + '| --- --- --- --- --- text |\\n';
+  const t0 = Date.now();
+  const cleaned = cleanSnippetText(evil);
+  const cleanMs = Date.now() - t0;
+
+  // 2. Prototype property names in SYNONYMS must not throw
+  const protoTokens = ['constructor', 'toString', 'valueOf', 'hasOwnProperty', '""'].map(q => parseSearchTokens(q));
+
+  // 3. Entity preservation & longest-token highlighting
+  const hlEntity = highlightTextString('"테스트" <tag> & 값', ['t', 'quot', 'amp', 'lt', '테스트']);
+
+  // 4. Async tab match counter parity
+  const items = [
+    { doc_id: 'D1', year: '2026', title: '딥페이크', full_markdown: '본문' },
+    { doc_id: 'D2', year: '2026', title: '일반', full_markdown: '다른 내용' },
+    { doc_id: 'D3', year: '2026', title: '딥페이크 2', full_markdown: '본문 2' },
+  ];
+  activeFilters.query = '딥페이크';
+  const syncLen = filterItemsFromList(items, false).length;
+  const asyncCnt = await countSearchMatchesAsync(items, prepareSearchQuery('딥페이크'), () => false);
+
+  console.log(JSON.stringify({
+    cleanMs,
+    cleanedHasText: cleaned.includes('text'),
+    protoOk: protoTokens.every(p => Array.isArray(p.posGroups)),
+    hlEntity,
+    syncLen,
+    asyncCnt,
+  }));
+})();
+"""
+        )
+        out = run_node(code)
+        self.assertLess(
+            out["cleanMs"], 500, f"cleanSnippetText took {out['cleanMs']}ms"
+        )
+        self.assertTrue(out["cleanedHasText"])
+        self.assertTrue(out["protoOk"])
+        self.assertIn("&quot;", out["hlEntity"])
+        self.assertIn("&lt;", out["hlEntity"])
+        self.assertIn('<mark class="highlight">테스트</mark>', out["hlEntity"])
+        self.assertEqual(out["syncLen"], 2)
+        self.assertEqual(out["asyncCnt"], 2)
+
 
 class TestJsonExportAndOptimize(unittest.TestCase):
     def setUp(self):

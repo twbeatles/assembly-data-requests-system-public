@@ -21,7 +21,7 @@ async function render() {
   if (typeof hideSearchSpinner === 'function') hideSearchSpinner();
   if (filtered === null || seq !== RENDER_SEQ) return;
   if (typeof updateBodyLoadStatus === 'function') updateBodyLoadStatus();
-  if (typeof refreshSearchExtras === 'function') refreshSearchExtras(filtered);
+  if (typeof refreshSearchExtras === 'function') refreshSearchExtras(seq, filtered);
 
   document.getElementById('count-filtered').innerText = filtered.length;
   let totalCount = DOCUMENTS.length;
@@ -252,7 +252,7 @@ async function render() {
         card.onclick = openParent;
 
         const rawText = qa.answer_full || qa.answer_markdown || '';
-        const rawSnippet = getSnippet(highlightTokens.length ? cleanSnippetText(rawText) : cardPreviewText(rawText), highlightTokens);
+        const rawSnippet = getSnippet(snippetSourceText(rawText, highlightTokens), highlightTokens);
         const snippet = rawSnippet || (bodiesLoading() ? '<span class="snippet-loading muted">답변 내용 불러오는 중...</span>' : '');
 
         card.innerHTML = `
@@ -312,12 +312,34 @@ function cleanSnippetText(text, maxLen = 0) {
   return s
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*\b[^>]*>/g, ' ')
-    .replace(/^\s{0,3}#{1,6}\s*/gm, '')
-    .replace(/^\s*\|?[\s:|-]*-{3,}[\s:|-]*\|?\s*$/gm, ' ')
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]*/gm, '')
+    // 줄바꿈(\n)을 먹지 않는 단일 문자클래스([ \t:|-]+)로 역추적 폭발(ReDoS)을 원천 차단한다.
+    .replace(/^[ \t:|-]+\r?$/gm, (m) => (m.indexOf('---') !== -1 ? ' ' : m))
     .replace(/\|/g, ' ')
     .replace(/(\*\*|__|`)/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function snippetSourceText(text, tokens) {
+  const s = String(text || '');
+  const valid = (tokens || []).filter(t => t && !isChoseongOnly(t));
+  if (!valid.length) return cardPreviewText(s);
+  if (s.length <= 4000) return cleanSnippetText(s);
+  const lower = s.toLowerCase();
+  let firstIdx = -1;
+  for (const t of valid) {
+    const idx = lower.indexOf(String(t).toLowerCase());
+    if (idx !== -1 && (firstIdx === -1 || idx < firstIdx)) {
+      firstIdx = idx;
+    }
+  }
+  if (firstIdx !== -1) {
+    const start = Math.max(0, firstIdx - 600);
+    const end = Math.min(s.length, firstIdx + 1400);
+    return cleanSnippetText(s.slice(start, end));
+  }
+  return cleanSnippetText(s);
 }
 
 function cardPreviewText(text) {
@@ -382,7 +404,8 @@ function toggleSelectAll(checked) {
 
 function clearSelection() {
   selectedDocIds.clear();
-  document.getElementById('chk-select-all').checked = false;
+  const chkAll = document.getElementById('chk-select-all');
+  if (chkAll) chkAll.checked = false;
   updateSelectionBar();
   render();
 }
@@ -414,6 +437,7 @@ async function printSelectedReport() {
   for (const d of DOCUMENTS.filter(x => selectedDocIds.has(x.doc_id))) {
     selectedDocs.push(await ensureDocBody(d));
   }
+  if (printWindow.closed) return;
   let html = `
     <!DOCTYPE html>
     <html>
@@ -438,7 +462,7 @@ async function printSelectedReport() {
   `;
 
   selectedDocs.forEach(d => {
-    let bodyHtml = safeMarkedParse(docDisplayBody(d));
+    let bodyHtml = safeMarkedParse(fixDocMediaPaths(docDisplayBody(d), d));
     html += `
       <div class="doc-entry">
         <div class="doc-header">

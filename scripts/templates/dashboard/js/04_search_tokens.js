@@ -87,7 +87,7 @@ function parseSearchTokens(query) {
 
   // 1. Extract quoted exact phrases e.g. "24시간 신속심의"
   const phrases = [];
-  cleanQuery = cleanQuery.replace(/"([^"]+)"/g, (m, p1) => {
+  cleanQuery = cleanQuery.replace(/"([^"]*)"/g, (m, p1) => {
     const trimmed = p1.trim();
     if (trimmed) {
       phrases.push(trimmed.toLowerCase());
@@ -105,11 +105,11 @@ function parseSearchTokens(query) {
       variants.add(stem);
     }
     if (useSynonyms) {
-      if (SYNONYMS[lower]) {
-        SYNONYMS[lower].forEach(s => variants.add(s.toLowerCase()));
+      if (Object.prototype.hasOwnProperty.call(SYNONYMS, lower) && Array.isArray(SYNONYMS[lower])) {
+        SYNONYMS[lower].forEach(s => variants.add(String(s).toLowerCase()));
       }
-      if (stem && SYNONYMS[stem]) {
-        SYNONYMS[stem].forEach(s => variants.add(s.toLowerCase()));
+      if (stem && Object.prototype.hasOwnProperty.call(SYNONYMS, stem) && Array.isArray(SYNONYMS[stem])) {
+        SYNONYMS[stem].forEach(s => variants.add(String(s).toLowerCase()));
       }
     }
     return Array.from(variants);

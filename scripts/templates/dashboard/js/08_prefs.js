@@ -177,7 +177,10 @@ function warmSearchCache() {
       const summary = item.answer_summary || '';
       const body = item.full_markdown || item.answer_full_text || item.answer_full || item.answer_markdown || '';
       const answer = body ? `${summary} ${body}` : summary;
-      searchCache(item, 'answerNoSpace', answer, (x) => x.replace(/\s+/g, '').toLowerCase());
+      const bodyNorm = typeof searchableBodyNoSpace === 'function'
+        ? searchableBodyNoSpace
+        : (x) => String(x || '').replace(/\s+/g, '').toLowerCase();
+      searchCache(item, 'answerNoSpace', answer, bodyNorm);
     }
     if (listIdx < lists.length) setTimeout(step, 30);
   };

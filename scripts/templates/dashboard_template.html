@@ -52,6 +52,16 @@
   button, input, select, textarea { font-family: inherit; }
   [hidden] { display: none !important; }
   .muted { color: var(--text-muted); }
+  .visually-hidden:where(:not(:focus-within, :active)) {
+    position: absolute !important; clip-path: inset(50%) !important; overflow: hidden !important;
+    width: 1px !important; height: 1px !important; margin: -1px !important; padding: 0 !important;
+    border: 0 !important; white-space: nowrap !important;
+  }
+  .skip-link:focus-visible {
+    position: fixed; top: 10px; left: 12px; z-index: 10001;
+    background: var(--primary-dark); color: #fff; padding: 8px 14px; border-radius: 8px;
+    font-size: 13px; font-weight: 700; text-decoration: none; outline: 2px solid #fff; outline-offset: 2px;
+  }
 
   /* ---------------- 머리말 ---------------- */
   header {
@@ -301,6 +311,10 @@
     background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 14px 16px; cursor: pointer; transition: border-color .15s, box-shadow .15s;
     display: flex; flex-direction: column; position: relative; min-width: 0;
+  }
+  .card-grid > .card:nth-child(n + 13) {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto 230px;
   }
   .card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
   .card.due-overdue { border-left: 4px solid #dc2626; }
@@ -772,6 +786,7 @@
   </div>
 </div>
 <div id="toast-stack" popover="manual" role="region" aria-label="알림" aria-live="polite"></div>
+<a href="#main-content" class="skip-link visually-hidden">본문으로 건너뛰기</a>
 
 <header>
   <div class="header-content">
@@ -805,7 +820,7 @@
   </div>
 </header>
 
-<main>
+<main id="main-content" tabindex="-1">
   <!-- 탭 + 주요 작업 -->
   <div class="top-tabs-row">
     <div class="mode-switcher" role="group" aria-label="보기 전환">
@@ -1513,6 +1528,14 @@ function bodiesLoading() {
   return BODY_CHUNKS_TOTAL > 0 && BODY_CHUNKS_LOADED < BODY_CHUNKS_TOTAL;
 }
 
+// 50ms 넘는 작업을 나눌 때 scheduler.yield()로 입력·그리기를 우선 처리하고, 미지원 환경은 setTimeout으로 양보한다.
+function yieldToMain() {
+  if (typeof scheduler !== 'undefined' && typeof scheduler.yield === 'function') {
+    return scheduler.yield();
+  }
+  return new Promise(r => setTimeout(r, 0));
+}
+
 // `am_ref`(부모 본문 안의 [시작, 길이], 파이썬 코드포인트 단위)를 문자열로 되살리는 함수를 만든다.
 // 문서 하나에 Q&A가 수십 개라도 본문 분석은 한 번만 한다. 예전에는 Q&A마다 본문 전체를
 // `Array.from`으로 풀어 문서가 클수록 부팅이 느렸고 임시 배열이 메모리를 크게 썼다.
@@ -1631,7 +1654,7 @@ async function loadDeferredBodies() {
     if (BODY_CHUNKS_LOADED === 1 && isQaMode && !hasQuery && typeof render === 'function') {
       render();
     }
-    await new Promise(r => setTimeout(r, 0));
+    await yieldToMain();
   }
   BODY_CHUNKS_LOADED = BODY_CHUNKS_TOTAL;
   DOCUMENTS.forEach(d => {
@@ -1658,7 +1681,7 @@ async function loadAndDecompressDatabase() {
   BODY_CHUNKS_TOTAL = Number(DB.body_chunks || 0);
   BODY_CHUNKS_LOADED = 0;
   if (BODY_CHUNKS_TOTAL > 0) {
-    BODIES_READY = new Promise(resolve => { resolveBodiesReady = resolve; });
+    ({ promise: BODIES_READY, resolve: resolveBodiesReady } = Promise.withResolvers());
   }
 
   // If running in web server mode (HTTP/HTTPS), fetch latest live records from server SQLite DB
@@ -2552,7 +2575,7 @@ function parseSearchTokens(query) {
 
   // 1. Extract quoted exact phrases e.g. "24시간 신속심의"
   const phrases = [];
-  cleanQuery = cleanQuery.replace(/"([^"]+)"/g, (m, p1) => {
+  cleanQuery = cleanQuery.replace(/"([^"]*)"/g, (m, p1) => {
     const trimmed = p1.trim();
     if (trimmed) {
       phrases.push(trimmed.toLowerCase());
@@ -2570,11 +2593,11 @@ function parseSearchTokens(query) {
       variants.add(stem);
     }
     if (useSynonyms) {
-      if (SYNONYMS[lower]) {
-        SYNONYMS[lower].forEach(s => variants.add(s.toLowerCase()));
+      if (Object.prototype.hasOwnProperty.call(SYNONYMS, lower) && Array.isArray(SYNONYMS[lower])) {
+        SYNONYMS[lower].forEach(s => variants.add(String(s).toLowerCase()));
       }
-      if (stem && SYNONYMS[stem]) {
-        SYNONYMS[stem].forEach(s => variants.add(s.toLowerCase()));
+      if (stem && Object.prototype.hasOwnProperty.call(SYNONYMS, stem) && Array.isArray(SYNONYMS[stem])) {
+        SYNONYMS[stem].forEach(s => variants.add(String(s).toLowerCase()));
       }
     }
     return Array.from(variants);
@@ -2755,17 +2778,23 @@ function looseTokenPattern(token) {
 }
 
 function applyDomHighlight(element, tokens) {
-  if (!tokens || !tokens.length) return;
-  const validTokens = tokens.filter(t => t && !isChoseongOnly(t));
+  if (!element || !tokens || !tokens.length) return;
+  const validTokens = Array.from(new Set(tokens.filter(t => t && !isChoseongOnly(t))))
+    .sort((a, b) => b.length - a.length);
   if (!validTokens.length) return;
   const escapedTokens = validTokens.map(looseTokenPattern).filter(t => t.length > 0);
   if (!escapedTokens.length) return;
   const pattern = `(${escapedTokens.join('|')})`;
   // split용(g)과 판정용(g 없음)을 나눈다. g 플래그 정규식에 test()를 반복 호출하면 lastIndex가
   // 누적돼 결과가 번갈아 바뀌고, 강조가 문단마다 빠지거나 엉뚱한 조각에 붙었다. (감사 R4-12)
-  const splitRegex = new RegExp(pattern, 'gi');
-  const matchRegex = new RegExp(pattern, 'i');
-  const exactRegex = new RegExp(`^${pattern}$`, 'i');
+  let splitRegex, matchRegex, exactRegex;
+  try {
+    splitRegex = new RegExp(pattern, 'gi');
+    matchRegex = new RegExp(pattern, 'i');
+    exactRegex = new RegExp(`^${pattern}$`, 'i');
+  } catch (e) {
+    return;
+  }
 
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
   const textNodes = [];
@@ -2778,51 +2807,88 @@ function applyDomHighlight(element, tokens) {
     }
   }
 
-  textNodes.forEach(textNode => {
+  // 대용량 문서에서 1글자 검색어(예: '1', 'x')로 수만 개 <mark> 노드가 생성돼 브라우저가 멈추는 것을 막는다.
+  const MAX_DOM_HIGHLIGHTS = 1500;
+  let totalHighlights = 0;
+  for (const textNode of textNodes) {
+    if (totalHighlights >= MAX_DOM_HIGHLIGHTS) break;
     const parent = textNode.parentNode;
     if (parent && parent.nodeName !== 'MARK' && parent.nodeName !== 'SCRIPT' && parent.nodeName !== 'STYLE' && !(parent.closest && parent.closest('.table-wrapper-header'))) {
       const frag = document.createDocumentFragment();
       const parts = textNode.nodeValue.split(splitRegex);
-      parts.forEach(part => {
-        if (part && exactRegex.test(part)) {
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (!part) continue;
+        if (totalHighlights < MAX_DOM_HIGHLIGHTS && exactRegex.test(part)) {
           const mark = document.createElement('mark');
           mark.className = 'highlight';
           mark.textContent = part;
           frag.appendChild(mark);
-        } else if (part) {
+          totalHighlights += 1;
+        } else {
           frag.appendChild(document.createTextNode(part));
         }
-      });
+      }
       parent.replaceChild(frag, textNode);
     }
-  });
+  }
 }
 
 let __highlightRegexCache = { key: null, regex: null };
 function highlightRegexFor(tokens) {
-  const validTokens = (tokens || []).filter(t => t && !isChoseongOnly(t));
+  const validTokens = Array.from(new Set((tokens || []).filter(t => t && !isChoseongOnly(t))))
+    .sort((a, b) => b.length - a.length);
   if (!validTokens.length) return null;
-  const escapedTokens = validTokens.map(looseTokenPattern).filter(t => t.length > 0);
+  // 단독 추출 테스트에서도 동작하도록 느슨 이스케이프를 내장한다(looseTokenPattern과 동일 로직).
+  const loose = (token) => {
+    const t = String(token || '');
+    const esc = (c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (t.length < 2 || t.length > 30 || /\s/.test(t)) return esc(t);
+    return Array.from(t).map(esc).join('\\s*');
+  };
+  const escapedTokens = validTokens.map(loose).filter(t => t.length > 0);
   if (!escapedTokens.length) return null;
   const key = escapedTokens.join('');
   if (__highlightRegexCache.key === key && __highlightRegexCache.regex) return __highlightRegexCache.regex;
-  const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi');
-  __highlightRegexCache = { key, regex };
-  return regex;
+  try {
+    const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi');
+    __highlightRegexCache = { key, regex };
+    return regex;
+  } catch (e) {
+    return null;
+  }
 }
 function highlightTextString(text, tokens) {
   if (!text) return '';
-  const safeText = escapeHtml(text);
-  if (!tokens || !tokens.length) return safeText;
-  const cachedHl = highlightRegexFor(tokens);
-  if (cachedHl) return safeText.replace(cachedHl, '<mark class="highlight">$1</mark>');
-  // 아래는 유효 토큰이 없어 캐시가 null인 경우의 폴백으로, 항상 safeText를 돌려준다.
-  const validTokens = tokens.filter(t => t && !isChoseongOnly(t));
-  if (!validTokens.length) return safeText;
-  const escapedTokens = validTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).filter(t => t.length > 0);
-  if (!escapedTokens.length) return safeText;
-  const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi');
-  return safeText.replace(regex, '<mark class="highlight">$1</mark>');
+  const raw = String(text);
+  if (!tokens || !tokens.length) return escapeHtml(raw);
+  const regex = highlightRegexFor(tokens);
+  if (!regex) return escapeHtml(raw);
+  // escapeHtml을 먼저 하면 &quot;, &lt; 같은 엔티티 내부 글자(t, x, quot 등)가 <mark>로 찢어진다.
+  // 원문에서 먼저 일치 구간을 나누고 각 조각을 escapeHtml 처리한다.
+  regex.lastIndex = 0;
+  let out = '';
+  let lastIdx = 0;
+  let match;
+  let hits = 0;
+  const MAX_TEXT_HIGHLIGHTS = 200;
+  while ((match = regex.exec(raw)) !== null) {
+    if (!match[0]) {
+      regex.lastIndex += 1;
+      continue;
+    }
+    if (match.index > lastIdx) {
+      out += escapeHtml(raw.slice(lastIdx, match.index));
+    }
+    out += '<mark class="highlight">' + escapeHtml(match[0]) + '</mark>';
+    lastIdx = match.index + match[0].length;
+    hits += 1;
+    if (hits >= MAX_TEXT_HIGHLIGHTS) break;
+  }
+  if (lastIdx < raw.length) {
+    out += escapeHtml(raw.slice(lastIdx));
+  }
+  return out;
 }
 
 // clean: 잘라 낸 미리보기 조각을 다듬는 함수(카드에서는 마크다운 기호를 걷어 내는 cardPreviewText).
@@ -2837,7 +2903,7 @@ function getSnippet(fullText, tokens, maxLen = 140, clean = null) {
   const lower = fullText.toLowerCase();
   let firstIdx = -1;
   for (const t of validTokens) {
-    const idx = lower.indexOf(t);
+    const idx = lower.indexOf(String(t).toLowerCase());
     if (idx !== -1 && (firstIdx === -1 || idx < firstIdx)) {
       firstIdx = idx;
     }
@@ -3566,7 +3632,10 @@ function warmSearchCache() {
       const summary = item.answer_summary || '';
       const body = item.full_markdown || item.answer_full_text || item.answer_full || item.answer_markdown || '';
       const answer = body ? `${summary} ${body}` : summary;
-      searchCache(item, 'answerNoSpace', answer, (x) => x.replace(/\s+/g, '').toLowerCase());
+      const bodyNorm = typeof searchableBodyNoSpace === 'function'
+        ? searchableBodyNoSpace
+        : (x) => String(x || '').replace(/\s+/g, '').toLowerCase();
+      searchCache(item, 'answerNoSpace', answer, bodyNorm);
     }
     if (listIdx < lists.length) setTimeout(step, 30);
   };
@@ -3882,12 +3951,33 @@ async function filterItemsFromListAsync(items, isStale) {
       if ((i & 7) === 0 && Date.now() - started >= SEARCH_SLICE_MS) break;
     }
     if (i < list.length) {
-      await new Promise(r => setTimeout(r, 0));
+      await ((typeof yieldToMain === 'function') ? yieldToMain() : new Promise(r => setTimeout(r, 0)));
       if (isStale && isStale()) return null;
     }
   }
   if (isStale && isStale()) return null;
   return sortSearchResults(results);
+}
+
+// 탭별 건수 표시용 비동기 카운터. 정렬 없이 일치 건수만 시간 조각(12ms)으로 세어 UI 멈춤을 막는다.
+async function countSearchMatchesAsync(items, prepared, isStale) {
+  const list = items || [];
+  let count = 0;
+  let i = 0;
+  while (i < list.length) {
+    const started = Date.now();
+    while (i < list.length) {
+      const item = list[i++];
+      if (matchSearchItem(item, prepared, false) >= 0) count += 1;
+      if ((i & 7) === 0 && Date.now() - started >= SEARCH_SLICE_MS) break;
+    }
+    if (i < list.length) {
+      await ((typeof yieldToMain === 'function') ? yieldToMain() : new Promise(r => setTimeout(r, 0)));
+      if (isStale && isStale()) return null;
+    }
+  }
+  if (isStale && isStale()) return null;
+  return count;
 }
 // --- System & Department Config Functions ---
 // 렌더러가 설정 원본값을 JSON으로 넣는다. 예전에는 부서명이 이미 붙은 HTML 이스케이프 제목을 넣어,
@@ -4257,7 +4347,9 @@ function openLedgerModal(item) {
 
 function closeLedgerModal() {
   hideModalDialog(document.getElementById('ledger-modal-backdrop'));
-  history.replaceState(null, null, ' ');
+  try {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch (e) {}
 }
 
 function copyLedgerDetails() {
@@ -4888,7 +4980,7 @@ async function render() {
   if (typeof hideSearchSpinner === 'function') hideSearchSpinner();
   if (filtered === null || seq !== RENDER_SEQ) return;
   if (typeof updateBodyLoadStatus === 'function') updateBodyLoadStatus();
-  if (typeof refreshSearchExtras === 'function') refreshSearchExtras(filtered);
+  if (typeof refreshSearchExtras === 'function') refreshSearchExtras(seq, filtered);
 
   document.getElementById('count-filtered').innerText = filtered.length;
   let totalCount = DOCUMENTS.length;
@@ -5119,7 +5211,7 @@ async function render() {
         card.onclick = openParent;
 
         const rawText = qa.answer_full || qa.answer_markdown || '';
-        const rawSnippet = getSnippet(highlightTokens.length ? cleanSnippetText(rawText) : cardPreviewText(rawText), highlightTokens);
+        const rawSnippet = getSnippet(snippetSourceText(rawText, highlightTokens), highlightTokens);
         const snippet = rawSnippet || (bodiesLoading() ? '<span class="snippet-loading muted">답변 내용 불러오는 중...</span>' : '');
 
         card.innerHTML = `
@@ -5179,12 +5271,34 @@ function cleanSnippetText(text, maxLen = 0) {
   return s
     .replace(/\x3c!--[\s\S]*?-->/g, ' ')
     .replace(/<\/?[a-zA-Z][a-zA-Z0-9]*\b[^>]*>/g, ' ')
-    .replace(/^\s{0,3}#{1,6}\s*/gm, '')
-    .replace(/^\s*\|?[\s:|-]*-{3,}[\s:|-]*\|?\s*$/gm, ' ')
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]*/gm, '')
+    // 줄바꿈(\n)을 먹지 않는 단일 문자클래스([ \t:|-]+)로 역추적 폭발(ReDoS)을 원천 차단한다.
+    .replace(/^[ \t:|-]+\r?$/gm, (m) => (m.indexOf('---') !== -1 ? ' ' : m))
     .replace(/\|/g, ' ')
     .replace(/(\*\*|__|`)/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function snippetSourceText(text, tokens) {
+  const s = String(text || '');
+  const valid = (tokens || []).filter(t => t && !isChoseongOnly(t));
+  if (!valid.length) return cardPreviewText(s);
+  if (s.length <= 4000) return cleanSnippetText(s);
+  const lower = s.toLowerCase();
+  let firstIdx = -1;
+  for (const t of valid) {
+    const idx = lower.indexOf(String(t).toLowerCase());
+    if (idx !== -1 && (firstIdx === -1 || idx < firstIdx)) {
+      firstIdx = idx;
+    }
+  }
+  if (firstIdx !== -1) {
+    const start = Math.max(0, firstIdx - 600);
+    const end = Math.min(s.length, firstIdx + 1400);
+    return cleanSnippetText(s.slice(start, end));
+  }
+  return cleanSnippetText(s);
 }
 
 function cardPreviewText(text) {
@@ -5249,7 +5363,8 @@ function toggleSelectAll(checked) {
 
 function clearSelection() {
   selectedDocIds.clear();
-  document.getElementById('chk-select-all').checked = false;
+  const chkAll = document.getElementById('chk-select-all');
+  if (chkAll) chkAll.checked = false;
   updateSelectionBar();
   render();
 }
@@ -5281,6 +5396,7 @@ async function printSelectedReport() {
   for (const d of DOCUMENTS.filter(x => selectedDocIds.has(x.doc_id))) {
     selectedDocs.push(await ensureDocBody(d));
   }
+  if (printWindow.closed) return;
   let html = `
     <!DOCTYPE html>
     <html>
@@ -5305,7 +5421,7 @@ async function printSelectedReport() {
   `;
 
   selectedDocs.forEach(d => {
-    let bodyHtml = safeMarkedParse(docDisplayBody(d));
+    let bodyHtml = safeMarkedParse(fixDocMediaPaths(docDisplayBody(d), d));
     html += `
       <div class="doc-entry">
         <div class="doc-header">
@@ -5437,8 +5553,11 @@ async function ensureDocBody(doc) {
 }
 
 // Modal open
+let DOC_MODAL_SEQ = 0;
 async function openDocModal(doc, targetQNum = null) {
+  const modalSeq = ++DOC_MODAL_SEQ;
   doc = await ensureDocBody(doc);
+  if (modalSeq !== DOC_MODAL_SEQ || !doc) return;
   currentSelectedDoc = doc;
   const { allHighlightTokens } = parseSearchTokens(activeFilters.query);
   const highlightTokens = allHighlightTokens || [];
@@ -5697,13 +5816,18 @@ function switchModalTab(tab) {
 
 function closeModal() {
   hideModalDialog(document.getElementById('modal-backdrop'));
-  // clear hash without jump
-  history.replaceState(null, null, ' ');
+  // clear hash without leaving trailing space (%20)
+  try {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch (e) {}
 }
 
 // Side-by-Side Compare Feature
+let COMPARE_PANE_SEQ = 0;
 function openComparePicker() {
   if (!currentSelectedDoc) return;
+  const { allHighlightTokens } = parseSearchTokens(activeFilters.query);
+  const highlightTokens = allHighlightTokens || [];
   const selectB = document.getElementById('compare-select-b');
   selectB.replaceChildren();
 
@@ -5731,7 +5855,7 @@ function openComparePicker() {
   `;
 
   enhanceTablesInElement(leftPane);
-  if (typeof highlightTokens !== 'undefined' && highlightTokens.length) {
+  if (highlightTokens.length) {
     applyDomHighlight(leftPane, highlightTokens);
   }
   updateCompareRightPane();
@@ -5739,6 +5863,7 @@ function openComparePicker() {
 }
 
 async function updateCompareRightPane() {
+  const seq = ++COMPARE_PANE_SEQ;
   const selectB = document.getElementById('compare-select-b');
   const docBId = selectB.value;
   const found = DOCUMENTS.find(d => d.doc_id === docBId);
@@ -5748,6 +5873,9 @@ async function updateCompareRightPane() {
     return;
   }
   const docB = await ensureDocBody(found);
+  if (seq !== COMPARE_PANE_SEQ) return;
+  const { allHighlightTokens } = parseSearchTokens(activeFilters.query);
+  const highlightTokens = allHighlightTokens || [];
   rightPane.innerHTML = `
     <div class="compare-pane-header">
       <div class="side">고른 답변서</div>
@@ -5757,7 +5885,7 @@ async function updateCompareRightPane() {
     <div class="modal-rendered-view">${safeMarkedParse(fixDocMediaPaths(docDisplayBody(docB), docB))}</div>
   `;
   enhanceTablesInElement(rightPane);
-  if (typeof highlightTokens !== 'undefined' && highlightTokens.length) {
+  if (highlightTokens.length) {
     applyDomHighlight(rightPane, highlightTokens);
   }
 }
@@ -5876,15 +6004,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
-  document.getElementById('modal-backdrop').addEventListener('click', (e) => {
-    if (e.target.id === 'modal-backdrop') closeModal();
-  });
-  document.getElementById('compare-backdrop').addEventListener('click', (e) => {
-    if (e.target.id === 'compare-backdrop') closeCompareModal();
-  });
   // 읽기만 하는 창은 바깥(어두운 부분)을 눌러도 닫힌다. 입력 폼(등록·수정)은 실수로 닫히지 않게 뺀다.
   // 창 안에서 글자를 끌어 선택하다가 바깥에서 손을 떼는 경우는 닫지 않는다(누른 곳도 바깥이어야 한다).
-  [['ledger-modal-backdrop', () => closeLedgerModal()],
+  [['modal-backdrop', () => closeModal()],
+    ['compare-backdrop', () => closeCompareModal()],
+    ['ledger-modal-backdrop', () => closeLedgerModal()],
     ['quarantine-modal-backdrop', () => closeQuarantineModal()],
     ['config-modal-backdrop', () => closeConfigModal()]].forEach(([id, close]) => {
     const bd = document.getElementById(id);
@@ -6437,70 +6561,107 @@ function hasActiveSearch() {
     || (f.due && f.due !== 'ALL') || f.tablesOnly || f.onlyFavorites);
 }
 
-// 탭별 건수 계산 차례. 새 검색이 시작되면 하던 계산은 버린다.
-let SEARCH_EXTRAS_SEQ = 0;
-
-// 같은 matchSearchItem으로 목록을 시간 조각(약 12ms)으로 나눠 평가한다(불변조건 51 — 결과 일치).
-// 예전에는 렌더할 때마다 네 목록을 한 번에 동기로 다시 훑어, 시간 조각으로 나눈 화면 검색의
-// 이득을 이 계산이 다 까먹었다(문서가 많으면 입력이 멈췄다).
-async function collectMatchesAsync(items, prepared, isStale) {
-  const out = [];
-  const list = items || [];
-  let i = 0;
-  while (i < list.length) {
-    const started = Date.now();
-    while (i < list.length) {
-      if (matchSearchItem(list[i], prepared, false) >= 0) out.push(list[i]);
-      i += 1;
-      if ((i & 7) === 0 && Date.now() - started >= 12) break;
-    }
-    if (i < list.length) {
-      await new Promise(r => setTimeout(r, 0));
-      if (isStale()) return null;
-    }
-  }
-  return out;
-}
-
-async function refreshTabCounts(currentFiltered, setTab) {
-  const seq = ++SEARCH_EXTRAS_SEQ;
-  const isStale = () => seq !== SEARCH_EXTRAS_SEQ;
-  // 결과 목록을 먼저 그리고 나서 센다.
-  await new Promise(r => setTimeout(r, 0));
-  if (isStale()) return;
-  const prepared = prepareSearchQuery(activeFilters.query);
-  const mode = (typeof currentMode !== 'undefined') ? currentMode : 'docs';
-  const reuse = (m) => (mode === m && Array.isArray(currentFiltered)) ? currentFiltered : null;
-  try {
-    // '표 있는 답변서' = 답변서 가운데 표가 있는 것. 같은 조건이므로 답변서 결과에서 바로 센다.
-    const docs = reuse('docs') || await collectMatchesAsync(DOCUMENTS, prepared, isStale);
-    if (docs === null || isStale()) return;
-    setTab('tab-count-docs', docs.length);
-    const tables = docs.filter(d => d && d.has_tables === 'Y').length;
-    setTab('tab-count-tables', tables);
-    const ledger = reuse('ledger') || await collectMatchesAsync(REQUEST_LEDGER, prepared, isStale);
-    if (ledger === null || isStale()) return;
-    setTab('tab-count-ledger', ledger.length);
-    const qas = reuse('qa') || await collectMatchesAsync(QA_ITEMS, prepared, isStale);
-    if (qas === null || isStale()) return;
-    setTab('tab-count-qa', qas.length);
-    SEARCH_TAB_COUNTS = { docs: docs.length, qa: qas.length, tables, ledger: ledger.length };
-    renderEmptyJumps();
-  } catch (e) { /* 본문 로딩 중 실패하면 예전 값을 둔다 */ }
-}
-
-function refreshSearchExtras(currentFiltered) {
+function refreshSearchExtras(seq, precomputedFiltered) {
   if (!_UXD) return;
-  const show = hasActiveSearch() && (typeof matchSearchItem === 'function');
+  const show = hasActiveSearch() && (typeof filterItemsFromList === 'function');
   const setTab = (id, v) => {
     const el = _UXD.getElementById(id);
     if (el) el.textContent = show ? ` · ${v}건` : '';
   };
   if (show) {
-    SEARCH_TAB_COUNTS = null;
-    refreshTabCounts(currentFiltered, setTab);
+    const mode = (typeof currentMode !== 'undefined') ? currentMode : 'docs';
+    const isStale = () => (typeof RENDER_SEQ !== 'undefined' && seq != null && seq !== RENDER_SEQ);
+
+    if (typeof countSearchMatchesAsync === 'function' && typeof prepareSearchQuery === 'function') {
+      (async () => {
+        let prepared;
+        try {
+          prepared = prepareSearchQuery(activeFilters.query);
+        } catch (e) {
+          return;
+        }
+        let docs = null;
+        let tables = null;
+        let qas = null;
+        let ledger = null;
+        const pre = Array.isArray(precomputedFiltered) ? precomputedFiltered : null;
+        if (pre) {
+          if (mode === 'docs') {
+            docs = pre.length;
+            tables = pre.filter(d => d && d.has_tables === 'Y').length;
+          } else if (mode === 'tables') {
+            tables = pre.length;
+          } else if (mode === 'qa') {
+            qas = pre.length;
+          } else if (mode === 'ledger') {
+            ledger = pre.length;
+          }
+        }
+        try {
+          if (docs === null) {
+            let docCount = 0;
+            let tableCount = 0;
+            const list = (typeof DOCUMENTS !== 'undefined' && DOCUMENTS) || [];
+            let i = 0;
+            const sliceMs = (typeof SEARCH_SLICE_MS === 'number') ? SEARCH_SLICE_MS : 12;
+            while (i < list.length) {
+              const started = Date.now();
+              while (i < list.length) {
+                const d = list[i++];
+                if (matchSearchItem(d, prepared, false) >= 0) {
+                  docCount += 1;
+                  if (d && d.has_tables === 'Y') tableCount += 1;
+                }
+                if ((i & 7) === 0 && Date.now() - started >= sliceMs) break;
+              }
+              if (i < list.length) {
+                await ((typeof yieldToMain === 'function') ? yieldToMain() : new Promise(r => setTimeout(r, 0)));
+                if (isStale()) return;
+              }
+            }
+            if (isStale()) return;
+            docs = docCount;
+            if (tables === null) tables = tableCount;
+          }
+          if (qas === null) {
+            qas = await countSearchMatchesAsync((typeof QA_ITEMS !== 'undefined' && QA_ITEMS) || [], prepared, isStale);
+            if (qas === null || isStale()) return;
+          }
+          if (ledger === null) {
+            ledger = await countSearchMatchesAsync((typeof REQUEST_LEDGER !== 'undefined' && REQUEST_LEDGER) || [], prepared, isStale);
+            if (ledger === null || isStale()) return;
+          }
+        } catch (e) {
+          return;
+        }
+        if (isStale()) return;
+        setTab('tab-count-docs', docs);
+        setTab('tab-count-qa', qas);
+        setTab('tab-count-tables', tables);
+        setTab('tab-count-ledger', ledger);
+        SEARCH_TAB_COUNTS = { docs, qa: qas, tables, ledger };
+        try { renderEmptyJumps(); } catch (e) {}
+      })();
+    } else {
+      // 폴백 (단위 테스트 등)
+      let docs = 0;
+      let qas = 0;
+      let ledger = 0;
+      let tables = 0;
+      try {
+        const docHits = filterItemsFromList(DOCUMENTS, false);
+        docs = docHits.length;
+        tables = docHits.filter(d => d && d.has_tables === 'Y').length;
+        qas = filterItemsFromList(QA_ITEMS, false).length;
+        ledger = filterItemsFromList(REQUEST_LEDGER, false).length;
+      } catch (e) { /* 본문 로딩 중 실패하면 0건으로 둔다 */ }
+      setTab('tab-count-docs', docs);
+      setTab('tab-count-qa', qas);
+      setTab('tab-count-tables', tables);
+      setTab('tab-count-ledger', ledger);
+      SEARCH_TAB_COUNTS = { docs, qa: qas, tables, ledger };
+    }
   } else {
-    SEARCH_EXTRAS_SEQ += 1;
     ['tab-count-docs', 'tab-count-qa', 'tab-count-tables', 'tab-count-ledger'].forEach(id => setTab(id, ''));
     SEARCH_TAB_COUNTS = null;
   }

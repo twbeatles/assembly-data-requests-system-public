@@ -27,6 +27,14 @@ function bodiesLoading() {
   return BODY_CHUNKS_TOTAL > 0 && BODY_CHUNKS_LOADED < BODY_CHUNKS_TOTAL;
 }
 
+// 50ms 넘는 작업을 나눌 때 scheduler.yield()로 입력·그리기를 우선 처리하고, 미지원 환경은 setTimeout으로 양보한다.
+function yieldToMain() {
+  if (typeof scheduler !== 'undefined' && typeof scheduler.yield === 'function') {
+    return scheduler.yield();
+  }
+  return new Promise(r => setTimeout(r, 0));
+}
+
 // `am_ref`(부모 본문 안의 [시작, 길이], 파이썬 코드포인트 단위)를 문자열로 되살리는 함수를 만든다.
 // 문서 하나에 Q&A가 수십 개라도 본문 분석은 한 번만 한다. 예전에는 Q&A마다 본문 전체를
 // `Array.from`으로 풀어 문서가 클수록 부팅이 느렸고 임시 배열이 메모리를 크게 썼다.
@@ -145,7 +153,7 @@ async function loadDeferredBodies() {
     if (BODY_CHUNKS_LOADED === 1 && isQaMode && !hasQuery && typeof render === 'function') {
       render();
     }
-    await new Promise(r => setTimeout(r, 0));
+    await yieldToMain();
   }
   BODY_CHUNKS_LOADED = BODY_CHUNKS_TOTAL;
   DOCUMENTS.forEach(d => {
@@ -172,7 +180,7 @@ async function loadAndDecompressDatabase() {
   BODY_CHUNKS_TOTAL = Number(DB.body_chunks || 0);
   BODY_CHUNKS_LOADED = 0;
   if (BODY_CHUNKS_TOTAL > 0) {
-    BODIES_READY = new Promise(resolve => { resolveBodiesReady = resolve; });
+    ({ promise: BODIES_READY, resolve: resolveBodiesReady } = Promise.withResolvers());
   }
 
   // If running in web server mode (HTTP/HTTPS), fetch latest live records from server SQLite DB

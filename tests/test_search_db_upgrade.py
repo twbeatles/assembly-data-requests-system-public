@@ -1026,5 +1026,30 @@ class DashboardPayloadTests(unittest.TestCase):
             )
 
 
+class SearchParityAndSuggestTests(unittest.TestCase):
+    def test_row_matches_expands_synonyms_after_stripping_particle(self):
+        """조사 제거 후 어간 동의어('심의위는' -> '대외심의위원회')도 일치해야 한다."""
+        plan = parse_query("심의위는")
+        self.assertTrue(
+            row_matches(plan, ["대외심의위원회 심의 결과"], use_synonyms=True)
+        )
+
+    def test_make_snippet_uses_synonym_position(self):
+        """동의어 검색 시 스니펫이 동의어 일치 위치를 중심으로 잘려야 한다."""
+        body = ("가나다라 " * 120) + "여기에 엑스(구 트위터) 관련 조치 내용 있음"
+        tmp = Path(tempfile.mkdtemp(prefix="snip_syn_"))
+        try:
+            db = tmp / "data_requests.db"
+            _seed(db)
+            svc = LedgerService(db_path=db, json_path=tmp / "d.json", base_dir=tmp)
+            snip = svc._make_snippet(parse_query("트위터"), body, use_synonyms=True)
+            self.assertIn("엑스", snip)
+            self.assertEqual(svc.suggest("%"), [])
+            self.assertEqual(svc.suggest("___"), [])
+        finally:
+            LedgerService.wait_last_sync(3)
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()

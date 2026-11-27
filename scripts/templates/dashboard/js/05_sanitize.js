@@ -108,17 +108,23 @@ function looseTokenPattern(token) {
 }
 
 function applyDomHighlight(element, tokens) {
-  if (!tokens || !tokens.length) return;
-  const validTokens = tokens.filter(t => t && !isChoseongOnly(t));
+  if (!element || !tokens || !tokens.length) return;
+  const validTokens = Array.from(new Set(tokens.filter(t => t && !isChoseongOnly(t))))
+    .sort((a, b) => b.length - a.length);
   if (!validTokens.length) return;
   const escapedTokens = validTokens.map(looseTokenPattern).filter(t => t.length > 0);
   if (!escapedTokens.length) return;
   const pattern = `(${escapedTokens.join('|')})`;
   // split용(g)과 판정용(g 없음)을 나눈다. g 플래그 정규식에 test()를 반복 호출하면 lastIndex가
   // 누적돼 결과가 번갈아 바뀌고, 강조가 문단마다 빠지거나 엉뚱한 조각에 붙었다. (감사 R4-12)
-  const splitRegex = new RegExp(pattern, 'gi');
-  const matchRegex = new RegExp(pattern, 'i');
-  const exactRegex = new RegExp(`^${pattern}$`, 'i');
+  let splitRegex, matchRegex, exactRegex;
+  try {
+    splitRegex = new RegExp(pattern, 'gi');
+    matchRegex = new RegExp(pattern, 'i');
+    exactRegex = new RegExp(`^${pattern}$`, 'i');
+  } catch (e) {
+    return;
+  }
 
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
   const textNodes = [];
@@ -131,51 +137,88 @@ function applyDomHighlight(element, tokens) {
     }
   }
 
-  textNodes.forEach(textNode => {
+  // 대용량 문서에서 1글자 검색어(예: '1', 'x')로 수만 개 <mark> 노드가 생성돼 브라우저가 멈추는 것을 막는다.
+  const MAX_DOM_HIGHLIGHTS = 1500;
+  let totalHighlights = 0;
+  for (const textNode of textNodes) {
+    if (totalHighlights >= MAX_DOM_HIGHLIGHTS) break;
     const parent = textNode.parentNode;
     if (parent && parent.nodeName !== 'MARK' && parent.nodeName !== 'SCRIPT' && parent.nodeName !== 'STYLE' && !(parent.closest && parent.closest('.table-wrapper-header'))) {
       const frag = document.createDocumentFragment();
       const parts = textNode.nodeValue.split(splitRegex);
-      parts.forEach(part => {
-        if (part && exactRegex.test(part)) {
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (!part) continue;
+        if (totalHighlights < MAX_DOM_HIGHLIGHTS && exactRegex.test(part)) {
           const mark = document.createElement('mark');
           mark.className = 'highlight';
           mark.textContent = part;
           frag.appendChild(mark);
-        } else if (part) {
+          totalHighlights += 1;
+        } else {
           frag.appendChild(document.createTextNode(part));
         }
-      });
+      }
       parent.replaceChild(frag, textNode);
     }
-  });
+  }
 }
 
 let __highlightRegexCache = { key: null, regex: null };
 function highlightRegexFor(tokens) {
-  const validTokens = (tokens || []).filter(t => t && !isChoseongOnly(t));
+  const validTokens = Array.from(new Set((tokens || []).filter(t => t && !isChoseongOnly(t))))
+    .sort((a, b) => b.length - a.length);
   if (!validTokens.length) return null;
-  const escapedTokens = validTokens.map(looseTokenPattern).filter(t => t.length > 0);
+  // 단독 추출 테스트에서도 동작하도록 느슨 이스케이프를 내장한다(looseTokenPattern과 동일 로직).
+  const loose = (token) => {
+    const t = String(token || '');
+    const esc = (c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (t.length < 2 || t.length > 30 || /\s/.test(t)) return esc(t);
+    return Array.from(t).map(esc).join('\\s*');
+  };
+  const escapedTokens = validTokens.map(loose).filter(t => t.length > 0);
   if (!escapedTokens.length) return null;
   const key = escapedTokens.join('');
   if (__highlightRegexCache.key === key && __highlightRegexCache.regex) return __highlightRegexCache.regex;
-  const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi');
-  __highlightRegexCache = { key, regex };
-  return regex;
+  try {
+    const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi');
+    __highlightRegexCache = { key, regex };
+    return regex;
+  } catch (e) {
+    return null;
+  }
 }
 function highlightTextString(text, tokens) {
   if (!text) return '';
-  const safeText = escapeHtml(text);
-  if (!tokens || !tokens.length) return safeText;
-  const cachedHl = highlightRegexFor(tokens);
-  if (cachedHl) return safeText.replace(cachedHl, '<mark class="highlight">$1</mark>');
-  // 아래는 유효 토큰이 없어 캐시가 null인 경우의 폴백으로, 항상 safeText를 돌려준다.
-  const validTokens = tokens.filter(t => t && !isChoseongOnly(t));
-  if (!validTokens.length) return safeText;
-  const escapedTokens = validTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).filter(t => t.length > 0);
-  if (!escapedTokens.length) return safeText;
-  const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi');
-  return safeText.replace(regex, '<mark class="highlight">$1</mark>');
+  const raw = String(text);
+  if (!tokens || !tokens.length) return escapeHtml(raw);
+  const regex = highlightRegexFor(tokens);
+  if (!regex) return escapeHtml(raw);
+  // escapeHtml을 먼저 하면 &quot;, &lt; 같은 엔티티 내부 글자(t, x, quot 등)가 <mark>로 찢어진다.
+  // 원문에서 먼저 일치 구간을 나누고 각 조각을 escapeHtml 처리한다.
+  regex.lastIndex = 0;
+  let out = '';
+  let lastIdx = 0;
+  let match;
+  let hits = 0;
+  const MAX_TEXT_HIGHLIGHTS = 200;
+  while ((match = regex.exec(raw)) !== null) {
+    if (!match[0]) {
+      regex.lastIndex += 1;
+      continue;
+    }
+    if (match.index > lastIdx) {
+      out += escapeHtml(raw.slice(lastIdx, match.index));
+    }
+    out += '<mark class="highlight">' + escapeHtml(match[0]) + '</mark>';
+    lastIdx = match.index + match[0].length;
+    hits += 1;
+    if (hits >= MAX_TEXT_HIGHLIGHTS) break;
+  }
+  if (lastIdx < raw.length) {
+    out += escapeHtml(raw.slice(lastIdx));
+  }
+  return out;
 }
 
 // clean: 잘라 낸 미리보기 조각을 다듬는 함수(카드에서는 마크다운 기호를 걷어 내는 cardPreviewText).
@@ -190,7 +233,7 @@ function getSnippet(fullText, tokens, maxLen = 140, clean = null) {
   const lower = fullText.toLowerCase();
   let firstIdx = -1;
   for (const t of validTokens) {
-    const idx = lower.indexOf(t);
+    const idx = lower.indexOf(String(t).toLowerCase());
     if (idx !== -1 && (firstIdx === -1 || idx < firstIdx)) {
       firstIdx = idx;
     }

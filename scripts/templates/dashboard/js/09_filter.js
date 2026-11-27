@@ -307,10 +307,31 @@ async function filterItemsFromListAsync(items, isStale) {
       if ((i & 7) === 0 && Date.now() - started >= SEARCH_SLICE_MS) break;
     }
     if (i < list.length) {
-      await new Promise(r => setTimeout(r, 0));
+      await ((typeof yieldToMain === 'function') ? yieldToMain() : new Promise(r => setTimeout(r, 0)));
       if (isStale && isStale()) return null;
     }
   }
   if (isStale && isStale()) return null;
   return sortSearchResults(results);
+}
+
+// 탭별 건수 표시용 비동기 카운터. 정렬 없이 일치 건수만 시간 조각(12ms)으로 세어 UI 멈춤을 막는다.
+async function countSearchMatchesAsync(items, prepared, isStale) {
+  const list = items || [];
+  let count = 0;
+  let i = 0;
+  while (i < list.length) {
+    const started = Date.now();
+    while (i < list.length) {
+      const item = list[i++];
+      if (matchSearchItem(item, prepared, false) >= 0) count += 1;
+      if ((i & 7) === 0 && Date.now() - started >= SEARCH_SLICE_MS) break;
+    }
+    if (i < list.length) {
+      await ((typeof yieldToMain === 'function') ? yieldToMain() : new Promise(r => setTimeout(r, 0)));
+      if (isStale && isStale()) return null;
+    }
+  }
+  if (isStale && isStale()) return null;
+  return count;
 }

@@ -447,7 +447,19 @@ class LedgerService:
         for terms in plan.get("groups") or ():
             for t in terms:
                 if not re.fullmatch(r"[ㄱ-ㅎ]+", t):
-                    needles.append(t.lower())
+                    low_t = t.lower()
+                    stem_t = strip_particle(low_t)
+                    needles.append(low_t)
+                    if stem_t and stem_t != low_t:
+                        needles.append(stem_t)
+                    if use_synonyms:
+                        for v in _expand_terms(low_t, True):
+                            if v.lower() not in needles:
+                                needles.append(v.lower())
+                        if stem_t and stem_t != low_t:
+                            for v in _expand_terms(stem_t, True):
+                                if v.lower() not in needles:
+                                    needles.append(v.lower())
         hit = -1
         for n in needles:
             if not n:
@@ -934,11 +946,12 @@ class LedgerService:
         오타가 줄면 0건 검색도 줄어든다. 본문은 후보로 쓰지 않는다(가짓수가 너무 많다).
         """
         prefix = str(prefix or "").strip()
-        if len(prefix) < 1:
+        clean_prefix = prefix.replace("%", "").replace("_", "").strip()
+        if len(clean_prefix) < 1:
             return []
         self._ensure_schema()
-        like = prefix.replace("%", "").replace("_", "") + "%"
-        contains = "%" + prefix.replace("%", "").replace("_", "") + "%"
+        like = clean_prefix + "%"
+        contains = "%" + clean_prefix + "%"
         sources = (
             ("requester", "request_ledger", "요구자"),
             ("party", "request_ledger", "정당"),

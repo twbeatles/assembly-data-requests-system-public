@@ -15,7 +15,7 @@ import threading
 import webbrowser
 from pathlib import Path
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 cast(Any, sys.stdout).reconfigure(encoding="utf-8")
 
@@ -349,7 +349,7 @@ class RequestLedgerHandler(
             return
 
         if path.startswith("/api/ledger/"):
-            ledger_id = path.replace("/api/ledger/", "").strip()
+            ledger_id = unquote(path[len("/api/ledger/") :]).strip()
             data = self.read_json_body()
             if not isinstance(data, dict) or not data:
                 code = getattr(self, "_last_body_status", 400)
@@ -395,7 +395,7 @@ class RequestLedgerHandler(
             return
 
         if path.startswith("/api/ledger/"):
-            ledger_id = path.replace("/api/ledger/", "").strip()
+            ledger_id = unquote(path[len("/api/ledger/") :]).strip()
             result = self.delete_ledger_item(ledger_id)
             self.send_json_response(result, status_code=status_for_result(result))
             return

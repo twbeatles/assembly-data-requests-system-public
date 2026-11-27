@@ -22,9 +22,12 @@ def _term_matches(
     lower = term.lower()
     if re.fullmatch(r"[ㄱ-ㅎ]+", lower):
         return lower in choseong_blob
-    variants = {lower, strip_particle(lower)}
+    stem = strip_particle(lower)
+    variants = {lower, stem}
     if use_synonyms:
         variants.update(_expand_terms(lower, True))
+        if stem and stem != lower:
+            variants.update(_expand_terms(stem, True))
     return any(v and _nospace_lower(v) in blob_nospace for v in variants)
 
 
@@ -122,9 +125,12 @@ def row_matches(
                     " ".join(get_choseong(c) for c in choseong_texts)
                 )
             return lower in choseong_blob
-        variants = {lower, strip_particle(lower)}
+        stem = strip_particle(lower)
+        variants = {lower, stem}
         if use_synonyms:
             variants.update(_expand_terms(lower, True))
+            if stem and stem != lower:
+                variants.update(_expand_terms(stem, True))
         return any(_any_field_has(_nospace_lower(v)) for v in variants if v)
 
     return any(all(_term_hit(t) for t in terms) for terms in plan["groups"])
